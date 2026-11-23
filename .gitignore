@@ -1,0 +1,21 @@
+# מערכת הפעלה
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# קבצים זמניים של Office
+~$*
+*.tmp
+*.bak
+
+# עורכים
+.vscode/
+.idea/
+*.swp
+
+# סודות ומשתני סביבה
+.env
+.env.*
+*.key
+*.pem
+credentials*.json
