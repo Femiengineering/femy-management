@@ -1,8 +1,10 @@
 // Service worker: lets the app open without a network connection.
-const CACHE = 'femy-v4';
+const CACHE = 'femy-v5';
 const ASSETS = [
   './',
   './index.html',
+  './firebase-config.js',
+  './cloud.js',
   './manifest.webmanifest',
   './docs/logo.png',
   './docs/letterhead.jpg',
@@ -26,17 +28,23 @@ self.addEventListener('activate', (e) => {
 });
 
 // Network first, so updates show up right away; fall back to the cache offline.
+// Besides the site itself, only the Firebase library files are cached. Everything
+// else (sign-in, database, Drive, Claude) goes straight to the network.
+const FIREBASE_SDK = 'https://www.gstatic.com/firebasejs/';
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const url = e.request.url;
+  const own = new URL(url).origin === location.origin;
+  if (!own && !url.startsWith(FIREBASE_SDK)) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        if (res.ok && new URL(e.request.url).origin === location.origin) {
+        if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(e.request, copy));
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
+      .catch(() => caches.match(e.request).then((r) => r || (own && e.request.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
   );
 });

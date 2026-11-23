@@ -1,0 +1,35 @@
+rules_version = '2';
+// כללי האבטחה של מסד הנתונים. מעתיקים לקונסולת Firebase: Firestore Database, Rules.
+// לפני ההעתקה: מחליפים את manager@example.com בכתובת של מנהל המערכת (באותיות קטנות),
+// בדיוק כמו ב-admins שבקובץ firebase-config.js.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function admins() { return ['manager@example.com']; }
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function memberPath(org) { return /databases/$(database)/documents/orgs/$(org)/members/$(myEmail()); }
+    function isAdmin(org) {
+      return signedIn() && (myEmail() in admins()
+        || (exists(memberPath(org)) && get(memberPath(org)).data.role == 'admin'));
+    }
+    function isMember(org) { return signedIn() && (myEmail() in admins() || exists(memberPath(org))); }
+
+    // Company data: only approved members can read or write.
+    match /orgs/{org}/{col}/{id} {
+      allow read, write: if col != 'members' && isMember(org);
+    }
+    // Member list: everyone can check their own entry, members see the list, admins change it.
+    match /orgs/{org}/members/{email} {
+      allow read: if (signedIn() && email == myEmail()) || isMember(org);
+      allow write: if isAdmin(org);
+    }
+    // Private profile (Claude API key): only the user themselves.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

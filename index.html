@@ -278,6 +278,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
 .settings p { color: var(--muted); margin-top: 0; }
 .settings .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.settings select.input { max-width: 100%; min-width: 0; width: 100%; }
 
 .overlay { display: none; }
 
@@ -334,6 +335,36 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .ai-suggest button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
 @media (max-width: 800px) { .ai-fab { left: 16px; bottom: 16px; } .ai-panel { left: 16px; right: 16px; width: auto; bottom: 80px; height: calc(100vh - 110px); } }
 @media print { .ai-fab, .ai-panel { display: none !important; } }
+
+/* Sign-in and cloud */
+.auth-gate { position: fixed; inset: 0; z-index: 100; background: var(--sidebar); display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; }
+.auth-gate[hidden] { display: none; }
+.auth-card { background: var(--surface); border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgba(0,0,0,.35); text-align: center; }
+.auth-logo { max-width: 200px; width: 70%; margin: 0 auto 6px; display: block; }
+.auth-card h2 { margin: 4px 0 18px; font-size: 18px; color: var(--muted); font-weight: 600; }
+.auth-card p { color: var(--muted); font-size: 14.5px; line-height: 1.55; margin: 0 0 14px; }
+.auth-card .input { width: 100%; margin-bottom: 10px; }
+.auth-card .btn { width: 100%; justify-content: center; margin-bottom: 8px; min-height: 44px; }
+.auth-or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin: 14px 0; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+.auth-links { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.auth-links button { background: none; border: 0; color: var(--primary); cursor: pointer; font: inherit; padding: 4px 0; }
+.auth-err { color: var(--red); font-size: 13.5px; min-height: 18px; margin-bottom: 6px; }
+.g-btn { background: #fff; border: 1px solid #c8cfd8; font-weight: 600; gap: 10px; }
+.user-box { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; gap: 10px; }
+.user-box img, .user-box .av { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.user-box .who { flex: 1; min-width: 0; font-size: 13px; line-height: 1.3; }
+.user-box .who b { color: #fff; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-box .who span { opacity: .65; font-size: 12px; }
+.user-box button { background: none; border: 1px solid rgba(255,255,255,.2); color: var(--sidebar-text); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: inherit; font-size: 12px; }
+.member-list { list-style: none; padding: 0; margin: 0 0 12px; border: 1px solid var(--border); border-radius: 10px; }
+.member-list li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.member-list li:first-child { border-top: 0; }
+.member-list .em { flex: 1; min-width: 160px; direction: ltr; text-align: right; overflow-wrap: anywhere; }
+.drive-files { list-style: none; padding: 0; margin: 8px 0 0; font-size: 14px; }
+.drive-files li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.drive-files li a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.drive-files small { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -351,7 +382,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <a href="#protocols" data-view="protocols"><span class="ico">📝</span>פרוטוקולים</a>
         <a href="#settings" data-view="settings"><span class="ico">⚙️</span>הגדרות וגיבוי</a>
       </nav>
-      <div class="sidebar-foot">הנתונים נשמרים במכשיר זה</div>
+      <div class="sidebar-foot" id="sidebarFoot">הנתונים נשמרים במכשיר זה</div>
+      <div class="user-box" id="userBox" style="display:none"></div>
     </aside>
     <div class="overlay" id="overlay"></div>
 
@@ -383,6 +415,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     </form>
   </div>
 
+  <div class="auth-gate" id="authGate" hidden>
+    <div class="auth-card">
+      <img src="docs/logo.png" class="auth-logo" alt="פמי הנדסה בע״מ">
+      <h2>מערכת ניהול ומעקב</h2>
+      <div id="authBody"></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <button class="ai-fab" id="aiFab" title="עוזר Claude" aria-label="עוזר Claude">✨</button>
   <div class="ai-panel" id="aiPanel" role="dialog" aria-label="עוזר Claude">
@@ -393,9 +433,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     </div>
     <form class="ai-form" id="aiForm"><textarea class="input" id="aiInput" placeholder="שאלה או בקשה..."></textarea><button class="btn primary" type="submit">שליחה</button></form>
   </div>
+  <script src="firebase-config.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
- * כל הנתונים נשמרים בדפדפן (localStorage). אין שרת.
+ * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
+ * מצב ענן (כשמוגדר firebase-config.js): התחברות, ונתונים משותפים ב-Firestore דרך cloud.js.
  */
 (function () {
   'use strict';
@@ -468,7 +510,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const VAT = 0.18;
 
   // ---------- Data ----------
-  let db = load();
+  const CLOUD = !!(window.FEMY_FIREBASE && window.FEMY_FIREBASE.apiKey);
+  let cloud = null; // the cloud.js module, once loaded
+  let me = null; // signed-in user { uid, email, name, photo, role }
+  let profile = {}; // the user's private profile (Claude key)
+  const isAdmin = () => !CLOUD || (me && me.role === 'admin');
+  let db = CLOUD ? emptyDb() : load();
 
   function emptyDb() { return { projects: [], tasks: [], invoices: [], protocols: [], settings: {}, demo: false }; }
   const settings = () => (db.settings = db.settings || {});
@@ -484,8 +531,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     return demoData();
   }
   function save() {
+    if (CLOUD) { if (cloud && me) cloud.push(db).catch(() => {}); return; }
     try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
     catch (e) { toast('שמירה נכשלה: האחסון בדפדפן אינו זמין'); }
+  }
+  // Data saved in this browser before the move to the cloud (not the demo data).
+  function localLegacy() {
+    try { const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); return d && !d.demo && (d.tasks || []).length + (d.projects || []).length + (d.protocols || []).length + (d.invoices || []).length ? d : null; } catch (e) { return null; }
   }
 
   function demoData() {
@@ -962,6 +1014,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
               <button class="btn sm" data-mail>✉️ שליחה במייל</button>
               <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
               <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
+              ${CLOUD ? '<button class="btn sm" data-drive>☁️ שמירה ב-Google Drive</button>' : ''}
+              ${CLOUD && pr.driveLink ? `<a class="btn sm" href="${esc(pr.driveLink)}" target="_blank" rel="noopener">פתיחה ב-Drive</a>` : ''}
             </div>
           </div></div>`;
       }).join('') || '<div class="card empty">אין פרוטוקולים. לחצו על "פרוטוקול חדש" כדי לתעד ישיבה.</div>'}</div>`;
@@ -973,6 +1027,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('[data-word]', c).addEventListener('click', () => exportProtocolWord(pr));
       $('[data-pdf]', c).addEventListener('click', () => exportProtocolPdf(pr));
       $('[data-mail]', c).addEventListener('click', () => emailProtocol(pr));
+      const dv = $('[data-drive]', c);
+      if (dv) dv.addEventListener('click', () => saveProtocolToDrive(pr));
       const mk = $('[data-mktasks]', c);
       if (mk) mk.addEventListener('click', () => {
         const items = lines(pr.actions);
@@ -1085,9 +1141,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const ind = o.indent ? '<w:ind w:start="360" w:hanging="360"/>' : '';
     return `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${bdr}<w:bidi/><w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 100 : o.after}"/>${ind}</w:pPr>${runs}</w:p>`;
   }
-  async function exportProtocolWord(pr) {
-    try {
-      toast('מכין קובץ Word...');
+  async function buildProtocolDocx(pr) {
       const [JSZip, tpl] = await Promise.all([loadJSZip(), fetch('docs/blank-template.docx').then((r) => { if (!r.ok) throw new Error('template'); return r.arrayBuffer(); })]);
       const zip = await JSZip.loadAsync(tpl);
       const docXml = await zip.file('word/document.xml').async('string');
@@ -1103,8 +1157,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const i2 = docXml.indexOf('<w:sectPr');
       if (i1 < 8 || i2 < 0) throw new Error('template structure');
       zip.file('word/document.xml', docXml.slice(0, i1) + body + docXml.slice(i2));
-      const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-      downloadBlob(protoFileName(pr, 'docx'), blob);
+      return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  }
+  async function exportProtocolWord(pr) {
+    try {
+      toast('מכין קובץ Word...');
+      downloadBlob(protoFileName(pr, 'docx'), await buildProtocolDocx(pr));
     } catch (e) {
       toast(navigator.onLine === false ? 'אין חיבור לרשת. ייצוא ל-Word דורש חיבור בפעם הראשונה' : 'ייצוא ל-Word נכשל');
     }
@@ -1129,6 +1187,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (body.length > 6000) body = body.slice(0, 6000) + '\n...\n(הפרוטוקול קוצר. את הגרסה המלאה אפשר לצרף כקובץ Word או PDF מהמערכת)';
     const to = cleanEmails(st.emailTo), cc = cleanEmails(st.emailCc);
     let url;
+    if (CLOUD && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
     if (st.mailApp === 'mailto') {
       const q = [cc && 'cc=' + encodeURIComponent(cc), 'subject=' + encodeURIComponent(subject), 'body=' + encodeURIComponent(body)].filter(Boolean).join('&');
       url = 'mailto:' + to + '?' + q;
@@ -1144,11 +1203,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Claude assistant ----------
-  // The API key is stored only in this browser (never in GitHub or in backup files).
+  // Local mode: the API key stays in this browser. Cloud mode: in the user's private
+  // profile in Firestore, which only that user can read. Never in GitHub or backup files.
   const AI_KEY = 'femy-claude-key';
   const AI_MODEL = 'claude-haiku-5-5';
   const AI_SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.6.0/+esm';
-  const getAiKey = () => { try { return localStorage.getItem(AI_KEY) || ''; } catch (e) { return ''; } };
+  const getAiKey = () => { if (CLOUD) return profile.claudeKey || ''; try { return localStorage.getItem(AI_KEY) || ''; } catch (e) { return ''; } };
+  async function setAiKey(v) {
+    if (CLOUD) { await cloud.setProfile({ claudeKey: v }); profile.claudeKey = v; return; }
+    if (v) localStorage.setItem(AI_KEY, v); else localStorage.removeItem(AI_KEY);
+  }
   let aiHistory = [];
   let aiBusy = false;
   let aiClient = null;
@@ -1312,13 +1376,248 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $$('#aiSuggest button').forEach((b) => b.addEventListener('click', () => aiSend(b.textContent)));
   }
 
+  // ---------- Cloud: sign-in, sync, Drive, Gmail ----------
+  const gErr = (e) => {
+    const c = (e && e.code) || '';
+    if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return 'החלון נסגר לפני שהחיבור הסתיים';
+    if (c === 'auth/popup-blocked') return 'הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב';
+    if (c === 'auth/user-mismatch') return 'יש לבחור את אותו חשבון Google שאיתו נכנסתם למערכת';
+    if (c === 'auth/credential-already-in-use') return 'חשבון ה-Google הזה כבר מחובר למשתמש אחר במערכת';
+    if (e && e.status === 403) return 'אין הרשאה. ודאו שה-API מופעל בפרויקט ושאישרתם את הגישה';
+    if (navigator.onLine === false) return 'אין חיבור לאינטרנט';
+    return (e && e.message) || 'הפעולה נכשלה';
+  };
+  async function saveProtocolToDrive(pr) {
+    try {
+      const token = await cloud.googleToken(cloud.SCOPE_DRIVE); // first, while the click still allows a popup
+      toast('שומר ב-Drive...');
+      const f = await cloud.driveSave(token, protoFileName(pr, 'docx'), await buildProtocolDocx(pr), pr.driveId);
+      pr.driveId = f.id; pr.driveLink = f.webViewLink || '';
+      save(); render(); toast('נשמר ב-Google Drive');
+    } catch (e) { toast('השמירה ב-Drive נכשלה: ' + gErr(e)); }
+  }
+  async function sendProtocolGmail(pr, to, cc, subject, text) {
+    if (!to) { toast('אין נמענים. הגדירו נמענים בעמוד ההגדרות'); location.hash = 'settings'; return; }
+    if (!confirm('לשלוח את הפרוטוקול מה-Gmail שלך אל:\n' + to.split(',').join('\n') + (cc ? '\nהעתק: ' + cc.split(',').join(', ') : '') + '\n\nקובץ Word יצורף למייל.')) return;
+    try {
+      const token = await cloud.googleToken(cloud.SCOPE_GMAIL);
+      toast('שולח...');
+      await cloud.gmailSend(token, { to, cc, subject, text, attachment: { name: protoFileName(pr, 'docx'), blob: await buildProtocolDocx(pr) } });
+      toast('המייל נשלח');
+    } catch (e) { toast('השליחה נכשלה: ' + gErr(e)); }
+  }
+
+  function renderUserBox() {
+    const box = $('#userBox');
+    if (!CLOUD || !me) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    box.innerHTML = `${me.photo ? `<img src="${esc(me.photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="av">${esc((me.name || '?').charAt(0))}</div>`}
+      <div class="who"><b>${esc(me.name)}</b><span>${me.role === 'admin' ? 'מנהל מערכת' : 'משתמש'}</span></div>
+      <button id="signOutBtn">יציאה</button>`;
+    $('#signOutBtn').addEventListener('click', signOut);
+    $('#sidebarFoot').textContent = 'מסונכרן בענן';
+  }
+  async function signOut() {
+    if (!confirm('לצאת מהמערכת במכשיר הזה?')) return;
+    await cloud.signOut();
+    location.reload();
+  }
+
+  function gate(state, info) {
+    const g = $('#authGate'), b = $('#authBody');
+    if (state === 'ready') { g.hidden = true; return; }
+    g.hidden = false;
+    const email = esc((info && info.email) || '');
+    const out = '<button class="btn" data-out>יציאה והתחברות עם חשבון אחר</button>';
+    if (state === 'loading') b.innerHTML = '<p>טוען...</p>';
+    else if (state === 'error') b.innerHTML = `<p>${esc(info.msg)}</p><button class="btn primary" onclick="location.reload()">ניסיון נוסף</button>`;
+    else if (state === 'denied') b.innerHTML = `<p>החשבון <b dir="ltr">${email}</b> עדיין לא אושר לשימוש במערכת.</p><p>בקשו ממנהל המערכת להוסיף את הכתובת הזו בעמוד "הגדרות", ואז לחצו "בדיקה חוזרת".</p>
+      <button class="btn primary" data-recheck>בדיקה חוזרת</button>${out}`;
+    else if (state === 'verify') b.innerHTML = `<p>שלחנו קישור אימות אל <b dir="ltr">${email}</b>. פתחו את המייל, לחצו על הקישור, ואז לחצו "אימתתי".</p>
+      <button class="btn primary" data-recheck>אימתתי</button><button class="btn" data-resend>שליחת הקישור שוב</button>${out}`;
+    else {
+      b.innerHTML = `
+        <button class="btn g-btn" id="gIn"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 2.9-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>כניסה עם Google</button>
+        <div class="auth-or">או עם אימייל וסיסמה</div>
+        <form id="pwForm">
+          <input class="input" id="auName" placeholder="שם מלא" autocomplete="name" style="display:none">
+          <input class="input" id="auEmail" type="email" dir="ltr" placeholder="אימייל" autocomplete="username" required>
+          <input class="input" id="auPw" type="password" dir="ltr" placeholder="סיסמה" autocomplete="current-password" required minlength="6">
+          <div class="auth-err" id="auErr"></div>
+          <button class="btn primary" type="submit" id="auSubmit">כניסה</button>
+        </form>
+        <div class="auth-links"><button id="auToggle">משתמש חדש? הרשמה</button><button id="auForgot">שכחתי סיסמה</button></div>`;
+      let register = false;
+      const err = (m) => { $('#auErr').textContent = m; };
+      const authMsg = (e) => ({
+        'auth/invalid-credential': 'אימייל או סיסמה שגויים', 'auth/wrong-password': 'אימייל או סיסמה שגויים', 'auth/user-not-found': 'אימייל או סיסמה שגויים',
+        'auth/email-already-in-use': 'כבר קיים משתמש עם האימייל הזה. נסו להיכנס, או "שכחתי סיסמה"',
+        'auth/weak-password': 'הסיסמה צריכה לכלול לפחות 6 תווים', 'auth/invalid-email': 'כתובת האימייל אינה תקינה',
+        'auth/too-many-requests': 'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות',
+        'auth/account-exists-with-different-credential': 'האימייל הזה רשום עם שיטת כניסה אחרת. נסו "כניסה עם Google"',
+      }[e && e.code] || gErr(e));
+      $('#gIn').addEventListener('click', () => { err(''); cloud.signInGoogle().catch((e) => err(authMsg(e))); });
+      $('#auToggle').addEventListener('click', () => {
+        register = !register;
+        $('#auName').style.display = register ? '' : 'none';
+        $('#auSubmit').textContent = register ? 'הרשמה' : 'כניסה';
+        $('#auToggle').textContent = register ? 'כבר רשומים? כניסה' : 'משתמש חדש? הרשמה';
+        $('#auPw').autocomplete = register ? 'new-password' : 'current-password';
+        err('');
+      });
+      $('#auForgot').addEventListener('click', () => {
+        const em = $('#auEmail').value.trim();
+        if (!em) { err('הזינו אימייל ואז לחצו "שכחתי סיסמה"'); return; }
+        cloud.resetPassword(em).then(() => err('אם קיים משתמש עם האימייל הזה, נשלח אליו קישור לאיפוס סיסמה')).catch((e) => err(authMsg(e)));
+      });
+      $('#pwForm').addEventListener('submit', (e) => {
+        e.preventDefault(); err('');
+        const em = $('#auEmail').value, pw = $('#auPw').value;
+        (register ? cloud.registerEmail(em, pw, $('#auName').value.trim()) : cloud.signInEmail(em, pw)).catch((x) => err(authMsg(x)));
+      });
+    }
+    const rc = $('[data-recheck]', b); if (rc) rc.addEventListener('click', () => { gate('loading'); cloud.recheck().catch((e) => gate('error', { msg: gErr(e) })); });
+    const rs = $('[data-resend]', b); if (rs) rs.addEventListener('click', () => cloud.resendVerification().then(() => toast('הקישור נשלח')).catch((e) => toast(gErr(e))));
+    const so = $('[data-out]', b); if (so) so.addEventListener('click', async () => { await cloud.signOut(); location.reload(); });
+  }
+
+  // Remote changes are merged into the existing objects, so open forms keep valid references.
+  let pendingRender = false;
+  function applyRemote(state) {
+    ['projects', 'tasks', 'invoices', 'protocols'].forEach((col) => {
+      const cur = new Map(db[col].map((x) => [x.id, x]));
+      db[col] = state[col].map((r) => {
+        const o = cur.get(r.id);
+        if (!o) return r;
+        Object.keys(o).forEach((k) => { if (!(k in r)) delete o[k]; });
+        return Object.assign(o, r);
+      });
+    });
+    const st = settings();
+    Object.keys(st).forEach((k) => { if (!(k in state.settings)) delete st[k]; });
+    Object.assign(st, state.settings);
+    db.demo = false;
+    // Don't redraw under someone who is typing in a search box or filter.
+    const a = document.activeElement;
+    if (a && $('#content').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) {
+      if (!pendingRender) { pendingRender = true; a.addEventListener('blur', () => { pendingRender = false; render(); }, { once: true }); }
+    } else render();
+  }
+
+  async function startCloud() {
+    gate('loading');
+    try { cloud = await import('./cloud.js'); } catch (e) {
+      gate('error', { msg: navigator.onLine === false ? 'אין חיבור לאינטרנט. בכניסה הראשונה צריך חיבור.' : 'טעינת החיבור לענן נכשלה.' });
+      return;
+    }
+    let first = true;
+    cloud.start({
+      onState: (s) => {
+        if (s.state !== 'ready') { me = null; renderUserBox(); gate(s.state, s); return; }
+        me = s.user; profile = s.profile || {};
+        renderUserBox(); aiClient = null; aiReset();
+        gate('loading');
+      },
+      onData: (state) => {
+        applyRemote(state);
+        if (first) { first = false; gate('ready'); }
+      },
+      onError: (e) => {
+        if (e && e.code === 'permission-denied') toast('אין הרשאה לפעולה הזו');
+        else if (e && e.code) toast('שגיאת סנכרון: ' + e.code);
+      },
+    });
+  }
+
+  function cloudSettingsHtml() {
+    if (!CLOUD || !me) return '';
+    const legacy = localLegacy();
+    return `
+      ${isAdmin() && cloud.isShared ? `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>משתמשים והרשאות</h2>
+        <p>רק כתובות שברשימה יכולות להיכנס למערכת ולראות את נתוני החברה. העובד נכנס עם חשבון Google של הכתובת הזו, או נרשם עם אותה כתובת וסיסמה. מנהל יכול גם להוסיף ולהסיר משתמשים.</p>
+        <ul class="member-list" id="memberList"><li>טוען...</li></ul>
+        <form class="row" id="memberForm"><input class="input" id="memberEmail" type="email" dir="ltr" placeholder="name@example.com" required style="flex:1;min-width:200px">
+          <select class="input" id="memberRole" style="width:auto"><option value="member">משתמש</option><option value="admin">מנהל</option></select>
+          <button class="btn primary" type="submit">הוספה</button></form>
+      </div>` : ''}
+      <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>Google Drive</h2>
+        <p>שמירת פרוטוקולים כקובצי Word, וגיבוי מלא של הנתונים, בתיקייה "פמי הנדסה - מערכת ניהול" ב-Drive האישי שלכם. המערכת רואה רק קבצים שהיא עצמה יצרה, ולא את שאר הקבצים שלכם.</p>
+        <div class="row"><button class="btn primary" id="driveBackup">גיבוי מלא ל-Drive</button><button class="btn" id="driveListBtn">הצגת הקבצים ב-Drive</button></div>
+        <ul class="drive-files" id="driveFiles"></ul>
+      </div>
+      ${legacy && isAdmin() ? `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>העברת נתונים מהמכשיר הזה לענן</h2>
+        <p>בדפדפן הזה שמורים נתונים מלפני המעבר לענן: ${(legacy.projects || []).length} פרויקטים, ${(legacy.tasks || []).length} משימות, ${(legacy.invoices || []).length} חשבונות, ${(legacy.protocols || []).length} פרוטוקולים. אפשר להוסיף אותם לנתונים המשותפים.</p>
+        <div class="row"><button class="btn primary" id="migrateBtn">הוספה לענן</button></div>
+      </div>` : ''}`;
+  }
+  function bindCloudSettings(el) {
+    if (!CLOUD || !me) return;
+    const ml = $('#memberList', el);
+    if (ml) {
+      const stop = cloud.watchMembers((list) => {
+        if (!document.body.contains(ml)) { stop(); return; }
+        if (!list) { ml.innerHTML = '<li>לא ניתן לטעון את הרשימה</li>'; return; }
+        const boot = cloud.bootAdmins.filter((a) => !list.some((m) => m.email === a)).map((a) => ({ email: a, role: 'admin', boot: true }));
+        ml.innerHTML = boot.concat(list).map((m) => `<li><span class="em">${esc(m.email)}</span>${pill([{ id: 'admin', label: 'מנהל', color: 'purple' }, { id: 'member', label: 'משתמש', color: 'gray' }], m.role === 'admin' ? 'admin' : 'member')}
+          ${m.boot ? '<small style="color:var(--muted)">מוגדר בקובץ ההגדרות</small>' : m.email === me.email ? '<small style="color:var(--muted)">(את/ה)</small>' : `<button class="btn sm danger" data-rm="${esc(m.email)}">הסרה</button>`}</li>`).join('') || '<li>אין משתמשים</li>';
+        $$('[data-rm]', ml).forEach((b) => b.addEventListener('click', () => {
+          if (confirm('להסיר את ' + b.dataset.rm + '? הוא לא יוכל להיכנס יותר.')) cloud.removeMember(b.dataset.rm).catch((e) => toast(gErr(e)));
+        }));
+      });
+      $('#memberForm', el).addEventListener('submit', (e) => {
+        e.preventDefault();
+        const em = $('#memberEmail', el).value.trim();
+        cloud.addMember(em, $('#memberRole', el).value).then(() => { $('#memberEmail', el).value = ''; toast(em + ' נוסף'); }).catch((x) => toast('ההוספה נכשלה: ' + gErr(x)));
+      });
+    }
+    const filesEl = $('#driveFiles', el);
+    const showFiles = (files) => {
+      filesEl.innerHTML = files.map((f) => `<li><a href="${esc(f.webViewLink)}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>
+        ${/\.json$/.test(f.name) && isAdmin() ? `<button class="btn sm" data-restore="${esc(f.id)}">שחזור</button>` : ''}</li>`).join('') || '<li>אין עדיין קבצים בתיקייה</li>';
+      $$('[data-restore]', filesEl).forEach((b) => b.addEventListener('click', async () => {
+        if (!confirm('השחזור יחליף את כל הנתונים המשותפים של החברה בנתונים מהגיבוי, אצל כל המשתמשים. להמשיך?')) return;
+        try {
+          const token = await cloud.googleToken(cloud.SCOPE_DRIVE);
+          const d = JSON.parse(await cloud.driveRead(token, b.dataset.restore));
+          if (!d || !Array.isArray(d.tasks) || !Array.isArray(d.projects)) throw new Error('הקובץ אינו קובץ גיבוי תקין');
+          db = Object.assign(emptyDb(), d, { demo: false }); save(); render(); toast('הגיבוי שוחזר');
+        } catch (e) { toast('השחזור נכשל: ' + gErr(e)); }
+      }));
+    };
+    $('#driveListBtn', el).addEventListener('click', async () => {
+      try { const token = await cloud.googleToken(cloud.SCOPE_DRIVE); filesEl.innerHTML = '<li>טוען...</li>'; showFiles(await cloud.driveList(token)); }
+      catch (e) { toast(gErr(e)); }
+    });
+    $('#driveBackup', el).addEventListener('click', async () => {
+      try {
+        const token = await cloud.googleToken(cloud.SCOPE_DRIVE);
+        toast('מגבה...');
+        await cloud.driveSave(token, 'femy-גיבוי-' + todayStr() + '.json', new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+        toast('הגיבוי נשמר ב-Drive'); showFiles(await cloud.driveList(token));
+      } catch (e) { toast('הגיבוי נכשל: ' + gErr(e)); }
+    });
+    const mg = $('#migrateBtn', el);
+    if (mg) mg.addEventListener('click', () => {
+      const d = localLegacy(); if (!d) return;
+      const have = new Set(['projects', 'tasks', 'invoices', 'protocols'].flatMap((c) => db[c].map((x) => x.id)));
+      let n = 0;
+      ['projects', 'tasks', 'invoices', 'protocols'].forEach((c) => (d[c] || []).forEach((x) => { if (x && x.id && !have.has(x.id)) { db[c].push(x); n++; } }));
+      if (d.settings) Object.keys(d.settings).forEach((k) => { if (settings()[k] == null) settings()[k] = d.settings[k]; });
+      save(); render(); toast(n + ' פריטים הועברו לענן');
+      try { localStorage.setItem(STORE_KEY + '-migrated', localStorage.getItem(STORE_KEY)); localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+    });
+  }
+
   // ---------- Settings ----------
   function renderSettings(el) {
     const st = settings();
-    el.innerHTML = `
+    el.innerHTML = cloudSettingsHtml() + `
       <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>עוזר Claude</h2>
-        <p>העוזר (הכפתור ✨ בפינה) עונה על שאלות על הנתונים במערכת, מסכם פרוטוקולים, ויכול ליצור ולעדכן משימות. הוא עובד עם מפתח API של Anthropic, וכל שיחה מחויבת בחשבון ה-API שלכם. המפתח נשמר רק בדפדפן הזה. הוא לא עולה לגיטהב ולא נכלל בקובץ הגיבוי. בכל שאלה נשלחים ל-Claude גם נתוני המערכת, כדי שיוכל לענות.</p>
+        <p>העוזר (הכפתור ✨ בפינה) עונה על שאלות על הנתונים במערכת, מסכם פרוטוקולים, ויכול ליצור ולעדכן משימות. הוא עובד עם מפתח API של Anthropic, וכל שיחה מחויבת בחשבון ה-API שלכם. ${CLOUD ? 'המפתח אישי: הוא נשמר בפרופיל הפרטי שלכם בענן, רק אתם יכולים לקרוא אותו, והוא זמין בכל המכשירים שבהם אתם מחוברים.' : 'המפתח נשמר רק בדפדפן הזה.'} הוא לא עולה לגיטהב ולא נכלל בקובץ הגיבוי. בכל שאלה נשלחים ל-Claude גם נתוני המערכת, כדי שיוכל לענות.</p>
         <div class="row"><input class="input" id="aiKeyInput" type="password" dir="ltr" autocomplete="off" placeholder="sk-ant-..." style="flex:1;min-width:220px" value="${esc(getAiKey())}">
         <button class="btn primary" id="aiKeySave">שמירה</button><button class="btn" id="aiKeyDel">מחיקה</button></div>
         <div class="hint">יוצרים מפתח ב-console.anthropic.com, תחת API Keys.</div>
@@ -1330,16 +1629,17 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           <div class="field full"><label>נמענים קבועים (אל)</label><input class="input" id="setTo" dir="ltr" placeholder="name@example.com, name2@example.com" value="${esc(st.emailTo || '')}"></div>
           <div class="field full"><label>רשימת תפוצה (העתק)</label><textarea class="input" id="setCc" dir="ltr" placeholder="כתובת בכל שורה או מופרדות בפסיק">${esc(st.emailCc || '')}</textarea></div>
           <div class="field full"><label>לפתוח את המייל ב</label><select class="input" id="setApp">
-            <option value="gmail" ${st.mailApp !== 'mailto' ? 'selected' : ''}>Gmail</option>
-            <option value="mailto" ${st.mailApp === 'mailto' ? 'selected' : ''}>אפליקציית המייל של המכשיר (Outlook, Mail)</option></select></div>
+            <option value="gmail" ${!st.mailApp || st.mailApp === 'gmail' ? 'selected' : ''}>Gmail (פתיחת טיוטה)</option>
+            <option value="mailto" ${st.mailApp === 'mailto' ? 'selected' : ''}>אפליקציית המייל של המכשיר (Outlook, Mail)</option>
+            ${CLOUD ? `<option value="gmailApi" ${st.mailApp === 'gmailApi' ? 'selected' : ''}>Gmail: שליחה ישירה עם Word מצורף</option>` : ''}</select></div>
         </div>
         <div class="row"><button class="btn primary" id="saveMail">שמירה</button></div>
       </div>
       <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>גיבוי ושחזור</h2>
-        <p>הנתונים נשמרים רק בדפדפן ובמכשיר הזה. כדי לא לאבד אותם, או כדי להעביר אותם למכשיר אחר, הורידו קובץ גיבוי מדי פעם וטענו אותו במכשיר השני.</p>
+        <p>${CLOUD ? 'הנתונים נשמרים בענן ומסונכרנים בין כל המשתמשים והמכשירים, וזמינים גם בלי רשת (השינויים נשלחים כשהחיבור חוזר). אפשר גם להוריד קובץ גיבוי למחשב.' : 'הנתונים נשמרים רק בדפדפן ובמכשיר הזה. כדי לא לאבד אותם, או כדי להעביר אותם למכשיר אחר, הורידו קובץ גיבוי מדי פעם וטענו אותו במכשיר השני.'}</p>
         <div class="row"><button class="btn primary" id="expBtn">הורדת קובץ גיבוי</button>
-        <label class="btn">טעינת קובץ גיבוי<input type="file" id="impFile" accept=".json,application/json" hidden></label></div>
+        ${isAdmin() ? '<label class="btn">טעינת קובץ גיבוי<input type="file" id="impFile" accept=".json,application/json" hidden></label>' : ''}</div>
         <div class="hint">במערכת כרגע: ${db.projects.length} פרויקטים, ${db.tasks.length} משימות, ${db.invoices.length} חשבונות, ${db.protocols.length} פרוטוקולים.</div>
       </div>
       ${nativeBridge() ? '' : `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
@@ -1348,19 +1648,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <strong>אנדרואיד:</strong> פתחו את האתר בכרום, לחצו על תפריט שלוש הנקודות ובחרו "התקנת אפליקציה".</p>
         <div class="row"><button class="btn primary" id="installBtn" style="display:none">התקנה עכשיו</button></div>
       </div>`}
-      <div class="card card-pad settings" style="max-width:720px">
+      ${isAdmin() ? `<div class="card card-pad settings" style="max-width:720px">
         <h2>איפוס</h2>
-        <p>מחיקה של כל הנתונים במכשיר הזה. כדאי להוריד קובץ גיבוי לפני כן.</p>
+        <p>${CLOUD ? 'מחיקה של כל נתוני החברה בענן, אצל כל המשתמשים.' : 'מחיקה של כל הנתונים במכשיר הזה.'} כדאי להוריד קובץ גיבוי לפני כן.</p>
         <div class="row"><button class="btn danger" id="wipeBtn">מחיקת כל הנתונים</button>
-        <button class="btn" id="demoBtn">טעינת נתוני דוגמה</button></div>
-      </div>`;
-    $('#aiKeySave', el).addEventListener('click', () => {
+        ${CLOUD ? '' : '<button class="btn" id="demoBtn">טעינת נתוני דוגמה</button>'}</div>
+      </div>` : ''}`;
+    $('#aiKeySave', el).addEventListener('click', async () => {
       const v = $('#aiKeyInput', el).value.trim();
-      try { if (v) localStorage.setItem(AI_KEY, v); else localStorage.removeItem(AI_KEY); } catch (e) { toast('לא ניתן לשמור בדפדפן הזה'); return; }
+      try { await setAiKey(v); } catch (e) { toast('שמירת המפתח נכשלה'); return; }
       aiClient = null; aiReset(); toast(v ? 'המפתח נשמר' : 'המפתח נמחק');
     });
-    $('#aiKeyDel', el).addEventListener('click', () => {
-      try { localStorage.removeItem(AI_KEY); } catch (e) { /* ignore */ }
+    $('#aiKeyDel', el).addEventListener('click', async () => {
+      try { await setAiKey(''); } catch (e) { toast('מחיקת המפתח נכשלה'); return; }
       $('#aiKeyInput', el).value = ''; aiClient = null; aiReset(); toast('המפתח נמחק');
     });
     $('#saveMail', el).addEventListener('click', () => {
@@ -1369,21 +1669,25 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       save(); toast(bad.length ? 'נשמר. כתובות לא תקינות ידולגו: ' + bad.join(', ') : 'הגדרות המייל נשמרו');
     });
     $('#expBtn', el).addEventListener('click', () => download('femy-גיבוי-' + todayStr() + '.json', JSON.stringify(db, null, 2), 'application/json'));
-    $('#impFile', el).addEventListener('change', (e) => {
+    const imp = $('#impFile', el);
+    if (imp) imp.addEventListener('change', (e) => {
       const file = e.target.files[0]; if (!file) return;
       const r = new FileReader();
       r.onload = () => {
         try {
           const d = JSON.parse(r.result);
           if (!d || !Array.isArray(d.tasks) || !Array.isArray(d.projects)) throw new Error();
-          if (!confirm('הטעינה תחליף את כל הנתונים הנוכחיים במכשיר. להמשיך?')) return;
-          db = Object.assign(emptyDb(), d); save(); render(); toast('הגיבוי נטען בהצלחה');
+          if (!confirm(CLOUD ? 'הטעינה תחליף את כל נתוני החברה בענן, אצל כל המשתמשים. להמשיך?' : 'הטעינה תחליף את כל הנתונים הנוכחיים במכשיר. להמשיך?')) return;
+          db = Object.assign(emptyDb(), d); if (CLOUD) db.demo = false; save(); render(); toast('הגיבוי נטען בהצלחה');
         } catch (err) { toast('הקובץ אינו קובץ גיבוי תקין'); }
       };
       r.readAsText(file);
     });
-    $('#wipeBtn', el).addEventListener('click', () => { if (confirm('למחוק את כל הנתונים? לא ניתן לבטל.')) { db = emptyDb(); save(); render(); toast('כל הנתונים נמחקו'); } });
-    $('#demoBtn', el).addEventListener('click', () => { if (confirm('נתוני הדוגמה יחליפו את הנתונים הנוכחיים. להמשיך?')) { db = demoData(); save(); render(); } });
+    const wipe = $('#wipeBtn', el);
+    if (wipe) wipe.addEventListener('click', () => { if (confirm(CLOUD ? 'למחוק את כל נתוני החברה בענן, אצל כל המשתמשים? לא ניתן לבטל.' : 'למחוק את כל הנתונים? לא ניתן לבטל.')) { db = emptyDb(); save(); render(); toast('כל הנתונים נמחקו'); } });
+    const demo = $('#demoBtn', el);
+    if (demo) demo.addEventListener('click', () => { if (confirm('נתוני הדוגמה יחליפו את הנתונים הנוכחיים. להמשיך?')) { db = demoData(); save(); render(); } });
+    bindCloudSettings(el);
     const ib = $('#installBtn', el);
     if (ib && deferredInstall) { ib.style.display = ''; ib.addEventListener('click', promptInstall); }
   }
@@ -1469,9 +1773,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       else openTaskForm();
     });
     window.addEventListener('hashchange', render);
-    window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
-    if (!localStorage.getItem(STORE_KEY)) save();
-    render();
+    if (CLOUD) { render(); startCloud(); }
+    else {
+      window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
+      if (!localStorage.getItem(STORE_KEY)) save();
+      render();
+    }
 
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       navigator.serviceWorker.register('sw.js').catch(() => {});
