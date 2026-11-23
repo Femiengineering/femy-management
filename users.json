@@ -1,4 +1,4 @@
 [
-  {"username": "moti", "password": "femy2024", "name": "מוטי", "role": "admin"},
-  {"username": "admin", "password": "admin123", "name": "מנהל", "role": "admin"}
+  {"username": "moti@femy.co.il", "password": "femy2024", "name": "מוטי", "role": "admin"},
+  {"username": "mendi@femy.co.il", "password": "femy2024", "name": "מנדי", "role": "user"}
 ]

@@ -1518,7 +1518,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     g.hidden = false;
     b.innerHTML = `
       <form id="lgForm">
-        <input class="input" id="lgUser" dir="ltr" placeholder="שם משתמש" autocomplete="username" required autocapitalize="off">
+        <input class="input" id="lgUser" type="email" dir="ltr" placeholder="אימייל" autocomplete="username" required autocapitalize="off">
         <input class="input" id="lgPw" type="password" dir="ltr" placeholder="סיסמה" autocomplete="current-password" required>
         <div class="auth-err" id="lgErr"></div>
         <button class="btn primary" type="submit" id="lgSubmit">כניסה</button>
@@ -1534,10 +1534,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         if (!r.ok) throw new Error('http ' + r.status);
         const users = await r.json();
         const u = (Array.isArray(users) ? users : []).find((x) => String(x.username || '').toLowerCase() === un && String(x.password) === pw);
-        if (!u) { err('שם משתמש או סיסמה שגויים'); $('#lgSubmit').disabled = false; return; }
+        if (!u) { err('אימייל או סיסמה שגויים'); $('#lgSubmit').disabled = false; return; }
         const key = un + '_' + BASE_KEY;
-        // Data saved in this browser before sign-in existed moves to the first user who signs in.
-        if (!localStorage.getItem(key) && localStorage.getItem(BASE_KEY)) {
+        // Usernames used to be short names (e.g. "moti"); move that user's data to the email-based key.
+        const oldKey = un.split('@')[0] + '_' + BASE_KEY;
+        if (oldKey !== key && !localStorage.getItem(key) && localStorage.getItem(oldKey)) {
+          localStorage.setItem(key, localStorage.getItem(oldKey));
+          localStorage.removeItem(oldKey);
+        }
+        // Data saved in this browser before sign-in existed moves only to the admin (moti@femy.co.il), never to another user.
+        if (u.role === 'admin' && !localStorage.getItem(key) && localStorage.getItem(BASE_KEY)) {
           localStorage.setItem(key, localStorage.getItem(BASE_KEY));
           localStorage.setItem(BASE_KEY + '-before-login', localStorage.getItem(BASE_KEY));
           localStorage.removeItem(BASE_KEY);
