@@ -1542,8 +1542,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           localStorage.setItem(key, localStorage.getItem(oldKey));
           localStorage.removeItem(oldKey);
         }
-        // Data saved in this browser before sign-in existed moves to the first user who signs in.
-        if (!localStorage.getItem(key) && localStorage.getItem(BASE_KEY)) {
+        // Data saved in this browser before sign-in existed moves only to the admin (moti@femy.co.il), never to another user.
+        if (u.role === 'admin' && !localStorage.getItem(key) && localStorage.getItem(BASE_KEY)) {
           localStorage.setItem(key, localStorage.getItem(BASE_KEY));
           localStorage.setItem(BASE_KEY + '-before-login', localStorage.getItem(BASE_KEY));
           localStorage.removeItem(BASE_KEY);
