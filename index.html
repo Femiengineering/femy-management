@@ -441,7 +441,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // ---------- Data ----------
   let db = load();
 
-  function emptyDb() { return { projects: [], tasks: [], invoices: [], protocols: [], demo: false }; }
+  function emptyDb() { return { projects: [], tasks: [], invoices: [], protocols: [], settings: {}, demo: false }; }
+  const settings = () => (db.settings = db.settings || {});
 
   function load() {
     try {
@@ -929,6 +930,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
             <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
               <button class="btn sm" data-edit>עריכה</button>
               ${lines(pr.actions).length ? '<button class="btn sm" data-mktasks>יצירת משימות מהפרוטוקול</button>' : ''}
+              <button class="btn sm" data-mail>✉️ שליחה במייל</button>
               <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
               <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
             </div>
@@ -941,6 +943,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('[data-edit]', c).addEventListener('click', () => openProtocolForm(pr));
       $('[data-word]', c).addEventListener('click', () => exportProtocolWord(pr));
       $('[data-pdf]', c).addEventListener('click', () => exportProtocolPdf(pr));
+      $('[data-mail]', c).addEventListener('click', () => emailProtocol(pr));
       const mk = $('[data-mktasks]', c);
       if (mk) mk.addEventListener('click', () => {
         const items = lines(pr.actions);
@@ -1078,9 +1081,55 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     }
   }
 
+  // Email: opens Gmail (or the phone's mail app) with the protocol as plain text.
+  function protocolText(pr) {
+    const { meta, sections } = protoSections(pr);
+    let t = 'פרוטוקול: ' + (pr.title || '') + '\n' + meta.map((m) => m[0] + ': ' + m[1]).join(' | ') + '\n';
+    sections.forEach((sec) => {
+      t += '\n' + sec.title + '\n';
+      t += sec.list ? sec.list.map((x, i) => (i + 1) + '. ' + x).join('\n') : sec.paras.join('\n');
+      t += '\n';
+    });
+    return t + '\n--\nפמי הנדסה בע"מ | ייעוץ | ניהול פרויקטים\noffice@femy.co.il | ב.ס.ר 1 רמת גן\n';
+  }
+  const cleanEmails = (s) => (s || '').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).join(',');
+  function emailProtocol(pr) {
+    const st = settings();
+    const subject = 'פרוטוקול: ' + (pr.title || '') + ' - ' + fmtDate(pr.date);
+    let body = protocolText(pr);
+    if (body.length > 6000) body = body.slice(0, 6000) + '\n...\n(הפרוטוקול קוצר. את הגרסה המלאה אפשר לצרף כקובץ Word או PDF מהמערכת)';
+    const to = cleanEmails(st.emailTo), cc = cleanEmails(st.emailCc);
+    let url;
+    if (st.mailApp === 'mailto') {
+      const q = [cc && 'cc=' + encodeURIComponent(cc), 'subject=' + encodeURIComponent(subject), 'body=' + encodeURIComponent(body)].filter(Boolean).join('&');
+      url = 'mailto:' + to + '?' + q;
+      location.href = url;
+      return;
+    }
+    const params = new URLSearchParams({ view: 'cm', fs: '1', su: subject, body });
+    if (to) params.set('to', to);
+    if (cc) params.set('cc', cc);
+    url = 'https://mail.google.com/mail/?' + params.toString();
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w) location.href = url;
+  }
+
   // ---------- Settings ----------
   function renderSettings(el) {
+    const st = settings();
     el.innerHTML = `
+      <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>שליחת פרוטוקולים במייל</h2>
+        <p>הנמענים האלה ימולאו אוטומטית בכל פעם שלוחצים "שליחה במייל" בפרוטוקול. אפשר לשנות אותם במייל עצמו לפני השליחה. מפרידים בין כתובות בפסיק.</p>
+        <div class="modal-body" style="padding:0;margin-bottom:12px">
+          <div class="field full"><label>נמענים קבועים (אל)</label><input class="input" id="setTo" dir="ltr" placeholder="name@example.com, name2@example.com" value="${esc(st.emailTo || '')}"></div>
+          <div class="field full"><label>רשימת תפוצה (העתק)</label><textarea class="input" id="setCc" dir="ltr" placeholder="כתובת בכל שורה או מופרדות בפסיק">${esc(st.emailCc || '')}</textarea></div>
+          <div class="field full"><label>לפתוח את המייל ב</label><select class="input" id="setApp">
+            <option value="gmail" ${st.mailApp !== 'mailto' ? 'selected' : ''}>Gmail</option>
+            <option value="mailto" ${st.mailApp === 'mailto' ? 'selected' : ''}>אפליקציית המייל של המכשיר (Outlook, Mail)</option></select></div>
+        </div>
+        <div class="row"><button class="btn primary" id="saveMail">שמירה</button></div>
+      </div>
       <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>גיבוי ושחזור</h2>
         <p>הנתונים נשמרים רק בדפדפן ובמכשיר הזה. כדי לא לאבד אותם, או כדי להעביר אותם למכשיר אחר, הורידו קובץ גיבוי מדי פעם וטענו אותו במכשיר השני.</p>
@@ -1100,6 +1149,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <div class="row"><button class="btn danger" id="wipeBtn">מחיקת כל הנתונים</button>
         <button class="btn" id="demoBtn">טעינת נתוני דוגמה</button></div>
       </div>`;
+    $('#saveMail', el).addEventListener('click', () => {
+      const bad = [$('#setTo', el).value, $('#setCc', el).value].join(',').split(/[\s,;]+/).filter((x) => x && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+      st.emailTo = $('#setTo', el).value.trim(); st.emailCc = $('#setCc', el).value.trim(); st.mailApp = $('#setApp', el).value;
+      save(); toast(bad.length ? 'נשמר. כתובות לא תקינות ידולגו: ' + bad.join(', ') : 'הגדרות המייל נשמרו');
+    });
     $('#expBtn', el).addEventListener('click', () => download('femy-גיבוי-' + todayStr() + '.json', JSON.stringify(db, null, 2), 'application/json'));
     $('#impFile', el).addEventListener('change', (e) => {
       const file = e.target.files[0]; if (!file) return;
