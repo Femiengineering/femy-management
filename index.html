@@ -929,7 +929,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
             <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
               <button class="btn sm" data-edit>עריכה</button>
               ${lines(pr.actions).length ? '<button class="btn sm" data-mktasks>יצירת משימות מהפרוטוקול</button>' : ''}
-              <button class="btn sm" data-print>הדפסה</button>
+              <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
+              <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
             </div>
           </div></div>`;
       }).join('') || '<div class="card empty">אין פרוטוקולים. לחצו על "פרוטוקול חדש" כדי לתעד ישיבה.</div>'}</div>`;
@@ -938,7 +939,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const pr = byId(db.protocols, c.dataset.id);
       $('.proto-head', c).addEventListener('click', () => { ui.openProto = ui.openProto === pr.id ? null : pr.id; c.classList.toggle('open'); });
       $('[data-edit]', c).addEventListener('click', () => openProtocolForm(pr));
-      $('[data-print]', c).addEventListener('click', () => printProtocol(pr));
+      $('[data-word]', c).addEventListener('click', () => exportProtocolWord(pr));
+      $('[data-pdf]', c).addEventListener('click', () => exportProtocolPdf(pr));
       const mk = $('[data-mktasks]', c);
       if (mk) mk.addEventListener('click', () => {
         const items = lines(pr.actions);
@@ -969,26 +971,111 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     },
     proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
   }
-  function printProtocol(pr) {
+  // ---------- Protocol export (company letterhead) ----------
+  const protoLines = (s) => (s || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  const protoFileName = (pr, ext) => ('פרוטוקול - ' + (pr.title || '') + ' - ' + fmtDate(pr.date).replace(/\//g, '.')).replace(/[\\/:*?"<>|]/g, '').trim() + '.' + ext;
+  function protoSections(pr) {
     const p = byId(db.projects, pr.projectId);
-    const lines = (s) => (s || '').split('\n').map((x) => x.trim()).filter(Boolean);
-    const html = buildProtocolHtml(pr, p, lines);
-    if (nativeBridge()) { nativeBridge().postMessage(JSON.stringify({ type: 'print', html })); return; }
-    const w = window.open('', '_blank');
-    if (!w) { toast('הדפדפן חסם את חלון ההדפסה'); return; }
-    w.document.write(html.replace('</body>', '<script>window.onload=function(){window.print()}<\\/script></body>'));
-    w.document.close();
+    const meta = [['תאריך', fmtDate(pr.date)], ['סוג', pr.type], ['פרויקט', p && p.name]].filter((x) => x[1]);
+    return {
+      meta,
+      sections: [
+        pr.participants ? { title: 'משתתפים', paras: [pr.participants] } : null,
+        pr.summary ? { title: 'סיכום הדיון', paras: protoLines(pr.summary) } : null,
+        protoLines(pr.decisions).length ? { title: 'החלטות', list: protoLines(pr.decisions) } : null,
+        protoLines(pr.actions).length ? { title: 'משימות להמשך', list: protoLines(pr.actions) } : null,
+      ].filter(Boolean),
+    };
   }
 
-  function buildProtocolHtml(pr, p, lines) {
-    return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(pr.title)}</title>
-      <style>body{font-family:Arial,sans-serif;padding:32px;line-height:1.6;color:#111}h1{font-size:22px;margin:0}h2{font-size:16px;margin:22px 0 6px;border-bottom:1px solid #ccc;padding-bottom:4px}.meta{color:#555}p{white-space:pre-wrap}</style></head><body>
-      <div class="meta">פמי הנדסה · פרוטוקול</div><h1>${esc(pr.title)}</h1>
-      <div class="meta">${fmtDate(pr.date)} · ${esc(pr.type || '')}${p ? ' · ' + esc(p.name) : ''}</div>
-      ${pr.participants ? `<h2>משתתפים</h2><p>${esc(pr.participants)}</p>` : ''}
-      ${pr.summary ? `<h2>סיכום</h2><p>${esc(pr.summary)}</p>` : ''}
-      ${lines(pr.decisions).length ? `<h2>החלטות</h2><ol>${lines(pr.decisions).map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
-      ${lines(pr.actions).length ? `<h2>משימות להמשך</h2><ol>${lines(pr.actions).map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}</body></html>`;
+  // PDF: opens a print view on the letterhead; choose "Save as PDF" in the print dialog.
+  function exportProtocolPdf(pr) {
+    const { meta, sections } = protoSections(pr);
+    const bg = new URL('docs/letterhead.jpg', location.href).href;
+    const body = `
+      <h1>פרוטוקול: ${esc(pr.title)}</h1>
+      <div class="meta">${meta.map((m) => `<span><b>${m[0]}:</b> ${esc(m[1])}</span>`).join('')}</div>
+      ${sections.map((sec) => `<h2>${sec.title}</h2>${sec.list ? `<ol>${sec.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : sec.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`).join('')}`;
+    const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(protoFileName(pr, 'pdf').replace(/\.pdf$/, ''))}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        @page { size: A4; margin: 0; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: Arial, "Assistant", sans-serif; color: #111; font-size: 11pt; line-height: 1.55; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .bg { position: fixed; inset: 0; width: 210mm; height: 297mm; z-index: -1; }
+        .bg img { width: 100%; height: 100%; display: block; }
+        table.page { width: 210mm; border-collapse: collapse; }
+        thead td { height: 67.5mm; } tfoot td { height: 22.5mm; }
+        td.content { padding: 0 31.7mm; vertical-align: top; }
+        h1 { font-size: 17pt; margin: 0 0 6px; }
+        .meta { color: #333; margin-bottom: 8px; } .meta span { margin-inline-end: 18px; display: inline-block; }
+        h2 { font-size: 12.5pt; margin: 16px 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid #52bd76; break-after: avoid; }
+        p { margin: 0 0 6px; white-space: pre-wrap; } ol { margin: 0; padding-inline-start: 22px; } li { margin-bottom: 3px; }
+        .bar { position: fixed; top: 0; left: 0; right: 0; background: #15253d; color: #fff; padding: 10px 16px; display: flex; gap: 10px; align-items: center; font-family: Arial, sans-serif; z-index: 10; }
+        .bar button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; background: #52bd76; color: #fff; font-weight: bold; cursor: pointer; }
+        @media screen { body { background: #888; padding-top: 52px; } table.page { margin: 16px auto; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.3); position: relative; } .bg { position: absolute; } .sheet { position: relative; width: 210mm; margin: 0 auto; } }
+        @media print { .bar { display: none; } }
+        @media screen and (max-width: 800px) { .sheet { zoom: .45; } }
+      </style></head><body>
+      <div class="bar"><button onclick="window.print()">שמירה כ-PDF / הדפסה</button><span>בחלון ההדפסה בחרו "שמירה כ-PDF"</span></div>
+      <div class="sheet"><div class="bg"><img src="${bg}" alt=""></div>
+      <table class="page"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot>
+      <tbody><tr><td class="content">${body}</td></tr></tbody></table></div>
+      <script>var i=document.querySelector('.bg img');function go(){setTimeout(function(){window.print()},300)}if(i.complete)go();else{i.onload=go;i.onerror=go}<\/script>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { toast('הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב'); return; }
+    w.document.write(html); w.document.close();
+  }
+
+  // Word: fills the company letterhead template (docs/blank-template.docx).
+  let jszipLoading = null;
+  function loadJSZip() {
+    if (window.JSZip) return Promise.resolve(window.JSZip);
+    if (!jszipLoading) jszipLoading = new Promise((res, rej) => {
+      const sc = document.createElement('script'); sc.src = 'vendor/jszip.min.js';
+      sc.onload = () => res(window.JSZip); sc.onerror = () => { jszipLoading = null; rej(new Error('jszip')); };
+      document.head.appendChild(sc);
+    });
+    return jszipLoading;
+  }
+  function wRun(text, o) {
+    o = o || {};
+    const sz = o.size ? `<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>` : '';
+    const b = o.bold ? '<w:b/><w:bCs/>' : '';
+    const color = o.color ? `<w:color w:val="${o.color}"/>` : '';
+    return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b}${color}${sz}<w:rtl/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+  }
+  function wPara(runs, o) {
+    o = o || {};
+    const bdr = o.border ? '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="52BD76"/></w:pBdr>' : '';
+    const ind = o.indent ? '<w:ind w:start="360" w:hanging="360"/>' : '';
+    return `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${bdr}<w:bidi/><w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 100 : o.after}"/>${ind}</w:pPr>${runs}</w:p>`;
+  }
+  async function exportProtocolWord(pr) {
+    try {
+      toast('מכין קובץ Word...');
+      const [JSZip, tpl] = await Promise.all([loadJSZip(), fetch('docs/blank-template.docx').then((r) => { if (!r.ok) throw new Error('template'); return r.arrayBuffer(); })]);
+      const zip = await JSZip.loadAsync(tpl);
+      const docXml = await zip.file('word/document.xml').async('string');
+      const { meta, sections } = protoSections(pr);
+      let body = wPara(wRun('פרוטוקול: ' + (pr.title || ''), { bold: true, size: 34 }), { after: 80 });
+      body += wPara(meta.map((m, i) => (i ? wRun('   |   ') : '') + wRun(m[0] + ': ', { bold: true }) + wRun(m[1])).join(''), { after: 160 });
+      sections.forEach((sec) => {
+        body += wPara(wRun(sec.title, { bold: true, size: 25 }), { before: 200, after: 100, border: true, keepNext: true });
+        if (sec.list) sec.list.forEach((x, i) => { body += wPara(wRun((i + 1) + '.\t' + x), { indent: true, after: 60 }); });
+        else sec.paras.forEach((x) => { body += wPara(wRun(x)); });
+      });
+      const i1 = docXml.indexOf('<w:body>') + '<w:body>'.length;
+      const i2 = docXml.indexOf('<w:sectPr');
+      if (i1 < 8 || i2 < 0) throw new Error('template structure');
+      zip.file('word/document.xml', docXml.slice(0, i1) + body + docXml.slice(i2));
+      const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      downloadBlob(protoFileName(pr, 'docx'), blob);
+    } catch (e) {
+      toast(navigator.onLine === false ? 'אין חיבור לרשת. ייצוא ל-Word דורש חיבור בפעם הראשונה' : 'ייצוא ל-Word נכשל');
+    }
   }
 
   // ---------- Settings ----------
@@ -1051,6 +1138,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // ---------- Misc ----------
   // When running inside the phone app (Expo WebView), hand files to the native side.
   const nativeBridge = () => window.ReactNativeWebView;
+  function downloadBlob(name, blob) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  }
   function download(name, text, type) {
     if (nativeBridge()) { nativeBridge().postMessage(JSON.stringify({ type: 'download', name, text, mime: type })); return; }
     const blob = new Blob([text], { type });
