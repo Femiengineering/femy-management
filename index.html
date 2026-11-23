@@ -394,6 +394,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <h1 id="pageTitle">לוח בקרה</h1>
         <button class="btn" id="installTop" style="display:none">📲 <span class="lbl">התקנת אפליקציה</span></button>
         <button class="btn primary" id="addBtn">+ <span class="lbl">משימה חדשה</span></button>
+        <button class="btn" id="logoutTop" style="display:none" title="יציאה מהמערכת">🚪 <span class="lbl" id="logoutName"></span> יציאה</button>
       </header>
       <main class="content" id="content"></main>
     </div>
@@ -442,7 +443,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 (function () {
   'use strict';
 
-  const STORE_KEY = 'femy-data-v1';
+  const BASE_KEY = 'femy-data-v1';
+  // Local mode: simple sign-in against users.json. Each user's data has its own key (username_femy-data-v1).
+  const SESSION_KEY = 'femy-session';
+  const localSession = (() => {
+    if (window.FEMY_FIREBASE && window.FEMY_FIREBASE.apiKey) return null;
+    try { const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); return s && s.username ? s : null; } catch (e) { return null; }
+  })();
+  let STORE_KEY = localSession ? localSession.username + '_' + BASE_KEY : BASE_KEY;
 
   // ---------- Dictionaries ----------
   const TASK_STATUS = [
@@ -515,7 +523,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   let me = null; // signed-in user { uid, email, name, photo, role }
   let profile = {}; // the user's private profile (Claude key)
   const isAdmin = () => !CLOUD || (me && me.role === 'admin');
-  let db = CLOUD ? emptyDb() : load();
+  let db = CLOUD || !localSession ? emptyDb() : load();
 
   function emptyDb() { return { projects: [], tasks: [], invoices: [], protocols: [], settings: {}, demo: false }; }
   const settings = () => (db.settings = db.settings || {});
@@ -1504,6 +1512,50 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     } else render();
   }
 
+  // ---------- Local sign-in (users.json) ----------
+  function localGate() {
+    const g = $('#authGate'), b = $('#authBody');
+    g.hidden = false;
+    b.innerHTML = `
+      <form id="lgForm">
+        <input class="input" id="lgUser" dir="ltr" placeholder="שם משתמש" autocomplete="username" required autocapitalize="off">
+        <input class="input" id="lgPw" type="password" dir="ltr" placeholder="סיסמה" autocomplete="current-password" required>
+        <div class="auth-err" id="lgErr"></div>
+        <button class="btn primary" type="submit" id="lgSubmit">כניסה</button>
+      </form>`;
+    $('#lgUser').focus();
+    $('#lgForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = (m) => { $('#lgErr').textContent = m; };
+      err(''); $('#lgSubmit').disabled = true;
+      const un = $('#lgUser').value.trim().toLowerCase(), pw = $('#lgPw').value;
+      try {
+        const r = await fetch('users.json', { cache: 'no-store' });
+        if (!r.ok) throw new Error('http ' + r.status);
+        const users = await r.json();
+        const u = (Array.isArray(users) ? users : []).find((x) => String(x.username || '').toLowerCase() === un && String(x.password) === pw);
+        if (!u) { err('שם משתמש או סיסמה שגויים'); $('#lgSubmit').disabled = false; return; }
+        const key = un + '_' + BASE_KEY;
+        // Data saved in this browser before sign-in existed moves to the first user who signs in.
+        if (!localStorage.getItem(key) && localStorage.getItem(BASE_KEY)) {
+          localStorage.setItem(key, localStorage.getItem(BASE_KEY));
+          localStorage.setItem(BASE_KEY + '-before-login', localStorage.getItem(BASE_KEY));
+          localStorage.removeItem(BASE_KEY);
+        }
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ username: un, name: u.name || un, role: u.role || 'user' }));
+        location.reload();
+      } catch (x) {
+        err(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'טעינת רשימת המשתמשים נכשלה');
+        $('#lgSubmit').disabled = false;
+      }
+    });
+  }
+  function localSignOut() {
+    if (!confirm('לצאת מהמערכת במכשיר הזה?')) return;
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
+    location.reload();
+  }
+
   async function startCloud() {
     gate('loading');
     try { cloud = await import('./cloud.js'); } catch (e) {
@@ -1774,7 +1826,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     });
     window.addEventListener('hashchange', render);
     if (CLOUD) { render(); startCloud(); }
+    else if (!localSession) { localGate(); }
     else {
+      $('#logoutName').textContent = localSession.name || localSession.username;
+      $('#logoutTop').style.display = '';
+      $('#logoutTop').addEventListener('click', localSignOut);
       window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
       if (!localStorage.getItem(STORE_KEY)) save();
       render();
