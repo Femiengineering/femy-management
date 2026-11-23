@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "פמי הנדסה",
+    "slug": "femy-management",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "il.co.femy.management",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "il.co.femy.management",
+      "adaptiveIcon": {
+        "backgroundColor": "#15253d",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#15253d"
+    },
+    "extra": {
+      "supportsRTL": true
+    }
+  }
+}

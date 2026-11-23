@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>פמי הנדסה - ניהול</title>
+  <meta name="description" content="מערכת ניהול ומעקב: משימות, פרויקטים, חשבונות ופרוטוקולים">
+  <meta name="theme-color" content="#15253d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="פמי הנדסה">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-name">פמי הנדסה</div>
+        <div class="brand-sub">ניהול ומעקב</div>
+      </div>
+      <nav class="nav">
+        <a href="#dashboard" data-view="dashboard"><span class="ico">📊</span>לוח בקרה</a>
+        <a href="#tasks" data-view="tasks"><span class="ico">✅</span>משימות<span class="badge" id="badgeTasks"></span></a>
+        <a href="#projects" data-view="projects"><span class="ico">🏗️</span>פרויקטים</a>
+        <a href="#accounts" data-view="accounts"><span class="ico">💰</span>חשבונות</a>
+        <a href="#protocols" data-view="protocols"><span class="ico">📝</span>פרוטוקולים</a>
+        <a href="#settings" data-view="settings"><span class="ico">⚙️</span>הגדרות וגיבוי</a>
+      </nav>
+      <div class="sidebar-foot">הנתונים נשמרים במכשיר זה</div>
+    </aside>
+    <div class="overlay" id="overlay"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn" aria-label="תפריט">☰</button>
+        <h1 id="pageTitle">לוח בקרה</h1>
+        <button class="btn" id="installTop" style="display:none">📲 <span class="lbl">התקנת אפליקציה</span></button>
+        <button class="btn primary" id="addBtn">+ <span class="lbl">משימה חדשה</span></button>
+      </header>
+      <main class="content" id="content"></main>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="modalBg">
+    <form class="modal" id="modalForm">
+      <div class="modal-head">
+        <h3 id="modalTitle"></h3>
+        <button type="button" class="icon-btn" data-close aria-label="סגירה">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-foot">
+        <button type="submit" class="btn primary">שמירה</button>
+        <button type="button" class="btn" data-close>ביטול</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn danger" id="modalDelete">מחיקה</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="assets/app.js"></script>
+</body>
+</html>
