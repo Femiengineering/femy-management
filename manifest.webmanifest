@@ -1,0 +1,19 @@
+{
+  "name": "פמי הנדסה - ניהול ומעקב",
+  "short_name": "פמי הנדסה",
+  "description": "משימות, פרויקטים, חשבונות ופרוטוקולים",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./index.html#dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f9",
+  "theme_color": "#15253d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
