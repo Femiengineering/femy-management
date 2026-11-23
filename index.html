@@ -87,10 +87,12 @@ a { color: var(--primary); }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .topbar {
   background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 14px 28px; display: flex; align-items: center; gap: 14px;
-  position: sticky; top: 0; z-index: 5;
+  padding: 10px 28px; display: flex; align-items: center; gap: 18px;
+  z-index: 5;
 }
 .topbar h1 { font-size: 20px; margin: 0; flex: 1; }
+.top-logo-link { display: flex; flex-shrink: 0; padding-inline-end: 18px; border-inline-end: 1px solid var(--border); }
+.top-logo { height: 120px; width: auto; display: block; }
 .menu-btn { display: none; background: none; border: 0; font-size: 22px; cursor: pointer; padding: 4px 8px; }
 .content { padding: 24px 28px 48px; max-width: 1400px; width: 100%; }
 
@@ -291,7 +293,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   .sidebar.open { transform: translateX(0); }
   .overlay.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 30; }
   .menu-btn { display: block; }
-  .topbar { padding: 12px 16px; }
+  .topbar { position: sticky; top: 0; }
+  .topbar { padding: 10px 16px; gap: 10px; }
+  .top-logo { height: 56px; }
+  .top-logo-link { padding-inline-end: 10px; }
+  .topbar h1 { font-size: 17px; }
   .content { padding: 16px 16px 40px; }
   .search { width: 100%; flex: 1 1 100%; }
   .kanban { grid-template-columns: repeat(4, 82vw); scroll-snap-type: x mandatory; }
@@ -332,6 +338,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     <div class="main">
       <header class="topbar">
         <button class="menu-btn" id="menuBtn" aria-label="תפריט">☰</button>
+        <a href="#dashboard" class="top-logo-link"><img src="docs/logo.png" class="top-logo" alt="פמי הנדסה בע״מ"></a>
         <h1 id="pageTitle">לוח בקרה</h1>
         <button class="btn" id="installTop" style="display:none">📲 <span class="lbl">התקנת אפליקציה</span></button>
         <button class="btn primary" id="addBtn">+ <span class="lbl">משימה חדשה</span></button>
