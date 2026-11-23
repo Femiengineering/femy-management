@@ -314,6 +314,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   .sidebar, .topbar, .toolbar, td.actions { display: none !important; }
   .content { padding: 0; }
 }
+
+/* Claude chat */
+.ai-fab { position: fixed; left: 20px; bottom: 20px; z-index: 45; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--primary); color: #fff; font-size: 24px; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.ai-panel { position: fixed; left: 20px; bottom: 88px; z-index: 46; width: 380px; max-width: calc(100vw - 32px); height: 540px; max-height: calc(100vh - 120px); background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.25); display: none; flex-direction: column; overflow: hidden; }
+.ai-panel.show { display: flex; }
+.ai-head { background: var(--sidebar); color: #fff; padding: 12px 14px; display: flex; align-items: center; gap: 8px; }
+.ai-head strong { flex: 1; }
+.ai-head button { background: none; border: 0; color: #fff; cursor: pointer; font-size: 16px; opacity: .8; }
+.ai-msgs { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--surface-2); }
+.ai-msg { padding: 8px 12px; border-radius: 12px; max-width: 88%; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; }
+.ai-msg.user { background: var(--primary); color: #fff; align-self: flex-start; }
+.ai-msg.bot { background: var(--surface); border: 1px solid var(--border); align-self: flex-end; }
+.ai-msg.note { background: var(--green-soft); color: var(--green); align-self: center; font-size: 12.5px; }
+.ai-msg.err { background: var(--red-soft); color: var(--red); align-self: center; font-size: 13px; }
+.ai-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
+.ai-form textarea { flex: 1; resize: none; height: 42px; }
+.ai-suggest { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; background: var(--surface-2); }
+.ai-suggest button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
+@media (max-width: 800px) { .ai-fab { left: 16px; bottom: 16px; } .ai-panel { left: 16px; right: 16px; width: auto; bottom: 80px; height: calc(100vh - 110px); } }
+@media print { .ai-fab, .ai-panel { display: none !important; } }
 </style>
 </head>
 <body>
@@ -364,6 +384,15 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   </div>
 
   <div class="toast" id="toast"></div>
+  <button class="ai-fab" id="aiFab" title="עוזר Claude" aria-label="עוזר Claude">✨</button>
+  <div class="ai-panel" id="aiPanel" role="dialog" aria-label="עוזר Claude">
+    <div class="ai-head"><span>✨</span><strong>עוזר Claude</strong><button id="aiClear" title="שיחה חדשה">↺</button><button id="aiClose" title="סגירה">✕</button></div>
+    <div class="ai-msgs" id="aiMsgs"></div>
+    <div class="ai-suggest" id="aiSuggest">
+      <button>מה המשימות באיחור?</button><button>סכם את הפרוטוקול האחרון</button><button>אילו חשבונות פתוחים?</button>
+    </div>
+    <form class="ai-form" id="aiForm"><textarea class="input" id="aiInput" placeholder="שאלה או בקשה..."></textarea><button class="btn primary" type="submit">שליחה</button></form>
+  </div>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * כל הנתונים נשמרים בדפדפן (localStorage). אין שרת.
@@ -1114,10 +1143,186 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!w) location.href = url;
   }
 
+  // ---------- Claude assistant ----------
+  // The API key is stored only in this browser (never in GitHub or in backup files).
+  const AI_KEY = 'femy-claude-key';
+  const AI_MODEL = 'claude-haiku-5-5';
+  const AI_SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.6.0/+esm';
+  const getAiKey = () => { try { return localStorage.getItem(AI_KEY) || ''; } catch (e) { return ''; } };
+  let aiHistory = [];
+  let aiBusy = false;
+  let aiClient = null;
+
+  const AI_TOOLS = [
+    {
+      name: 'create_task',
+      description: 'יוצר משימה חדשה במערכת. השתמש רק כשהמשתמש מבקש במפורש ליצור משימה.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'כותרת המשימה' },
+          projectId: { type: 'string', description: 'מזהה הפרויקט מהנתונים, או ריק' },
+          assignee: { type: 'string', description: 'שם האחראי' },
+          priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+          due: { type: 'string', description: 'תאריך יעד בפורמט YYYY-MM-DD, או ריק' },
+          notes: { type: 'string' },
+        },
+        required: ['title'],
+      },
+    },
+    {
+      name: 'update_task',
+      description: 'מעדכן משימה קיימת לפי המזהה שלה: סטטוס, עדיפות, אחראי או תאריך יעד.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          taskId: { type: 'string' },
+          status: { type: 'string', enum: ['todo', 'doing', 'waiting', 'done'] },
+          priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+          assignee: { type: 'string' },
+          due: { type: 'string', description: 'YYYY-MM-DD' },
+        },
+        required: ['taskId'],
+      },
+    },
+  ];
+
+  function aiContext() {
+    const pname = (id) => { const p = byId(db.projects, id); return p ? p.name : ''; };
+    return JSON.stringify({
+      today: todayStr(),
+      projects: db.projects.map((p) => ({ id: p.id, name: p.name, client: p.client, status: p.status, progress: p.progress, manager: p.manager, start: p.start, end: p.end, budget: p.budget })),
+      tasks: db.tasks.map((t) => ({ id: t.id, title: t.title, project: pname(t.projectId), assignee: t.assignee, priority: t.priority, status: t.status, due: t.due, notes: t.notes })),
+      invoices: db.invoices.map((i) => ({ number: i.number, type: i.type, party: i.party, project: pname(i.projectId), amountBeforeVat: i.amount, vat: i.vat, issueDate: i.issueDate, dueDate: i.dueDate, status: invoiceStatus(i) })),
+      protocols: db.protocols.slice().sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({ title: p.title, date: p.date, type: p.type, project: pname(p.projectId), participants: p.participants, summary: p.summary, decisions: p.decisions, actions: p.actions })),
+    });
+  }
+  const AI_SYSTEM = `אתה עוזר במערכת הניהול הפנימית של "פמי הנדסה בע״מ", חברת ייעוץ וניהול פרויקטים בבנייה.
+ענה תמיד בעברית, בקצרה ובבהירות, בטקסט פשוט בלי Markdown.
+תקבל את נתוני המערכת (פרויקטים, משימות, חשבונות ופרוטוקולים) כ-JSON. ענה רק על סמך הנתונים האלה, ואם משהו לא מופיע בהם, אמור זאת.
+סטטוסי משימות: todo=לביצוע, doing=בתהליך, waiting=ממתין, done=הושלם. עדיפויות: urgent=דחוף, high=גבוהה, medium=בינונית, low=נמוכה.
+סטטוסי חשבונות: draft=טיוטה, sent=ממתין לתשלום, paid=שולם, overdue=באיחור. סכומים בש״ח, מע״מ 18%.
+כשמבקשים ליצור או לעדכן משימה, השתמש בכלים. תאריכים יחסיים ("מחר", "יום ראשון") חשב לפי התאריך של היום שבנתונים. אחרי פעולה, אשר במשפט אחד מה נעשה.`;
+
+  function aiAdd(cls, text) {
+    const box = $('#aiMsgs');
+    const d = document.createElement('div');
+    d.className = 'ai-msg ' + cls; d.textContent = text;
+    const pending = cls === 'note' && box.querySelector('.ai-msg.pending');
+    if (pending) box.insertBefore(d, pending); else box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d;
+  }
+  function aiReset() {
+    aiHistory = [];
+    $('#aiMsgs').innerHTML = '';
+    $('#aiSuggest').style.display = '';
+    aiAdd('bot', getAiKey() ? 'שלום! אפשר לשאול אותי על המשימות, הפרויקטים, החשבונות והפרוטוקולים, או לבקש ליצור ולעדכן משימות.' : 'כדי להשתמש בעוזר, הזינו מפתח API של Claude בעמוד "הגדרות וגיבוי".');
+  }
+  const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+  function aiRunTool(name, input) {
+    if (name === 'create_task') {
+      if (!input.title) return { error: 'missing title' };
+      const t = {
+        id: uid(), title: String(input.title),
+        projectId: byId(db.projects, input.projectId) ? input.projectId : '',
+        assignee: input.assignee || '',
+        priority: PRIORITY.some((p) => p.id === input.priority) ? input.priority : 'medium',
+        status: 'todo', due: isDate(input.due) ? input.due : '', notes: input.notes || '',
+      };
+      db.tasks.push(t); save(); render();
+      aiAdd('note', '✓ נוצרה משימה: ' + t.title);
+      return { ok: true, taskId: t.id };
+    }
+    if (name === 'update_task') {
+      const t = byId(db.tasks, input.taskId);
+      if (!t) return { error: 'task not found' };
+      if (TASK_STATUS.some((s) => s.id === input.status)) t.status = input.status;
+      if (PRIORITY.some((p) => p.id === input.priority)) t.priority = input.priority;
+      if (input.assignee) t.assignee = String(input.assignee);
+      if (isDate(input.due)) t.due = input.due;
+      save(); render();
+      aiAdd('note', '✓ עודכנה משימה: ' + t.title);
+      return { ok: true };
+    }
+    return { error: 'unknown tool' };
+  }
+  async function aiSend(text) {
+    if (aiBusy || !text.trim()) return;
+    const key = getAiKey();
+    aiAdd('user', text);
+    $('#aiSuggest').style.display = 'none';
+    if (!key) { aiAdd('err', 'חסר מפתח API. הזינו אותו בעמוד "הגדרות וגיבוי".'); return; }
+    aiBusy = true;
+    const wait = aiAdd('bot pending', '...');
+    const turnStart = aiHistory.length;
+    try {
+      if (!aiClient || aiClient._femyKey !== key) {
+        const mod = await import(AI_SDK_URL);
+        const Anthropic = mod.default || mod.Anthropic;
+        aiClient = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+        aiClient._femyKey = key;
+      }
+      aiHistory.push({ role: 'user', content: text });
+      const system = AI_SYSTEM + '\n\nנתוני המערכת:\n' + aiContext();
+      let done = false;
+      for (let step = 0; step < 6 && !done; step++) {
+        const res = await aiClient.messages.create({
+          model: AI_MODEL,
+          max_tokens: 4000,
+          system,
+          tools: AI_TOOLS,
+          output_config: { effort: 'low' },
+          messages: aiHistory,
+        });
+        aiHistory.push({ role: 'assistant', content: res.content });
+        if (res.stop_reason === 'refusal') { wait.textContent = 'לא אוכל לעזור בבקשה הזו.'; done = true; break; }
+        if (res.stop_reason === 'tool_use') {
+          const results = res.content.filter((b) => b.type === 'tool_use')
+            .map((b) => ({ type: 'tool_result', tool_use_id: b.id, content: JSON.stringify(aiRunTool(b.name, b.input || {})) }));
+          aiHistory.push({ role: 'user', content: results });
+          continue;
+        }
+        const answer = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+        wait.textContent = answer || (res.stop_reason === 'max_tokens' ? 'התשובה נקטעה. נסו לבקש תשובה קצרה יותר.' : 'בוצע.');
+        done = true;
+      }
+      if (!done) wait.textContent = 'בוצע.';
+    } catch (e) {
+      wait.remove();
+      const st = e && e.status;
+      aiAdd('err', st === 401 ? 'מפתח ה-API לא תקין. בדקו אותו בהגדרות.'
+        : st === 429 ? 'יותר מדי בקשות, או שנגמר הקרדיט בחשבון ה-API. נסו שוב בעוד רגע.'
+        : st >= 500 ? 'השירות של Claude לא זמין כרגע. נסו שוב.'
+        : navigator.onLine === false ? 'אין חיבור לאינטרנט.'
+        : 'השליחה נכשלה: ' + ((e && e.message) || e));
+      aiHistory.length = turnStart; // drop the failed turn so the conversation stays valid
+    } finally {
+      aiBusy = false;
+      wait.classList.remove('pending');
+    }
+  }
+  function initAi() {
+    aiReset();
+    $('#aiFab').addEventListener('click', () => { const p = $('#aiPanel'); p.classList.toggle('show'); if (p.classList.contains('show')) $('#aiInput').focus(); });
+    $('#aiClose').addEventListener('click', () => $('#aiPanel').classList.remove('show'));
+    $('#aiClear').addEventListener('click', aiReset);
+    $('#aiForm').addEventListener('submit', (e) => { e.preventDefault(); const i = $('#aiInput'); const v = i.value; i.value = ''; aiSend(v); });
+    $('#aiInput').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#aiForm').requestSubmit(); } });
+    $$('#aiSuggest button').forEach((b) => b.addEventListener('click', () => aiSend(b.textContent)));
+  }
+
   // ---------- Settings ----------
   function renderSettings(el) {
     const st = settings();
     el.innerHTML = `
+      <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>עוזר Claude</h2>
+        <p>העוזר (הכפתור ✨ בפינה) עונה על שאלות על הנתונים במערכת, מסכם פרוטוקולים, ויכול ליצור ולעדכן משימות. הוא עובד עם מפתח API של Anthropic, וכל שיחה מחויבת בחשבון ה-API שלכם. המפתח נשמר רק בדפדפן הזה. הוא לא עולה לגיטהב ולא נכלל בקובץ הגיבוי. בכל שאלה נשלחים ל-Claude גם נתוני המערכת, כדי שיוכל לענות.</p>
+        <div class="row"><input class="input" id="aiKeyInput" type="password" dir="ltr" autocomplete="off" placeholder="sk-ant-..." style="flex:1;min-width:220px" value="${esc(getAiKey())}">
+        <button class="btn primary" id="aiKeySave">שמירה</button><button class="btn" id="aiKeyDel">מחיקה</button></div>
+        <div class="hint">יוצרים מפתח ב-console.anthropic.com, תחת API Keys.</div>
+      </div>
       <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>שליחת פרוטוקולים במייל</h2>
         <p>הנמענים האלה ימולאו אוטומטית בכל פעם שלוחצים "שליחה במייל" בפרוטוקול. אפשר לשנות אותם במייל עצמו לפני השליחה. מפרידים בין כתובות בפסיק.</p>
@@ -1149,6 +1354,15 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <div class="row"><button class="btn danger" id="wipeBtn">מחיקת כל הנתונים</button>
         <button class="btn" id="demoBtn">טעינת נתוני דוגמה</button></div>
       </div>`;
+    $('#aiKeySave', el).addEventListener('click', () => {
+      const v = $('#aiKeyInput', el).value.trim();
+      try { if (v) localStorage.setItem(AI_KEY, v); else localStorage.removeItem(AI_KEY); } catch (e) { toast('לא ניתן לשמור בדפדפן הזה'); return; }
+      aiClient = null; aiReset(); toast(v ? 'המפתח נשמר' : 'המפתח נמחק');
+    });
+    $('#aiKeyDel', el).addEventListener('click', () => {
+      try { localStorage.removeItem(AI_KEY); } catch (e) { /* ignore */ }
+      $('#aiKeyInput', el).value = ''; aiClient = null; aiReset(); toast('המפתח נמחק');
+    });
     $('#saveMail', el).addEventListener('click', () => {
       const bad = [$('#setTo', el).value, $('#setCc', el).value].join(',').split(/[\s,;]+/).filter((x) => x && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
       st.emailTo = $('#setTo', el).value.trim(); st.emailCc = $('#setCc', el).value.trim(); st.mailApp = $('#setApp', el).value;
@@ -1229,6 +1443,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   // ---------- Init ----------
   document.addEventListener('DOMContentLoaded', () => {
+    initAi();
     $('#modalForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(e.target); const data = {};
