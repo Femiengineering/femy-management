@@ -1,9 +1,10 @@
 // Service worker: lets the app open without a network connection.
-const CACHE = 'femy-v5';
+const CACHE = 'femy-v6';
 const ASSETS = [
   './',
   './index.html',
   './firebase-config.js',
+  './users.json',
   './cloud.js',
   './manifest.webmanifest',
   './docs/logo.png',
