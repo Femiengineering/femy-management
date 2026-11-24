@@ -15,7 +15,7 @@
 // Settings (wrangler.toml / `wrangler secret put`):
 //   GOOGLE_CLIENT_ID      the same OAuth Client ID as in google-config.js
 //   GOOGLE_CLIENT_SECRET  secret, from the same OAuth client
-//   ENC_KEY               secret, 32 random bytes in base64 (see docs/GOOGLE-SETUP.md)
+//   ENC_KEY               secret, any long random string (e.g. 32 random bytes in base64)
 //   ALLOWED_ORIGINS       comma separated, e.g. https://femiengineering.github.io
 
 const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
@@ -45,6 +45,7 @@ export default {
       if (path === '/forget') return reply(...(await forget(env, body)));
       return reply(404, { error: 'not_found' });
     } catch (e) {
+      console.error('femy-google ' + path + ': ' + (e && e.stack || e));
       return reply(500, { error: 'server_error' });
     }
   },
@@ -136,8 +137,16 @@ async function hash(s) {
   return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 let keyCache = null;
+// The AES key is the SHA-256 of ENC_KEY, so any long random string works, and a stray
+// space, newline or wrong length in the pasted secret can't break encryption.
 async function aesKey(env) {
-  if (!keyCache) keyCache = crypto.subtle.importKey('raw', fromB64(env.ENC_KEY), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  if (!keyCache) {
+    const secret = String(env.ENC_KEY || '').trim();
+    if (secret.length < 16) throw new Error('ENC_KEY is missing or too short');
+    keyCache = crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret))
+      .then((raw) => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']));
+    keyCache.catch(() => { keyCache = null; });
+  }
   return keyCache;
 }
 async function seal(env, text) {
