@@ -171,6 +171,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
 
 /* Kanban */
+.tgroup { padding: 14px 16px; margin-bottom: 12px; }
+.tg-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.tg-head .grow { flex: 1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.tg-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tg-row:last-child { border-bottom: 0; }
+.tg-title { flex: 1; min-width: 180px; color: inherit; text-decoration: none; }
+.tg-title:hover { text-decoration: underline; }
+.tg-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .kanban { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 6px; }
 .col { background: #eaeef3; border-radius: var(--radius); padding: 10px; min-height: 200px; display: flex; flex-direction: column; }
 .col.drop { outline: 2px dashed var(--primary); background: var(--primary-soft); }
@@ -624,7 +632,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'board', taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, projFilter: '', protoQ: '', openProto: null, gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, projFilter: '', protoQ: '', openProto: null, gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -775,7 +783,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <select class="input" id="ta"><option value="">כל האחראים</option>${assignees().map((a) => `<option ${a === f.assignee ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select>
         <select class="input" id="tpr">${dictOptions(PRIORITY, f.priority, 'כל העדיפויות')}</select>
         <span class="spacer"></span>
-        <div class="seg"><button data-v="board" class="${ui.taskView === 'board' ? 'on' : ''}">לוח</button><button data-v="list" class="${ui.taskView === 'list' ? 'on' : ''}">רשימה</button></div>
+        <div class="seg"><button data-v="projects" class="${ui.taskView === 'projects' ? 'on' : ''}">לפי פרויקט</button><button data-v="board" class="${ui.taskView === 'board' ? 'on' : ''}">לוח</button><button data-v="list" class="${ui.taskView === 'list' ? 'on' : ''}">רשימה</button></div>
       </div>
       <div id="taskArea"></div>`;
     const rerender = () => drawTasks($('#taskArea', el));
@@ -802,7 +810,47 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   function drawTasks(area) {
     const list = filteredTasks().sort((a, b) => byId(PRIORITY, a.priority).rank - byId(PRIORITY, b.priority).rank || (a.due || '9999').localeCompare(b.due || '9999'));
-    if (ui.taskView === 'board') {
+    if (ui.taskView === 'projects') {
+      // One section per project: its open tasks first, completed ones folded at the bottom.
+      const groups = db.projects.map((p) => ({ p, items: list.filter((t) => t.projectId === p.id) }));
+      groups.push({ p: null, items: list.filter((t) => !byId(db.projects, t.projectId)) });
+      const filtering = ui.taskFilter.q || ui.taskFilter.assignee || ui.taskFilter.priority || ui.taskFilter.project;
+      const shown = groups.filter((g) => g.items.length && (!ui.taskFilter.project || (g.p && g.p.id === ui.taskFilter.project)))
+        .sort((a, b) => (b.items.some((t) => t.status !== 'done') - a.items.some((t) => t.status !== 'done'))
+          || (a.p ? 0 : 1) - (b.p ? 0 : 1));
+      const row = (t) => {
+        const od = isOverdueTask(t); const done = t.status === 'done';
+        return `<div class="tg-row" data-id="${t.id}">
+          <input type="checkbox" data-done ${done ? 'checked' : ''} title="סימון כהושלם">
+          <a href="#" data-edit class="tg-title" style="${done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(t.title)}</a>
+          <span class="tg-meta">${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}${pill(PRIORITY, t.priority)}${pill(TASK_STATUS, t.status)}</span>
+        </div>`;
+      };
+      area.innerHTML = shown.map((g) => {
+        const key = g.p ? g.p.id : '_none';
+        const open = g.items.filter((t) => t.status !== 'done'); const done = g.items.filter((t) => t.status === 'done');
+        const odN = open.filter(isOverdueTask).length;
+        const showDone = ui.taskOpenDone[key];
+        return `<div class="card tgroup" data-key="${key}">
+          <div class="tg-head"><div class="grow"><b>${g.p ? esc(g.p.name) : 'ללא פרויקט'}</b>
+            ${g.p ? `<span class="hint">${esc(g.p.client || '')}</span> ${pill(PROJECT_STATUS, g.p.status)}` : ''}</div>
+            <span class="hint">${open.length} פתוחות${odN ? ` · <span class="overdue">${odN} באיחור</span>` : ''}</span>
+            <button class="btn sm" data-addp="${g.p ? g.p.id : ''}">+ משימה</button></div>
+          ${open.map(row).join('') || '<div class="hint" style="padding:8px 0">אין משימות פתוחות</div>'}
+          ${done.length ? `<a href="#" class="hint" data-toggle-done style="display:inline-block;padding-top:8px">${showDone ? 'הסתרת' : 'הצגת'} ${done.length} משימות שהושלמו</a>${showDone ? done.map(row).join('') : ''}` : ''}
+        </div>`;
+      }).join('') || `<div class="card empty">${filtering ? 'לא נמצאו משימות' : 'אין משימות עדיין'}</div>`;
+      $$('.tg-row', area).forEach((r) => {
+        const t = byId(db.tasks, r.dataset.id);
+        $('[data-edit]', r).addEventListener('click', (e) => { e.preventDefault(); openTaskForm(t); });
+        $('[data-done]', r).addEventListener('change', (e) => { t.status = e.target.checked ? 'done' : 'todo'; save(); drawTasks(area); updateBadge(); });
+      });
+      $$('.tgroup', area).forEach((g) => {
+        const tg = $('[data-toggle-done]', g);
+        if (tg) tg.addEventListener('click', (e) => { e.preventDefault(); ui.taskOpenDone[g.dataset.key] = !ui.taskOpenDone[g.dataset.key]; drawTasks(area); });
+        $('[data-addp]', g).addEventListener('click', (e) => openTaskForm(null, { projectId: e.target.dataset.addp }));
+      });
+    } else if (ui.taskView === 'board') {
       area.innerHTML = `<div class="kanban">${TASK_STATUS.map((s) => {
         const items = list.filter((t) => t.status === s.id);
         return `<div class="col" data-status="${s.id}">
