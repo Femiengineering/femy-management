@@ -556,6 +556,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .g-local { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .g-local select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--card, #fff); color: inherit; }
 .pd-list { max-height: 460px; overflow-y: auto; }
+.pd-head { gap: 10px; flex-wrap: wrap; }
+.pd-search { max-width: 240px; flex: 1 1 160px; padding: 6px 10px; }
+.pd-name { flex: 1; min-width: 0; }
+.pd-name a { overflow-wrap: anywhere; }
+.pd-where { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .pd-dir { cursor: pointer; user-select: none; }
 .pd-crumbs .g-copy { text-decoration: none; }
 .g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
@@ -820,7 +825,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [] } };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1479,7 +1484,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           ${doneT.length ? `<a href="#" class="hint" data-toggle-done style="display:inline-block;padding-top:8px">${ui.projTaskDone ? 'הסתרת' : 'הצגת'} ${doneT.length} משימות שהושלמו</a>${ui.projTaskDone ? doneT.map(row).join('') : ''}` : ''}
         </div>
         <div class="card card-pad">
-          <div class="card-head"><h2>תיקיית הפרויקט</h2>${p.driveFolder ? `<a href="${esc(driveUrl(p))}" target="_blank" rel="noopener">פתיחה ב-Drive ↗</a>` : ''}</div>
+          <div class="card-head pd-head"><h2>תיקיית הפרויקט</h2>${showDrive ? `<input class="input pd-search" id="pdq" type="search" placeholder="🔍 חיפוש קובץ או תיקייה" value="${esc(ui.projDrive.pid === p.id ? ui.projDrive.q : '')}">` : p.driveFolder ? `<a href="${esc(driveUrl(p))}" target="_blank" rel="noopener">פתיחה ב-Drive ↗</a>` : ''}</div>
           <div id="projDrive">${!p.driveFolder ? '<div class="hint">לפרויקט הזה עוד אין קישור לתיקייה ב-Drive. לחצו "עריכה" והדביקו את הקישור לתיקייה.</div>'
             : !showDrive ? `<div class="hint" style="margin-bottom:10px">כדי לדפדף כאן בתיקיות, חברו את חשבון ה-Google שלכם בלשונית <a href="#google">יומן, מייל ו-Drive</a>.</div><a class="btn" ${lpAttr(p)}>📋 העתק נתיב התיקייה</a>`
             : '<div class="hint">טוען קבצים...</div>'}</div>
@@ -1514,8 +1519,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
     const box = $('#projDrive', el);
     if (showDrive) {
-      if (ui.projDrive.pid !== p.id) ui.projDrive = { pid: p.id, path: [] };
+      if (ui.projDrive.pid !== p.id) ui.projDrive = { pid: p.id, path: [], q: '' };
       renderProjDrive(p, box);
+      const q = $('#pdq', el); let tm = 0;
+      q.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { if (ui.projDrive.q === q.value.trim()) return; ui.projDrive.q = q.value.trim(); renderProjDrive(p, box); }, 250); });
     }
   }
 
@@ -1558,7 +1565,70 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!files.length && !top) throw new Error('התיקייה עוד לא סונכרנה');
     return { files, src: 'cache' };
   }
+  // Every folder and file under a project folder, collected once (folder by folder) for the search box,
+  // and kept for 10 minutes.
+  const pdIndex = {};
+  function projDriveIndex(p, onProgress) {
+    const c = pdIndex[p.driveFolder];
+    if (c && (c.running || Date.now() - c.at < 10 * 60 * 1000)) { if (onProgress) c.listeners.push(onProgress); return c.promise; }
+    const ix = pdIndex[p.driveFolder] = { at: 0, running: true, items: [], partial: false, listeners: onProgress ? [onProgress] : [] };
+    ix.promise = (async () => {
+      const queue = [{ id: p.driveFolder, path: [] }]; let seen = 0;
+      const worker = async () => {
+        while (queue.length) {
+          const d = queue.shift();
+          if (++seen > 600) { ix.partial = true; queue.length = 0; return; }
+          let res; try { res = await listDriveFolder(d.id); } catch (e) { ix.partial = true; continue; }
+          if (res.src === 'cache') ix.partial = true;
+          res.files.forEach((f) => {
+            ix.items.push({ f, path: d.path });
+            if (f.folder) queue.push({ id: f.id, path: d.path.concat([{ id: f.id, name: f.name }]) });
+          });
+          ix.listeners.forEach((fn) => fn(ix));
+        }
+      };
+      // A few folders at a time; a worker that finds the queue empty waits for the others to add to it.
+      const run = async () => { await worker(); };
+      let active = [];
+      do { active = Array.from({ length: Math.min(6, Math.max(1, queue.length)) }, run); await Promise.all(active); } while (queue.length);
+      ix.running = false; ix.at = Date.now();
+      return ix;
+    })();
+    return ix.promise;
+  }
+  function renderProjDriveSearch(p, box) {
+    const st = ui.projDrive; const q = st.q; const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const rootName = folderNames[p.driveFolder] || p.name;
+    const copyBtn = (attr) => `<button type="button" class="g-copy" ${attr} title="העתקת הנתיב במחשב (Google Drive למחשב), להדבקה בסייר הקבצים עם Ctrl+L">📋</button>`;
+    const alive = () => document.body.contains(box) && ui.projDrive === st && st.q === q;
+    const draw = (ix) => {
+      if (!alive()) return;
+      const hits = ix.items.filter((it) => { const n = it.f.name.toLowerCase(); return words.every((w) => n.includes(w)); })
+        .sort((a, b) => (b.f.folder ? 1 : 0) - (a.f.folder ? 1 : 0) || a.path.length - b.path.length);
+      const shown = hits.slice(0, 200);
+      const where = (it) => `<div class="pd-where">${esc([rootName].concat(it.path.map((c) => c.name)).join(' › '))}</div>`;
+      const fileUrl = (f) => f.webViewLink || ('https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view');
+      box.innerHTML = `<div class="g-crumbs pd-crumbs"><b>תוצאות חיפוש: "${esc(q)}"</b><span style="flex:1"></span><button type="button" class="g-copy" data-clear>✕ ניקוי החיפוש</button></div>
+        <div class="pd-list">${shown.map((it, i) => (it.f.folder
+          ? `<div class="g-file pd-dir" data-i="${i}"><span>📁</span><div class="pd-name"><a href="#" data-dir="${i}" title="פתיחת התיקייה">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`
+          : `<div class="g-file">${it.f.iconLink ? `<img src="${esc(it.f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="pd-name"><a href="${esc(fileUrl(it.f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`)).join('')
+          || `<div class="hint" style="padding:8px 0">${ix.running ? 'מחפש...' : 'לא נמצא קובץ או תיקייה בשם הזה'}</div>`}</div>
+        <div class="hint" style="padding-top:8px">${hits.length} תוצאות${hits.length > shown.length ? ` (מוצגות ${shown.length})` : ''}${ix.running ? ` · סורק תיקיות... (${ix.items.length} פריטים עד עכשיו)` : ''}${!ix.running && ix.partial ? ' · ייתכן שחלק מהתיקיות לא נסרקו' : ''}</div>`;
+      const pick = (i) => shown[Number(i)];
+      $('[data-clear]', box).addEventListener('click', () => { st.q = ''; const inp = $('#pdq'); if (inp) inp.value = ''; renderProjDrive(p, box); });
+      const openDir = (it) => { st.q = ''; const inp = $('#pdq'); if (inp) inp.value = ''; st.path = it.path.concat([{ id: it.f.id, name: it.f.name }]); renderProjDrive(p, box); };
+      $$('[data-dir]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openDir(pick(a.dataset.dir)); }));
+      $$('.pd-dir', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; openDir(pick(r.dataset.i)); }));
+      $$('[data-copy]', box).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); const it = pick(b.dataset.copy); copyProjectPath(p, it.path.map((c) => c.name).concat([it.f.name])); }));
+    };
+    box.innerHTML = '<div class="hint" style="padding:8px 0">מחפש...</div>';
+    let last = 0;
+    projDriveIndex(p, (ix) => { if (Date.now() - last > 300) { last = Date.now(); draw(ix); } }).then(draw).catch((e) => {
+      if (alive()) box.innerHTML = `<div class="hint" style="padding:8px 0">החיפוש נכשל (${esc(gErr(e))})</div>`;
+    });
+  }
   function renderProjDrive(p, box) {
+    if (ui.projDrive.q) { renderProjDriveSearch(p, box); return; }
     const st = ui.projDrive; const path = st.path;
     const here = path.length ? path[path.length - 1].id : p.driveFolder;
     const rootName = folderNames[p.driveFolder] || p.name;
