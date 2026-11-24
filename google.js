@@ -278,6 +278,31 @@
     const p = new URLSearchParams({ q, orderBy: search ? 'modifiedTime desc' : 'viewedByMeTime desc', pageSize: '30', fields: FIELDS, includeItemsFromAllDrives: 'true', supportsAllDrives: 'true' });
     return (await json(DAPI + '?' + p)).files || [];
   }
+  // The company's shared projects folder: the Drive tab on the site shows only what is inside it.
+  const PROJECTS_NAME = (window.FEMY_GOOGLE && window.FEMY_GOOGLE.projectsFolderName) || 'פרויקטים פמי';
+  let projectsId = (window.FEMY_GOOGLE && window.FEMY_GOOGLE.projectsFolderId) || '';
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
+  async function projectsRoot() {
+    if (projectsId) return projectsId;
+    // Not configured: find the folder by name (it may be shared with the user rather than in their My Drive).
+    const q = `name contains '${qs(PROJECTS_NAME.trim())}' and mimeType='${FOLDER_MIME}' and trashed=false`;
+    const p = new URLSearchParams({ q, fields: 'files(id,name)', pageSize: '20', includeItemsFromAllDrives: 'true', supportsAllDrives: 'true' });
+    const found = ((await json(DAPI + '?' + p)).files || []).find((f) => f.name.trim() === PROJECTS_NAME.trim());
+    if (!found) { const e = new Error(`התיקייה "${PROJECTS_NAME}" לא נמצאה ב-Drive שלך`); e.status = 404; throw e; }
+    return (projectsId = found.id);
+  }
+  // Lists one folder inside the projects folder: subfolders first, then files (or only folders).
+  async function browse(parentId, opts) {
+    const o = opts || {};
+    const parent = parentId || await projectsRoot();
+    let q = `'${qs(parent)}' in parents and trashed=false`;
+    if (o.foldersOnly) q += ` and mimeType='${FOLDER_MIME}'`;
+    if (o.search) q += ` and name contains '${qs(o.search)}'`;
+    const p = new URLSearchParams({ q, orderBy: 'folder,name', pageSize: '200', fields: FIELDS, includeItemsFromAllDrives: 'true', supportsAllDrives: 'true' });
+    const list = (await json(DAPI + '?' + p)).files || [];
+    list.forEach((f) => { f.folder = f.mimeType === FOLDER_MIME; });
+    return { id: parent, files: list };
+  }
   let folderId = null;
   async function folder(tok) {
     if (folderId) return folderId;
@@ -297,7 +322,7 @@
     return (await (await api(tok, `${DAPI}?q=${q}&orderBy=modifiedTime desc&pageSize=50&fields=${FIELDS}`)).json()).files || [];
   }
   // Creates the file in the site's folder, or replaces it when fileId is given and still reachable.
-  async function save(name, blob, fileId) {
+  async function save(name, blob, fileId, parentId) {
     const tok = await token();
     const form = (meta) => {
       const f = new FormData();
@@ -309,6 +334,12 @@
       try { return await (await api(tok, `${UP}/${fileId}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'PATCH', body: form({ name }) })).json(); }
       catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
     }
+    if (parentId) {
+      // Into a folder the user chose (for example a project folder). Falls back to the site's own folder
+      // when Google does not let the site write there.
+      try { const f = await (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'POST', body: form({ name, parents: [parentId] }) })).json(); f.inFolder = true; return f; }
+      catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
+    }
     const parent = await folder(tok);
     return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form({ name, parents: [parent] }) })).json();
   }
@@ -318,6 +349,6 @@
     enabled, init, status, valid, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, send, link: mailLink },
-    drive: { files, appFiles, save, read: readFile },
+    drive: { files, browse, projectsRoot, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
   };
 })();

@@ -388,6 +388,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .g-file img { width: 16px; height: 16px; flex-shrink: 0; }
 .g-file a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .g-file small { color: var(--muted); white-space: nowrap; }
+.g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
 .g-search .input { flex: 1; }
 </style>
@@ -623,7 +624,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'board', taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, projFilter: '', protoQ: '', openProto: null, gTab: 'calendar', gMailQ: '', gDriveQ: '' };
+  const ui = { taskView: 'board', taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, projFilter: '', protoQ: '', openProto: null, gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -881,6 +882,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="toolbar">
         <div class="seg"><button data-s="" class="${!ui.projFilter ? 'on' : ''}">הכול (${db.projects.length})</button>
         ${PROJECT_STATUS.map((s) => `<button data-s="${s.id}" class="${ui.projFilter === s.id ? 'on' : ''}">${s.label} (${db.projects.filter((p) => p.status === s.id).length})</button>`).join('')}</div>
+        <span class="spacer"></span>
+        ${isAdmin() ? '<button class="btn" id="driveImportBtn" title="מוסיף פרויקטים מתיקיית פרויקטים פמי שעדיין אינם במערכת">📁 ייבוא פרויקטים מה-Drive</button>' : ''}
       </div>
       <div class="proj-grid">${list.map((p) => {
         const tasks = db.tasks.filter((t) => t.projectId === p.id);
@@ -899,17 +902,51 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
             <dt>תקציב</dt><dd>${p.budget ? fmtMoney(p.budget) : '-'}</dd>
             <dt>חויב עד כה</dt><dd>${fmtMoney(billed)}${p.budget ? ` <span class="hint">(${Math.round((billed / p.budget) * 100)}%)</span>` : ''}</dd>
           </dl>
-          ${p.notes ? `<div class="hint">${esc(p.notes)}</div>` : ''}
+          ${p.notes ? `<div class="hint" style="white-space:pre-line">${esc(p.notes)}</div>` : ''}
           <div class="proj-foot"><span>${openT} משימות פתוחות${odT ? ` · <span class="overdue">${odT} באיחור</span>` : ''}</span>
-            <span><button class="btn sm" data-tasks>משימות</button> <button class="btn sm" data-edit>עריכה</button></span></div>
+            <span>${p.driveFolder ? `<a class="btn sm" href="https://drive.google.com/drive/folders/${encodeURIComponent(p.driveFolder)}" target="_blank" rel="noopener">📁 Drive</a> ` : ''}<button class="btn sm" data-tasks>משימות</button> <button class="btn sm" data-edit>עריכה</button></span></div>
         </div>`;
       }).join('') || '<div class="card empty" style="grid-column:1/-1">אין פרויקטים להצגה. לחצו על "פרויקט חדש" כדי להוסיף.</div>'}</div>`;
     $$('.seg button', el).forEach((b) => b.addEventListener('click', () => { ui.projFilter = b.dataset.s; renderProjects(el); }));
+    const di = $('#driveImportBtn', el);
+    if (di) di.addEventListener('click', () => importDriveProjects(true));
     $$('.proj', el).forEach((c) => {
       const p = byId(db.projects, c.dataset.id);
       $('[data-edit]', c).addEventListener('click', () => openProjectForm(p));
       $('[data-tasks]', c).addEventListener('click', () => { ui.taskFilter = { q: '', project: p.id, assignee: '', priority: '' }; location.hash = 'tasks'; });
     });
+  }
+
+  // Projects collected from the company's Drive folder ("פרויקטים פמי"), in projects/drive-projects.json.
+  // Added once per version of that file; a project already in the system (same id or name) is left as is,
+  // so edits made on the site are never overwritten. manual: the button on the projects page.
+  async function importDriveProjects(manual) {
+    if (!isAdmin()) return;
+    let data;
+    try { data = await (await fetch('projects/drive-projects.json', { cache: 'no-cache' })).json(); }
+    catch (e) { if (manual) toast('טעינת רשימת הפרויקטים מה-Drive נכשלה'); return; }
+    if (!data || !Array.isArray(data.projects)) return;
+    if (!manual && settings().driveImport === data.version) return;
+    if (db.demo) db = emptyDb(); // replace the sample data with the real projects
+    const norm = (x) => (x || '').replace(/\s+/g, ' ').trim();
+    const ids = new Set(db.projects.map((p) => p.id));
+    const names = new Set(db.projects.map((p) => norm(p.name)));
+    let n = 0;
+    const added = {};
+    data.projects.forEach((p) => {
+      if (ids.has(p.id) || names.has(norm(p.name))) return;
+      db.projects.push(Object.assign({}, p)); added[p.id] = 1; n++;
+    });
+    // Open action items and recent meeting summaries, only for projects added now.
+    let nt = 0;
+    [['tasks', data.tasks], ['protocols', data.protocols]].forEach(([col, list]) => (list || []).forEach((x) => {
+      if (!added[x.projectId] || db[col].some((y) => y.id === x.id)) return;
+      db[col].push(Object.assign({}, x)); if (col === 'tasks') nt++;
+    }));
+    settings().driveImport = data.version;
+    save(); render();
+    if (n) toast(`נוספו ${n} פרויקטים ו-${nt} משימות מתיקיית פרויקטים פמי ב-Drive`);
+    else if (manual) toast('כל הפרויקטים מה-Drive כבר נמצאים במערכת');
   }
 
   function openProjectForm(proj) {
@@ -1816,11 +1853,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="toolbar">
         <div class="seg">${tabs.map(([k, l]) => `<button data-gtab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
         ${tab === 'gmail' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="חיפוש במיילים (כמו ב-Gmail)" value="${esc(ui.gMailQ)}"><button class="btn">חיפוש</button></form>` : ''}
-        ${tab === 'drive' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="חיפוש קובץ לפי שם" value="${esc(ui.gDriveQ)}"><button class="btn">חיפוש</button></form>` : ''}
+        ${tab === 'drive' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="${ui.gDrivePath.length ? 'חיפוש בתיקייה הזו' : 'חיפוש פרויקט'}" value="${esc(ui.gDriveQ)}"><button class="btn">חיפוש</button></form>` : ''}
         <span class="spacer"></span>
         ${tab === 'calendar' ? '<button class="btn primary" data-gnew>+ אירוע חדש</button>' : ''}
         ${tab === 'gmail' ? '<button class="btn primary" data-gnew>+ מייל חדש</button>' : ''}
-        ${tab === 'drive' ? '<label class="btn primary">⬆ העלאת קובץ<input type="file" id="gUpload" hidden></label>' : ''}
+        ${tab === 'drive' && ui.gDrivePath.length ? '<label class="btn primary">⬆ העלאת קובץ לתיקייה<input type="file" id="gUpload" hidden></label>' : ''}
       </div>
       <div class="card card-pad" id="gArea"></div>`;
     const area = $('#gArea', el);
@@ -1834,7 +1871,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const up = $('#gUpload', el);
     if (up) up.addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
-      try { await G.token(); toast('מעלה...'); await G.drive.save(f.name, f); toast('הקובץ הועלה לתיקייה "פמי הנדסה - מערכת ניהול"'); renderGoogle(el); }
+      const here = ui.gDrivePath[ui.gDrivePath.length - 1];
+      try {
+        await G.token(); toast('מעלה...');
+        const r = await G.drive.save(f.name, f, null, here && here.id);
+        toast(r.inFolder ? `הקובץ הועלה לתיקייה "${here.name}"` : 'Google לא אפשרה להעלות לתיקייה הזו, הקובץ הועלה לתיקייה "פמי הנדסה - מערכת ניהול"');
+        renderGoogle(el);
+      }
       catch (x) { toast('ההעלאה נכשלה: ' + gErr(x)); }
     });
     if (!s.valid) { area.innerHTML = '<div class="empty">כדי לראות את התוכן, חברו את חשבון ה-Google שלכם (הכפתור למעלה)</div>'; return; }
@@ -1860,11 +1903,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         });
       }).catch(fail);
     } else {
-      G.drive.files(ui.gDriveQ).then((files) => {
+      // Only the company's projects folder: at the top its project folders, inside a folder its contents.
+      const path = ui.gDrivePath;
+      const here = path[path.length - 1];
+      G.drive.browse(here && here.id, { foldersOnly: !here, search: ui.gDriveQ }).then((res) => {
         if (!alive()) return;
-        area.innerHTML = files.map((f) => `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}
-          <a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a>
-          <small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small></div>`).join('') || '<div class="empty">לא נמצאו קבצים</div>';
+        const crumbs = [{ name: '📁 ' + G.drive.projectsName }].concat(path);
+        const when = (f) => `<small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>`;
+        area.innerHTML = `<div class="g-crumbs">${crumbs.map((c, i) => i === crumbs.length - 1 ? `<b>${esc(c.name)}</b>` : `<a href="#" data-crumb="${i}">${esc(c.name)}</a>`).join(' <span class="hint">›</span> ')}</div>`
+          + (res.files.map((f) => f.folder
+            ? `<div class="g-file"><span>📁</span><a href="#" data-dir="${esc(f.id)}">${esc(f.name)}</a>${when(f)}<a class="hint" href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener" title="פתיחה ב-Drive" style="flex:0">↗</a></div>`
+            : `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a>${when(f)}</div>`).join('')
+          || `<div class="empty">${ui.gDriveQ ? 'לא נמצא דבר בשם הזה' : here ? 'התיקייה ריקה' : 'אין תיקיות'}</div>`);
+        $$('[data-dir]', area).forEach((a) => a.addEventListener('click', (e) => {
+          e.preventDefault(); ui.gDrivePath = path.concat([{ id: a.dataset.dir, name: a.textContent }]); ui.gDriveQ = ''; renderGoogle(el);
+        }));
+        $$('[data-crumb]', area).forEach((a) => a.addEventListener('click', (e) => {
+          e.preventDefault(); ui.gDrivePath = path.slice(0, Number(a.dataset.crumb)); ui.gDriveQ = ''; renderGoogle(el);
+        }));
       }).catch(fail);
     }
   }
@@ -2043,6 +2099,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
       if (!localStorage.getItem(STORE_KEY)) save();
       render();
+      importDriveProjects(false);
     }
 
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
