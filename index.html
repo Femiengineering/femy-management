@@ -325,6 +325,21 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .proto-kinds .n { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text); font-size: 12px; margin-inline-start: 4px; }
 .proto-kinds button.on .n { background: var(--primary); color: #fff; }
 .dp-status { margin: -4px 0 12px; }
+/* Protocols by project: one compact tile per project with its latest documents. */
+.prtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.prtile { display: flex; flex-direction: column; align-items: stretch; padding: 10px 12px; min-width: 0; cursor: pointer; transition: box-shadow .12s, border-color .12s; }
+.prtile:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(16, 24, 40, .1); }
+.prtile-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.prtile-head b { flex: 1; min-width: 0; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-head .n { flex: none; font-size: 11.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 9px; padding: 0 7px; }
+.prtile-client { font-size: 12px; color: var(--muted); margin: -4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile ul { list-style: none; margin: 0; padding: 0; }
+.prtile li { display: flex; font-size: 13px; padding: 3px 0; border-top: 1px solid var(--border); }
+.prtile li a { color: inherit; text-decoration: none; display: flex; gap: 8px; align-items: baseline; min-width: 0; flex: 1; }
+.prtile li a:hover .t { text-decoration: underline; color: var(--primary); }
+.prtile li .d { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 58px; }
+.prtile li .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-more { margin-top: auto; padding-top: 4px; font-size: 12px; color: var(--primary); }
 .dproto { display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .dproto .proto-head { flex: 1; min-width: 240px; text-decoration: none; color: inherit; }
 .dproto .proto-head:hover .proto-title { text-decoration: underline; }
@@ -771,7 +786,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1958,8 +1973,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   const protoKind = (pr) => (pr.template === 'supervision' ? 'report' : 'meeting');
   const PROTO_KINDS = { meeting: 'סיכומי פגישות', report: 'דוחות ביצוע ופיקוח' };
-  const GROUP_SHOW = 6;
-
+  
   function renderProtocols(el) {
     syncDriveProtos(false);
     const kind = ui.protoKind === 'report' ? 'report' : 'meeting';
@@ -1973,10 +1987,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       && (!src || (src === 'drive' ? e.drive : src === '_other' ? e.site && !protoTpl(e.site) : e.site && e.site.template === src)))
       .sort((a, b) => b.date.localeCompare(a.date));
     const cardHtml = (e, o) => (e.site ? protoCardHtml(e.site, o) : driveProtoHtml(e.drive, o));
-    ui.protoMore = ui.protoMore || {};
     let body;
     if (ui.protoGroup !== 'date') {
-      // One section per project (or client folder), the one with the most recent document first.
+      // One group per project (or client folder), the one with the most recent document first.
       const map = new Map();
       list.forEach((e) => {
         const k = e.p ? e.p.id : e.drive && e.drive.group ? 'g:' + e.drive.group : '_none';
@@ -1984,15 +1997,33 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         map.get(k).items.push(e);
       });
       const groups = Array.from(map.values()).sort((a, b) => (a.k === '_none') - (b.k === '_none') || (b.items[0].date || '').localeCompare(a.items[0].date || ''));
-      body = groups.map((g) => {
-        const more = !q && g.items.length > GROUP_SHOW + 1 && !ui.protoMore[g.k];
-        const shown = more ? g.items.slice(0, GROUP_SHOW) : g.items;
-        return `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.label)}</a>` : esc(g.label)}</h2>
-          <span class="count">${g.items.length} ${kind === 'report' ? 'דוחות' : 'סיכומים'}${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
-          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ ${kind === 'report' ? 'דוח פיקוח' : 'סיכום פגישה'}</button>` : ''}</div>
-          ${shown.map((e) => cardHtml(e, { hideProject: true })).join('')}
-          ${more ? `<button class="btn sm ghost" data-more="${esc(g.k)}" style="margin-bottom:8px">הצגת כל ה-${g.items.length}</button>` : ''}`;
-      }).join('');
+      const noun = kind === 'report' ? 'דוחות' : 'סיכומים';
+      const groupHead = (g) => `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.label)}</a>` : esc(g.label)}</h2>
+          <span class="count">${g.items.length} ${noun}${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
+          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ ${kind === 'report' ? 'דוח פיקוח' : 'סיכום פגישה'}</button>` : ''}</div>`;
+      const openG = ui.protoOpenGroup && groups.find((g) => g.k === ui.protoOpenGroup);
+      if (openG) {
+        // One project opened from its tile: all of its documents.
+        body = `<button class="btn sm ghost" data-tilesback style="margin-bottom:10px">→ חזרה לכל הפרויקטים</button>
+          ${groupHead(openG)}${openG.items.map((e) => cardHtml(e, { hideProject: true })).join('')}`;
+      } else if (q || ui.protoProject) {
+        body = groups.map((g) => groupHead(g) + g.items.map((e) => cardHtml(e, { hideProject: true })).join('')).join('');
+      } else {
+        // A dense grid: one small tile per project with its 3 latest documents, as many projects on screen as fit.
+        const shortDate = (dt) => (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) + '.' + dt.slice(2, 4) : '');
+        const row = (e) => {
+          const title = e.site ? (e.site.title || protoHeading(e.site)) : (e.drive.title || e.drive.label);
+          return e.drive
+            ? `<li><a href="${esc(dpUrl(e.drive.files[0]))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive"><span class="d">${shortDate(e.date)}</span><span class="t">${esc(title)}</span></a></li>`
+            : `<li><a href="#" data-tileproto="${esc(e.site.id)}"><span class="d">${shortDate(e.date)}</span><span class="t">${esc(title)}</span></a></li>`;
+        };
+        body = `<div class="prtiles">${groups.map((g) => `<div class="card prtile" data-tile="${esc(g.k)}" title="כל ה${noun} של ${esc(g.label)}">
+          <div class="prtile-head"><b>${esc(g.label)}</b><span class="n">${g.items.length}</span></div>
+          ${g.p && g.p.client ? `<div class="prtile-client">${esc(g.p.client)}</div>` : ''}
+          <ul>${g.items.slice(0, 3).map(row).join('')}</ul>
+          ${g.items.length > 3 ? `<div class="prtile-more">עוד ${g.items.length - 3} ←</div>` : ''}
+        </div>`).join('')}</div>`;
+      }
     } else {
       // By date: one section per month, newest first.
       const map = new Map();
@@ -2019,12 +2050,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       </div>
       <div class="dp-status hint">${driveProtoStatusHtml()}</div>
       <div id="protoList">${body || `<div class="card empty">${q || ui.protoProject || src ? 'לא נמצאו מסמכים' : 'אין עדיין ' + PROTO_KINDS[kind] + '.'}</div>`}</div>`;
-    $$('[data-kind]', el).forEach((b) => b.addEventListener('click', () => { ui.protoKind = b.dataset.kind; ui.protoTpl = ''; renderProtocols(el); }));
-    $$('.toolbar .seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; renderProtocols(el); }));
-    $$('[data-more]', el).forEach((b) => b.addEventListener('click', () => { ui.protoMore[b.dataset.more] = true; renderProtocols(el); }));
+    $$('[data-kind]', el).forEach((b) => b.addEventListener('click', () => { ui.protoKind = b.dataset.kind; ui.protoTpl = ''; ui.protoOpenGroup = ''; renderProtocols(el); }));
+    $$('.toolbar .seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; ui.protoOpenGroup = ''; renderProtocols(el); }));
+    $$('[data-tile]', el).forEach((t) => t.addEventListener('click', (e) => {
+      if (e.target.closest('a[target]')) return; // a Drive document opens in its own tab
+      e.preventDefault();
+      const a = e.target.closest('[data-tileproto]');
+      ui.protoOpenGroup = t.dataset.tile; if (a) ui.openProto = a.dataset.tileproto;
+      renderProtocols(el); window.scrollTo(0, 0);
+    }));
+    const back = $('[data-tilesback]', el);
+    if (back) back.addEventListener('click', () => { ui.protoOpenGroup = ''; renderProtocols(el); });
     $$('[data-newtpl]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { template: b.dataset.newtpl })));
     $$('[data-newfor]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { projectId: b.dataset.newfor, template: kind === 'report' ? 'supervision' : 'meeting' })));
-    $('#pp', el).addEventListener('change', (e) => { ui.protoProject = e.target.value; renderProtocols(el); });
+    $('#pp', el).addEventListener('change', (e) => { ui.protoProject = e.target.value; ui.protoOpenGroup = ''; renderProtocols(el); });
     $('#pt', el).addEventListener('change', (e) => { ui.protoTpl = e.target.value; renderProtocols(el); });
     $('#pq', el).addEventListener('input', (e) => { ui.protoQ = e.target.value; renderProtocols(el); const i = $('#pq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
     bindProtoCards($('#protoList', el));
