@@ -1,0 +1,816 @@
+{
+ "version": "2026-11-24",
+ "source": "Google Drive: קובצי האקסל \"חשבונות ...\" של כל פרויקט. סכומים כולל מע\"מ.",
+ "ledgers": [
+  {
+   "projectId": "drv-schmidman-3",
+   "projectName": "שמידמן 3",
+   "file": "חשבונות שמידמן.xlsx",
+   "fileDate": "2026-11-19",
+   "driveId": "1pbTe-kxi-0GhS0sWFlIl4UCLCIzIwROB",
+   "title": "פירוט חשבונות שמידמן · לקוח - אלי חדד · תאריך 08.03.26",
+   "rows": [
+    {
+     "group": "",
+     "field": "אדריכלות",
+     "name": "קרייזמן אדריכלים",
+     "total": 259600,
+     "payments": [
+      {
+       "amount": 23600
+      },
+      {
+       "amount": 28320
+      },
+      {
+       "amount": 77820
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "אדריכלות - תוספת",
+     "name": "",
+     "total": 106200,
+     "payments": [
+      {
+       "amount": 106200
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "ניהול פרויקט",
+     "name": "פמי הנדסה",
+     "total": 0,
+     "payments": [
+      {
+       "amount": 35400
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "חשמל",
+     "name": "מטרה וט",
+     "total": 49855,
+     "payments": [
+      {
+       "amount": 14956.5
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "פיתוח",
+     "name": "דרך ארץ",
+     "total": 33040,
+     "payments": [
+      {
+       "amount": 7788
+      },
+      {
+       "amount": 15576
+      },
+      {
+       "amount": 2596
+      },
+      {
+       "amount": 3540
+      },
+      {
+       "amount": 3540
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "אינסטלציה",
+     "name": "טוקאר הנדסה",
+     "total": 31270,
+     "payments": [
+      {
+       "amount": 5900
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "קרקע",
+     "name": "קובי אוחיון הנדסת קרקע",
+     "total": 24780,
+     "payments": [
+      {
+       "amount": 21240
+      },
+      {
+       "amount": 3540
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "קונסטרוקציה",
+     "name": "Y & S מהנדסים",
+     "total": 64900,
+     "payments": [
+      {
+       "amount": 12980
+      },
+      {
+       "amount": 19470
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "בטיחות",
+     "name": "מעיין פתרונות בטיחות",
+     "total": 15340,
+     "payments": [
+      {
+       "amount": 3068
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "נגישות",
+     "name": "נופך הנדסה",
+     "total": 4484,
+     "payments": [
+      {
+       "amount": 2242
+      },
+      {
+       "amount": 2242
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "מיזוג אויר",
+     "name": "אייל ארז",
+     "total": 11800,
+     "payments": [
+      {
+       "amount": 4130
+      },
+      {
+       "amount": 2950
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "מיגון",
+     "name": "מיגון פלוס",
+     "total": 7670,
+     "payments": [
+      {
+       "amount": 3835
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "תנועה",
+     "name": "הדס סוויסה",
+     "total": 12980,
+     "payments": [
+      {
+       "amount": 2478
+      },
+      {
+       "amount": 5782
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "בניה ירוקה",
+     "name": "גלגל הנדסה",
+     "total": 16815,
+     "payments": [
+      {
+       "amount": 9248.25
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "בידוד",
+     "name": "גלגל הנדסה",
+     "total": 3923.5,
+     "payments": [
+      {
+       "amount": 1961.75
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "אקוסטיקה",
+     "name": "גלגל הנדסה",
+     "total": 3363,
+     "payments": [
+      {
+       "amount": 3363
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "קרינה",
+     "name": "יאיר בן עזרא",
+     "total": 5900,
+     "payments": [
+      {
+       "amount": 4720
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "הידרולוגיה",
+     "name": "גלגל הנדסה",
+     "total": 8407.5,
+     "payments": [
+      {
+       "amount": 7566.75
+      }
+     ]
+    },
+    {
+     "group": "",
+     "field": "אינסטלציה",
+     "name": "איזוטופ מעבדות",
+     "total": 1062,
+     "payments": [
+      {
+       "amount": 1062
+      }
+     ],
+     "service": "בדיקת הידרנטים (אופיין רשת מים"
+    },
+    {
+     "group": "",
+     "field": "פיתוח",
+     "name": "ורד ייעוץ ולוגיסטיקה",
+     "total": 4720,
+     "payments": [
+      {
+       "amount": 2360
+      },
+      {
+       "amount": 1180
+      }
+     ],
+     "service": "סקר עצים"
+    },
+    {
+     "group": "",
+     "field": "מודד",
+     "name": "מגיד",
+     "total": 1180,
+     "payments": [],
+     "service": "מדידה"
+    },
+    {
+     "group": "",
+     "field": "עיצוב",
+     "name": "יובל בודור",
+     "total": 2832,
+     "payments": [
+      {
+       "amount": 1416
+      },
+      {
+       "amount": 1416
+      }
+     ],
+     "service": "הדמיות חזית"
+    },
+    {
+     "group": "",
+     "field": "בניה ירוקה",
+     "name": "סיסטם מעבדות",
+     "total": 14160,
+     "payments": [
+      {
+       "amount": 4956
+      }
+     ],
+     "service": "מעבדה בנייה ירוקה"
+    },
+    {
+     "group": "",
+     "field": "",
+     "name": "פסגה שיווק ופרסום",
+     "total": 2142.88,
+     "payments": [
+      {
+       "amount": 2142.88
+      }
+     ],
+     "service": "פרסום היתרים"
+    },
+    {
+     "group": "",
+     "field": "",
+     "name": "",
+     "total": 191,
+     "payments": [
+      {
+       "amount": 191
+      }
+     ],
+     "service": "העתקות"
+    },
+    {
+     "group": "",
+     "field": "",
+     "name": "",
+     "total": 160,
+     "payments": [
+      {
+       "amount": 160
+      }
+     ],
+     "service": "רשות העתיקות"
+    },
+    {
+     "group": "שולם ע\"י היזם",
+     "field": "",
+     "name": "",
+     "total": 800,
+     "payments": [
+      {
+       "amount": 800
+      }
+     ],
+     "service": "אגרת תיק מידע"
+    },
+    {
+     "group": "שולם ע\"י היזם",
+     "field": "",
+     "name": "",
+     "total": 40060,
+     "payments": [
+      {
+       "amount": 40060
+      }
+     ],
+     "service": "עו\"ד"
+    },
+    {
+     "group": "שולם ע\"י היזם",
+     "field": "",
+     "name": "",
+     "total": 4770,
+     "payments": [
+      {
+       "amount": 4770
+      }
+     ],
+     "service": "מדידה"
+    },
+    {
+     "group": "שולם ע\"י היזם",
+     "field": "",
+     "name": "",
+     "total": 21938,
+     "payments": [
+      {
+       "amount": 21938
+      }
+     ],
+     "service": "אגרות לעיריית בני ברק"
+    },
+    {
+     "group": "שולם ע\"י היזם",
+     "field": "",
+     "name": "",
+     "total": 10000,
+     "payments": [
+      {
+       "amount": 10000
+      }
+     ],
+     "service": "הוצאות משפטיות (02.26)"
+    },
+    {
+     "group": "שולם ע\"י היזם",
+     "field": "",
+     "name": "",
+     "total": 13000,
+     "payments": [
+      {
+       "amount": 13000
+      }
+     ],
+     "service": "תשלום לגויטן 05.26"
+    }
+   ],
+   "deposits": [
+    {
+     "label": "1",
+     "date": "",
+     "amount": 200000
+    },
+    {
+     "label": "2",
+     "date": "",
+     "amount": 20000
+    },
+    {
+     "label": "3",
+     "date": "",
+     "amount": 100000
+    }
+   ]
+  },
+  {
+   "projectId": "drv-bb-shefa",
+   "projectName": "בתי ספר מתחם שפע",
+   "file": "חשבונות יועצים בתי ספר שפע.xlsx",
+   "fileDate": "2026-11-17",
+   "driveId": "1-NwmfYw6KNpx436VTKjthtlx6h9wNNhq",
+   "title": "",
+   "rows": [
+    {
+     "group": "תשלומי יועצים",
+     "field": "קונסטרוקציה",
+     "name": "S&Y מהנדסים",
+     "total": 528050,
+     "payments": [
+      {
+       "amount": 165200
+      }
+     ],
+     "person": "יהושע הופמן",
+     "phone": "052-7694973",
+     "phone2": "08-8011221",
+     "email": "sy.eng26@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "אינסטלציה",
+     "name": "פמי יועצים",
+     "total": 0,
+     "payments": [],
+     "person": "חני קינסטליכר",
+     "phone": "054-2855766",
+     "email": "Chani@femy.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "ספרינקלרים",
+     "name": "שי אורן",
+     "total": 16638,
+     "payments": [],
+     "phone": "054-8077325",
+     "email": "shayo707@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "חשמל",
+     "name": "מטרה וט הנדסת חשמל",
+     "total": 234418.8,
+     "payments": [],
+     "person": "ניר נגר",
+     "phone": "052-8544918",
+     "phone2": "03-9216440",
+     "email": "nir@metra-watt.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "פיתוח",
+     "name": "דוד גת",
+     "total": 0,
+     "payments": [
+      {
+       "amount": 30000
+      },
+      {
+       "amount": 11800
+      },
+      {
+       "amount": 11800
+      }
+     ],
+     "person": "דוד גת",
+     "phone": "052-3870912",
+     "email": "GDLandArch@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "נגישות",
+     "name": "אפרת קנופף",
+     "total": 34456,
+     "payments": [
+      {
+       "amount": 5192
+      }
+     ],
+     "person": "אפרת קנופף",
+     "phone": "052-7149780",
+     "email": "efrat@eknopf.co.i, office@eknopf.co.ill"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "בטיחות",
+     "name": "אפרת קנופף",
+     "total": 105610,
+     "payments": [
+      {
+       "amount": 30975
+      }
+     ],
+     "person": "אפרת קנופף",
+     "phone": "052-7149781",
+     "email": "efrat@eknopf.co.i, office@eknopf.co.ill"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "הגא מיגון",
+     "name": "מיגון פלוס",
+     "total": 18880,
+     "payments": [
+      {
+       "amount": 3304
+      }
+     ],
+     "person": "איציק שינברגר",
+     "phone": "08-6167121",
+     "phone2": "052-7131445",
+     "email": "office@migun-plus.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "קרקע",
+     "name": "קובי אוחיון",
+     "total": 25960,
+     "payments": [
+      {
+       "amount": 25960
+      }
+     ]
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "מיזוג אוויר",
+     "name": "אייל ארז",
+     "total": 220247.88,
+     "payments": [
+      {
+       "amount": 13393,
+       "billed": true
+      },
+      {
+       "amount": 13393,
+       "billed": true
+      },
+      {
+       "amount": 33485.5,
+       "billed": true
+      },
+      {
+       "amount": 40179,
+       "billed": true
+      }
+     ],
+     "person": "אייל ארז",
+     "phone": "0545919748",
+     "email": "eyal@eyal-eng.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "קרינה",
+     "name": "יאיר בן עזרא",
+     "total": 8260,
+     "payments": [
+      {
+       "amount": 6608,
+       "billed": true
+      }
+     ],
+     "phone": "0524218154",
+     "email": "yairkrina@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "תרמי",
+     "name": "גלגל",
+     "total": 3540,
+     "payments": [
+      {
+       "amount": 1770,
+       "billed": true
+      }
+     ]
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "מטבחים",
+     "name": "נחשון",
+     "total": 14160,
+     "payments": [
+      {
+       "amount": 4248
+      },
+      {
+       "amount": 6000,
+       "billed": true
+      }
+     ]
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "איטום",
+     "name": "אורי ענבל",
+     "total": 30916,
+     "payments": []
+    },
+    {
+     "group": "תשלומים נוספים",
+     "field": "אופיין רשת",
+     "name": "ברוכי אשר",
+     "total": 944,
+     "payments": [
+      {
+       "amount": 944
+      }
+     ]
+    }
+   ],
+   "deposits": []
+  },
+  {
+   "projectId": "drv-bb-norok-school",
+   "projectName": "בית ספר נורוק",
+   "file": "חשבונות בית ספר נורוק.xlsx",
+   "fileDate": "2026-11-12",
+   "driveId": "1odeJkMPMOFTzZ9XKZWpUtkj7zs5ruujU",
+   "title": "",
+   "rows": [
+    {
+     "group": "תשלומי יועצים",
+     "field": "קונסטרוקציה",
+     "name": "S&Y מהנדסים",
+     "total": 135700,
+     "payments": [],
+     "person": "יהושע הופמן",
+     "phone": "052-7694973",
+     "phone2": "08-8011221",
+     "email": "sy.eng26@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "אינסטלציה",
+     "name": "פמי יועצים",
+     "total": 0,
+     "payments": []
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "חשמל",
+     "name": "מטרה וט הנדסת חשמל",
+     "total": 161689.5,
+     "payments": [],
+     "person": "ניר נגר",
+     "phone": "052-8544918",
+     "phone2": "03-9216440",
+     "email": "nir@metra-watt.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "פיתוח",
+     "name": "דוד גת",
+     "total": 110448,
+     "payments": [
+      {
+       "amount": 10000
+      },
+      {
+       "amount": 11800
+      }
+     ],
+     "person": "דוד גת",
+     "phone": "052-3870912",
+     "email": "GDLandArch@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "נגישות",
+     "name": "אפרת קנופף",
+     "total": 17110,
+     "payments": [
+      {
+       "amount": 3422,
+       "billed": true
+      }
+     ],
+     "person": "אפרת קנופף",
+     "phone": "052-7149780",
+     "email": "efrat@eknopf.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "בטיחות",
+     "name": "אפרת קנופף",
+     "total": 30680,
+     "payments": [
+      {
+       "amount": 7670,
+       "billed": true
+      }
+     ],
+     "person": "אפרת קנופף",
+     "phone": "052-7149781",
+     "email": "efrat@eknopf.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "הגא מיגון",
+     "name": "מיגון פלוס",
+     "total": 8496,
+     "payments": [
+      {
+       "amount": 1699.2
+      }
+     ],
+     "person": "איציק שינברגר",
+     "phone": "08-6167121",
+     "phone2": "052-7131445",
+     "email": "office@migun-plus.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "קרקע",
+     "name": "קובי אוחיון",
+     "total": 21240,
+     "payments": [
+      {
+       "amount": 21240
+      }
+     ],
+     "person": "קובי אוחיון",
+     "phone": "053-5222495",
+     "email": "office@kobi-eng.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "מיזוג אוויר",
+     "name": "אייל ארז",
+     "total": 58410,
+     "payments": [],
+     "person": "אייל ארז",
+     "phone": "0545919748",
+     "email": "eyal@eyal-eng.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "איטום",
+     "name": "משה סהלו",
+     "total": 16520,
+     "payments": [],
+     "person": "משה סהלו",
+     "phone": "050-4445847",
+     "email": "msahalo33@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "קרינה",
+     "name": "יאיר בן עזרא",
+     "total": 5310,
+     "payments": [],
+     "email": "yairkrina@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "מטבחים",
+     "name": "אור - לופו",
+     "total": 42480,
+     "payments": [
+      {
+       "amount": 12744
+      }
+     ]
+    },
+    {
+     "group": "תשלומים נוספים",
+     "field": "אופיין רשת",
+     "name": "ברוכי אשר",
+     "total": 944,
+     "payments": [
+      {
+       "amount": 944
+      }
+     ]
+    }
+   ],
+   "deposits": []
+  }
+ ]
+}
