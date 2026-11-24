@@ -1,5 +1,5 @@
 {
- "version": "2026-11-24",
+ "version": "2026-11-24b",
  "source": "Google Drive: קובצי האקסל \"חשבונות ...\" של כל פרויקט. סכומים כולל מע\"מ.",
  "ledgers": [
   {
@@ -640,6 +640,129 @@
      "payments": [
       {
        "amount": 944
+      }
+     ]
+    }
+   ],
+   "deposits": []
+  },
+  {
+   "projectId": "drv-bb-pejo",
+   "projectName": "בית ספר מתחם פג'ו",
+   "file": "חשבונות יועצים.xlsx",
+   "fileDate": "2026-11-01",
+   "driveId": "1WM9leVrHElgMRl7GwgYbgWrfjoPFn5IP",
+   "title": "",
+   "rows": [
+    {
+     "group": "תשלומי יועצים",
+     "field": "קונסטרוקציה",
+     "name": "S&Y מהנדסים",
+     "total": 212400,
+     "payments": [
+      {
+       "amount": 21240
+      }
+     ],
+     "person": "יהושע הופמן",
+     "phone": "052-7694973",
+     "phone2": "08-8011221",
+     "email": "sy.eng26@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "אינסטלציה",
+     "name": "",
+     "total": 0,
+     "payments": []
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "חשמל",
+     "name": "מטרה וט הנדסת חשמל",
+     "total": 123900,
+     "payments": [],
+     "person": "ניר נגר",
+     "phone": "052-8544918",
+     "phone2": "03-9216440",
+     "email": "nir@metra-watt.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "נגישות",
+     "name": "חיים רוזנשטיין",
+     "total": 13570,
+     "payments": []
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "בטיחות",
+     "name": "אפרת קנופף",
+     "total": 42480,
+     "payments": [
+      {
+       "amount": 12744
+      }
+     ],
+     "person": "אפרת קנופף",
+     "phone": "052-7149781",
+     "email": "efrat@eknopf.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "הגא מיגון",
+     "name": "מיגון פלוס",
+     "total": 10030,
+     "payments": [
+      {
+       "amount": 2006
+      }
+     ],
+     "person": "איציק שינברגר",
+     "phone": "08-6167121",
+     "phone2": "052-7131445",
+     "email": "office@migun-plus.co.il"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "מיזוג אוויר",
+     "name": "אייל ארז",
+     "total": 87320,
+     "payments": [
+      {
+       "amount": 8732
+      }
+     ],
+     "person": "אייל ארז",
+     "phone": "0545919748",
+     "email": "eyal@eyal-eng.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "קרינה",
+     "name": "יאיר בן עזרא",
+     "total": 5900,
+     "payments": [],
+     "email": "yairkrina@gmail.com"
+    },
+    {
+     "group": "תשלומי יועצים",
+     "field": "איטום",
+     "name": "משה סהלו",
+     "total": 21240,
+     "payments": [],
+     "person": "משה סהלו",
+     "phone": "050-4445847",
+     "email": "msahalo33@gmail.com"
+    },
+    {
+     "group": "תשלומים נוספים",
+     "field": "",
+     "name": "פרסום",
+     "total": 401.2,
+     "payments": [
+      {
+       "amount": 401.2
       }
      ]
     }
