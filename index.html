@@ -381,6 +381,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .lchip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lchip.paid { background: var(--green-soft); color: var(--green); }
 .lchip.billed { background: var(--amber-soft); color: var(--amber); }
+.led-line { display: flex; align-items: center; gap: 10px 22px; flex-wrap: wrap; padding: 12px 18px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s; }
+.led-line:hover { border-color: var(--primary); }
+.led-line .led-name { flex: 1 1 200px; font-size: 16px; }
+.led-c { display: flex; flex-direction: column; min-width: 96px; }
+.led-c small { color: var(--muted); font-size: 12px; }
+.led-c strong { font-variant-numeric: tabular-nums; }
+.led-pct { flex-direction: row; align-items: center; gap: 6px; min-width: 120px; }
+.led-pct .progress { flex: 1; min-width: 70px; }
 .led-table td, .led-table th { padding: 8px 10px; }
 .led-table tr.lgroup td { background: var(--surface-2); font-weight: 700; font-size: 13.5px; }
 .led-table tr.lsub td, .led-table tfoot td { font-weight: 700; }
@@ -1752,7 +1760,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   function ledgerCardHtml(p, q) {
     const L = p.ledger; const s = ledSum(L.rows);
-    const open = (ui.ledOpen || {})[p.id] !== false;
+    const open = !!(ui.ledOpen || {})[p.id] || (!!q && L.rows.some((r) => [r.field, r.name, r.service, r.person, r.group].join(' ').toLowerCase().includes(q)));
     const match = (r) => !q || [r.field, r.name, r.service, r.person, r.group].join(' ').toLowerCase().includes(q);
     const rows = L.rows.map((r, i) => ({ r, i })).filter((x) => match(x.r));
     const groups = [];
@@ -1775,6 +1783,18 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     };
     const dep = (L.deposits || []).filter((d) => Number(d.amount));
     const depTotal = dep.reduce((a, d) => a + Number(d.amount), 0);
+    // Collapsed: one summary line per project; the button opens the full table.
+    if (!open) {
+      return `<div class="card ledger led-line" data-pid="${esc(p.id)}">
+        <a class="ov-name led-name" href="${projectHref(p)}">${esc(p.name)}</a>
+        <span class="led-c"><small>עלות כוללת</small><strong>${fmtMoney(s.total)}</strong></span>
+        <span class="led-c"><small>שולם</small><strong style="color:var(--green)">${fmtMoney(s.paid)}</strong></span>
+        <span class="led-c"><small>הוגש וממתין</small><strong style="color:var(--amber)">${s.billed ? fmtMoney(s.billed) : '-'}</strong></span>
+        <span class="led-c"><small>יתרה</small><strong>${fmtMoney(s.left)}</strong></span>
+        <span class="led-c led-pct"><div class="progress ${s.pct >= 100 ? 'done' : ''}"><span style="width:${s.pct}%"></span></div><small>${s.pct}%</small></span>
+        <button class="btn sm" data-ltoggle>▾ פירוט (${L.rows.length})</button>
+      </div>`;
+    }
     return `<div class="card card-pad ledger" data-pid="${esc(p.id)}" style="margin-bottom:16px">
       <div class="proj-head">
         <div class="grow">
@@ -1784,7 +1804,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <div class="acts">
           <button class="btn sm" data-lreimport>עדכון מאקסל</button>
           <button class="btn sm" data-ladd>+ שורה</button>
-          <button class="btn sm" data-ltoggle>${open ? 'הסתרת פירוט' : `הצגת פירוט (${L.rows.length})`}</button>
+          <button class="btn sm" data-ltoggle>▴ סגירת הפירוט</button>
         </div>
       </div>
       <div class="led-kpis">
@@ -1813,7 +1833,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $$('.ledger', box).forEach((card) => {
       const p = byId(db.projects, card.dataset.pid);
       if (!p) return;
-      $('[data-ltoggle]', card).addEventListener('click', () => { ui.ledOpen = ui.ledOpen || {}; ui.ledOpen[p.id] = (ui.ledOpen[p.id] === false); render(); });
+      $('[data-ltoggle]', card).addEventListener('click', () => { ui.ledOpen = ui.ledOpen || {}; ui.ledOpen[p.id] = !ui.ledOpen[p.id]; render(); });
+      if (card.classList.contains('led-line')) {
+        card.addEventListener('click', (e) => { if (!e.target.closest('a, button')) $('[data-ltoggle]', card).click(); });
+        return;
+      }
       $('[data-lreimport]', card).addEventListener('click', () => openLedgerImport(p.id));
       $('[data-ladd]', card).addEventListener('click', () => openLedgerRowForm(p, -1));
       $$('tr[data-row]', card).forEach((tr) => $('[data-ledit]', tr).addEventListener('click', () => openLedgerRowForm(p, Number(tr.dataset.row))));
