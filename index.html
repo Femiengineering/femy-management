@@ -305,14 +305,41 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 7px; margin-inline-end: 7px; vertical-align: 1px; background: var(--primary-soft); color: var(--primary); }
 .tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
-.pv-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.pv-pane { position: sticky; top: -18px; z-index: 3; background: var(--surface); padding-bottom: 6px; }
-.pv-pane iframe { width: 100%; height: min(520px, 55vh); border: 1px solid var(--border); border-radius: 8px; background: #9aa1a8; display: block; }
+.pv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 13px; }
+.pv-bar b { font-size: 14px; }
+/* Protocol form: the form on the right, a fixed live preview on the left (on top on narrow screens). */
+.modal.wide.with-pv { max-width: 1480px; }
+.modal.with-pv .modal-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 44%); grid-template-areas: "form pv"; gap: 18px; align-items: start; }
+.pv-form { grid-area: form; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; min-width: 0; }
+.pv-pane { grid-area: pv; position: sticky; top: -28px; z-index: 3; background: var(--surface); padding: 6px 0; min-width: 0; }
+.pv-pane iframe { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--border); border-radius: 8px; background: #9aa1a8; display: block; }
+.pv-pane [data-preview] { display: none; }
+@media (max-width: 1099px) {
+  .modal.with-pv .modal-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "pv" "form"; }
+  .pv-pane { top: -40px; }
+  .pv-pane iframe { height: min(440px, 42vh); }
+  .pv-pane [data-preview] { display: inline-flex; }
+}
 .proto-kinds { display: flex; width: 100%; margin-bottom: 12px; }
 .proto-kinds button { flex: 1; padding: 10px 12px; font-size: 15px; }
 .proto-kinds .n { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text); font-size: 12px; margin-inline-start: 4px; }
 .proto-kinds button.on .n { background: var(--primary); color: #fff; }
 .dp-status { margin: -4px 0 12px; }
+/* Protocols by project: one compact tile per project with its latest documents. */
+.prtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.prtile { display: flex; flex-direction: column; align-items: stretch; padding: 10px 12px; min-width: 0; cursor: pointer; transition: box-shadow .12s, border-color .12s; }
+.prtile:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(16, 24, 40, .1); }
+.prtile-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.prtile-head b { flex: 1; min-width: 0; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-head .n { flex: none; font-size: 11.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 9px; padding: 0 7px; }
+.prtile-client { font-size: 12px; color: var(--muted); margin: -4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile ul { list-style: none; margin: 0; padding: 0; }
+.prtile li { display: flex; font-size: 13px; padding: 3px 0; border-top: 1px solid var(--border); }
+.prtile li a { color: inherit; text-decoration: none; display: flex; gap: 8px; align-items: baseline; min-width: 0; flex: 1; }
+.prtile li a:hover .t { text-decoration: underline; color: var(--primary); }
+.prtile li .d { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 58px; }
+.prtile li .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-more { margin-top: auto; padding-top: 4px; font-size: 12px; color: var(--primary); }
 .dproto { display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .dproto .proto-head { flex: 1; min-width: 240px; text-decoration: none; color: inherit; }
 .dproto .proto-head:hover .proto-title { text-decoration: underline; }
@@ -325,14 +352,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .dp-line a { flex: 1; min-width: 0; }
 @media (max-width: 760px) { .dp-cols { grid-template-columns: 1fr; } .dp-acts { padding: 0 14px 12px; } }
 .proto-doc { padding-top: 12px; overflow-x: auto; }
-.proto-doc .pd-title { font-weight: 700; margin: 12px 0 6px; color: var(--muted); font-size: 14px; }
-.proto-doc .pd-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13.5px; min-width: 520px; }
-.proto-doc .pd-kv { min-width: 0; }
-.proto-doc .pd-table th, .proto-doc .pd-table td { border: 1px solid var(--border); padding: 6px 8px; vertical-align: top; text-align: right; }
-.proto-doc .pd-table thead th { background: var(--primary-soft); color: var(--primary); }
-.proto-doc .pd-kv th { width: 130px; background: var(--bg); color: var(--muted); font-weight: 600; }
-.proto-doc .pd-note { font-weight: 700; text-align: center; margin: 10px 0 0; }
-.proto-doc p { margin: 0 0 4px; }
+.proto-doc .fdoc { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 14px 12px 2px; min-width: 560px; font-size: 13px; }
 .modal.wide { max-width: 940px; }
 .pi-head { display: flex; align-items: center; gap: 8px; }
 .pi-head .spacer { flex: 1; }
@@ -346,6 +366,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pi-fields.pi-tour { grid-template-columns: 1fr; }
 .pi-f { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
 .pi-f textarea { min-height: 54px; resize: vertical; }
+@media (max-width: 700px) { .pv-form { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .pi-fields.pi-meeting, .pi-fields.pi-supervision { grid-template-columns: 1fr 1fr; } .pi-fields .pi-details, .pi-fields .pi-instructions { grid-column: 1 / -1; } }
 .proto.open .chev { transform: rotate(-90deg); }
 
@@ -354,6 +375,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .summary .card { padding: 12px 16px; }
 .summary .label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .summary .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.led-kpis { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.led-kpis strong { color: var(--text); font-variant-numeric: tabular-nums; margin-inline-start: 4px; }
+.lchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lchip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lchip.paid { background: var(--green-soft); color: var(--green); }
+.lchip.billed { background: var(--amber-soft); color: var(--amber); }
+.led-table td, .led-table th { padding: 8px 10px; }
+.led-table tr.lgroup td { background: var(--surface-2); font-weight: 700; font-size: 13.5px; }
+.led-table tr.lsub td, .led-table tfoot td { font-weight: 700; }
+.led-dep { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; font-size: 14px; }
+.led-pays { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.led-pays > div { display: flex; flex-direction: column; gap: 3px; }
+.led-preview { padding: 8px 10px; border-radius: 8px; background: var(--green-soft); color: var(--green); }
+.led-preview.err { background: var(--red-soft); color: var(--red); }
 
 /* Modal */
 .modal-bg {
@@ -577,6 +612,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   <script src="google.js"></script>
   <script src="sheet-sync.js"></script>
   <script src="drive-protocols.js"></script>
+  <script src="ledger-xlsx.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
@@ -665,6 +701,25 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // The signed-in user's own Google account (calendar, Gmail, Drive), via google.js.
   const G = window.FemyGoogle || { enabled: false, status: () => ({}), valid: () => false, init() {}, forget() {}, onChange() {} };
   const GOOGLE = !!G.enabled;
+  // The background sync server (worker/): every 15 minutes it reads the company's Drive with the Google
+  // account already connected on the site (its stored token), so the tasks sheet and the protocols stay up to date even with no Google account connected.
+  const SYNC = String((window.FEMY_GOOGLE && (window.FEMY_GOOGLE.syncServer || window.FEMY_GOOGLE.tokenServer)) || '').replace(/\/+$/, '');
+  let syncDown = false; // the server has no data for us (not set up yet), so stop asking it this session
+  async function syncFetch(path, opts) {
+    let r;
+    try { r = await fetch(SYNC + path, Object.assign({ cache: 'no-store' }, opts)); }
+    catch (e) { throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת הסנכרון לא זמין'); }
+    if (!r.ok) {
+      let j = {}; try { j = await r.json(); } catch (e) { /* ignore */ }
+      const down = r.status === 404 || r.status === 405 || r.status === 503;
+      if (down) syncDown = true;
+      throw Object.assign(new Error(down ? 'הסנכרון ברקע מה-Drive עדיין לא הוגדר בשרת' : j.error || 'HTTP ' + r.status), { status: r.status, code: j.error });
+    }
+    syncDown = false;
+    return r;
+  }
+  const syncRefresh = () => syncFetch('/data/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  const useSync = (manual) => !!SYNC && (manual || !syncDown);
   let me = null; // signed-in user { uid, email, name, photo, role }
   let profile = {}; // the user's private profile (Claude key)
   const isAdmin = () => !CLOUD || (me && me.role === 'admin');
@@ -739,7 +794,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1076,27 +1131,41 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function sheetStatusText() {
     const st = settings().sheetSync;
     if (sheetSyncing) return '🔄 מסנכרן מהגיליון "משימות פמי"...';
-    if (!st) return GOOGLE && G.status().connected ? 'המשימות יסונכרנו מהגיליון "משימות פמי"' : 'כדי לסנכרן מהגיליון "משימות פמי", חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive)';
+    if (!st) return SYNC || (GOOGLE && G.status().connected) ? 'המשימות יסונכרנו מהגיליון "משימות פמי"' : 'כדי לסנכרן מהגיליון "משימות פמי", חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive)';
     const min = Math.round((Date.now() - st.at) / 60000);
     return `מסונכרן מהגיליון "משימות פמי": ${st.tasks} משימות, ${st.contacts} אנשי קשר · ${min < 1 ? 'עכשיו' : min < 60 ? `לפני ${min} דק׳` : new Date(st.at).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   }
   function showSheetStatus() { const e = $('#sheetStatus'); if (e) e.textContent = sheetStatusText(); }
+  // With a Google account connected the site reads the sheet itself (always the latest); without one it
+  // takes the copy the sync server keeps (at most 15 minutes old).
   async function syncTaskSheet(manual) {
-    if (!GOOGLE || !TASK_SHEET || !window.FemySheet || sheetSyncing || !isAdmin()) return;
-    if (!manual && !G.silent()) return;
+    if (!TASK_SHEET || !window.FemySheet || sheetSyncing || !isAdmin()) return;
+    const direct = GOOGLE && (G.silent() || (manual && !SYNC));
+    if (!direct && !useSync(manual)) return;
     sheetSyncing = true; showSheetStatus();
     try {
-      if (manual) await G.token(); // may ask to connect, straight from the click
-      const [JSZip, buf] = await Promise.all([loadJSZip(), G.drive.exportFile(TASK_SHEET, XLSX)]);
+      let buf, at = Date.now();
+      if (direct) {
+        if (manual) await G.token(); // may ask to connect, straight from the click
+        buf = await G.drive.exportFile(TASK_SHEET, XLSX);
+      } else {
+        if (manual) await syncRefresh();
+        const r = await syncFetch('/data/sheet');
+        at = Number(r.headers.get('X-Synced-At')) || at;
+        const st = settings().sheetSync;
+        if (!manual && st && st.at >= at) return; // nothing new since the last sync
+        buf = await r.arrayBuffer();
+      }
+      const JSZip = await loadJSZip();
       const res = FemySheet.parse(await FemySheet.readXlsx(buf, JSZip));
       if (!res.tasks.length) throw new Error('לא נמצאו משימות בגיליון');
-      applySheet(res);
+      applySheet(res, at);
       if (manual) toast(`סונכרנו ${res.tasks.length} משימות ו-${res.contacts.length} אנשי קשר מהגיליון`);
     } catch (e) {
       if (manual) toast('הסנכרון מהגיליון נכשל: ' + gErr(e));
     } finally { sheetSyncing = false; showSheetStatus(); }
   }
-  function applySheet(res) {
+  function applySheet(res, at) {
     const st = settings();
     const map = st.sheetMap = st.sheetMap || {}; // "לקוח|פרויקט בגיליון" -> project id on the site
     res.groups.forEach((g) => {
@@ -1118,7 +1187,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     // The tasks taken from the status reports (drv-t-) are replaced by the sheet, which is the real list.
     db.tasks = db.tasks.filter((t) => !t.sheet && !/^drv-t-/.test(t.id)).concat(fromSheet);
     db.contacts = res.contacts;
-    st.sheetSync = { at: Date.now(), tasks: fromSheet.length, contacts: res.contacts.length };
+    st.sheetSync = { at: at || Date.now(), tasks: fromSheet.length, contacts: res.contacts.length };
     save();
     // Don't redraw under someone who is typing or has a form open.
     const a = document.activeElement;
@@ -1372,6 +1441,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ${p.notes ? `<h4 style="margin:14px 0 4px;font-size:14px;color:var(--muted)">סיכום מצב</h4><div style="white-space:pre-line">${esc(p.notes)}</div>` : ''}
       </div>
 
+      ${p.ledger && p.ledger.rows ? (() => { const ls = ledSum(p.ledger.rows); return `<div class="card card-pad" style="margin-bottom:18px">
+        <div class="card-head"><h2>חשבונות יועצים</h2><a href="#accounts" data-ledall>לפירוט המלא</a></div>
+        <div class="led-kpis" style="margin-top:0"><span>עלות כוללת <strong>${fmtMoney(ls.total)}</strong></span><span>שולם <strong style="color:var(--green)">${fmtMoney(ls.paid)}</strong></span>${ls.billed ? `<span>הוגש וממתין <strong style="color:var(--amber)">${fmtMoney(ls.billed)}</strong></span>` : ''}<span>יתרה <strong>${fmtMoney(ls.left)}</strong></span></div>
+        <div class="progress ${ls.pct >= 100 ? 'done' : ''}" style="margin:8px 0 4px"><span style="width:${ls.pct}%"></span></div><div class="hint">${ls.pct}% מעלות התכנון שולמו · ${p.ledger.rows.length} שורות${p.ledger.file ? ' · ' + esc(p.ledger.file) : ''}</div>
+      </div>`; })() : ''}
       <div class="grid-2">
         <div class="card card-pad" id="projTasks">
           <div class="card-head"><h2>משימות (${openT.length} פתוחות${st.overdue ? `, <span class="overdue">${st.overdue} באיחור</span>` : ''})</h2><button class="btn sm" data-addtask>+ משימה</button></div>
@@ -1408,6 +1482,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const td = $('[data-toggle-done]', el);
     if (td) td.addEventListener('click', (e) => { e.preventDefault(); ui.projTaskDone = !ui.projTaskDone; render(); });
     bindProtoCards($('#projProtos', el));
+    const lda = $('[data-ledall]', el);
+    if (lda) lda.addEventListener('click', () => { ui.accTab = 'ledgers'; ui.ledClient = p.client || 'ללא לקוח'; });
     const dpa = $('[data-dpall]', el);
     if (dpa) dpa.addEventListener('click', () => { ui.protoProject = p.id; ui.protoGroup = 'project'; });
 
@@ -1488,7 +1564,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Accounts ----------
+  // Two tabs: consultant ledgers per project (from the office's Excel sheets) and single invoices.
   function renderAccounts(el) {
+    const tab = ui.accTab === 'invoices' ? 'invoices' : 'ledgers';
+    el.innerHTML = `<div class="toolbar"><div class="seg" id="accTabs">${[['ledgers', 'חשבונות יועצים לפי פרויקט'], ['invoices', 'חשבוניות']].map(([k, l]) => `<button data-acc="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div id="accBody"></div>`;
+    $$('#accTabs button', el).forEach((b) => b.addEventListener('click', () => { ui.accTab = b.dataset.acc; renderAccounts(el); }));
+    if (tab === 'ledgers') renderLedgers($('#accBody', el)); else renderInvoiceList($('#accBody', el));
+  }
+  function renderInvoiceList(el) {
     const f = ui.invFilter;
     el.innerHTML = `
       <div class="summary" id="invSummary"></div>
@@ -1586,6 +1669,242 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     download('חשבונות-' + todayStr() + '.csv', csv, 'text/csv;charset=utf-8');
   }
 
+  // ---------- Consultant ledgers (חשבונות יועצים) ----------
+  // Each project can hold project.ledger, read from the office's "חשבונות ..." Excel sheet:
+  // { file, fileDate, title, rows: [{ group, field, name, service, total, payments: [{ amount, billed }], person, phone, email }], deposits }
+  // Amounts include VAT. A payment with billed: true was submitted but not paid yet.
+  // accounts/consultant-accounts.json holds the sheets already collected from Drive; importLedgers adds them once per version.
+  const ledPayments = (r) => (r.payments || []).filter((x) => x && Number(x.amount));
+  const ledPaid = (r) => ledPayments(r).filter((x) => !x.billed).reduce((s, x) => s + Number(x.amount), 0);
+  const ledBilled = (r) => ledPayments(r).filter((x) => x.billed).reduce((s, x) => s + Number(x.amount), 0);
+  function ledSum(rows) {
+    const o = { total: 0, paid: 0, billed: 0 };
+    rows.forEach((r) => { o.total += Number(r.total) || 0; o.paid += ledPaid(r); o.billed += ledBilled(r); });
+    o.left = Math.max(0, o.total - o.paid);
+    o.pct = o.total ? Math.min(100, Math.round((o.paid / o.total) * 100)) : 0;
+    return o;
+  }
+  const ledProjects = () => db.projects.filter((p) => p.ledger && Array.isArray(p.ledger.rows));
+  const ledGroupLabel = (g) => g || 'יועצים ומתכננים';
+
+  async function importLedgers(manual) {
+    if (!isAdmin()) return;
+    let data;
+    try { data = await (await fetch('accounts/consultant-accounts.json', { cache: 'no-cache' })).json(); }
+    catch (e) { if (manual) toast('טעינת חשבונות היועצים נכשלה'); return; }
+    if (!data || !Array.isArray(data.ledgers)) return;
+    if (!manual && settings().ledgerImport === data.version) return;
+    const norm = (x) => (x || '').replace(/\s+/g, ' ').trim();
+    let n = 0;
+    data.ledgers.forEach((l) => {
+      const p = byId(db.projects, l.projectId) || db.projects.find((x) => norm(x.name) === norm(l.projectName));
+      if (!p) return;
+      if (p.ledger && (p.ledger.edited || p.ledger.seed === data.version)) return;
+      const led = Object.assign({}, l, { seed: data.version });
+      delete led.projectId; delete led.projectName;
+      p.ledger = led; n++;
+    });
+    settings().ledgerImport = data.version;
+    save();
+    if (n) { render(); toast(`נוספו חשבונות יועצים ל-${n} פרויקטים`); }
+    else if (manual) toast('חשבונות היועצים כבר מעודכנים');
+  }
+
+  function renderLedgers(el) {
+    const all = ledProjects();
+    const clients = Array.from(new Set(all.map((p) => p.client || 'ללא לקוח')));
+    if (ui.ledClient && !clients.includes(ui.ledClient)) ui.ledClient = '';
+    const q = (ui.ledQ || '').trim().toLowerCase();
+    const list = all.filter((p) => !ui.ledClient || (p.client || 'ללא לקוח') === ui.ledClient);
+    const tot = ledSum(list.flatMap((p) => p.ledger.rows));
+    el.innerHTML = `
+      <div class="summary">
+        <div class="card"><div class="label">עלות תכנון כוללת (כולל מע״מ)</div><div class="value">${fmtMoney(tot.total)}</div></div>
+        <div class="card"><div class="label">שולם עד כה</div><div class="value" style="color:var(--green)">${fmtMoney(tot.paid)}</div></div>
+        <div class="card"><div class="label">הוגש וממתין לתשלום</div><div class="value" style="color:var(--amber)">${fmtMoney(tot.billed)}</div></div>
+        <div class="card"><div class="label">יתרה לתשלום</div><div class="value">${fmtMoney(tot.left)}</div></div>
+      </div>
+      <div class="toolbar">
+        <div class="seg" id="ledClients"><button data-c="" class="${!ui.ledClient ? 'on' : ''}">כל הלקוחות</button>${clients.map((c) => `<button data-c="${esc(c)}" class="${ui.ledClient === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+        <input class="input search" id="ledQ" placeholder="חיפוש יועץ או תחום..." value="${esc(ui.ledQ || '')}">
+        <span class="spacer"></span>
+        <button class="btn" id="ledCsv">ייצוא לאקסל (CSV)</button>
+        <button class="btn primary" id="ledImport">ייבוא מקובץ אקסל</button>
+      </div>
+      <div id="ledList">${list.length ? '' : `<div class="card card-pad empty">${all.length ? 'אין חשבונות ללקוח הזה' : 'עדיין אין חשבונות יועצים. לחצו "ייבוא מקובץ אקסל" ובחרו את קובץ החשבונות של הפרויקט.'}</div>`}</div>`;
+    const box = $('#ledList', el);
+    const byClient = {};
+    list.forEach((p) => { (byClient[p.client || 'ללא לקוח'] = byClient[p.client || 'ללא לקוח'] || []).push(p); });
+    box.insertAdjacentHTML('beforeend', Object.keys(byClient).map((c) => {
+      const ps = byClient[c]; const cs = ledSum(ps.flatMap((p) => p.ledger.rows));
+      return `<div class="group-head"><h2>${esc(c)}</h2><span class="count">${ps.length} פרויקטים · שולם ${fmtMoney(cs.paid)} מתוך ${fmtMoney(cs.total)}</span></div>
+        ${ps.map((p) => ledgerCardHtml(p, q)).join('')}`;
+    }).join(''));
+    $$('#ledClients button', el).forEach((b) => b.addEventListener('click', () => { ui.ledClient = b.dataset.c; renderLedgers(el); }));
+    $('#ledQ', el).addEventListener('input', (e) => {
+      ui.ledQ = e.target.value; const pos = e.target.selectionStart;
+      renderLedgers(el); const i = $('#ledQ', el); i.focus(); i.setSelectionRange(pos, pos);
+    });
+    $('#ledImport', el).addEventListener('click', () => openLedgerImport());
+    $('#ledCsv', el).addEventListener('click', () => exportLedgersCsv(list));
+    bindLedgerCards(box);
+  }
+
+  function ledgerCardHtml(p, q) {
+    const L = p.ledger; const s = ledSum(L.rows);
+    const open = (ui.ledOpen || {})[p.id] !== false;
+    const match = (r) => !q || [r.field, r.name, r.service, r.person, r.group].join(' ').toLowerCase().includes(q);
+    const rows = L.rows.map((r, i) => ({ r, i })).filter((x) => match(x.r));
+    const groups = [];
+    rows.forEach((x) => { const g = ledGroupLabel(x.r.group); let gr = groups.find((y) => y.g === g); if (!gr) groups.push(gr = { g, items: [] }); gr.items.push(x); });
+    const chips = (r) => (r.payments || []).map((x, k) => (x && Number(x.amount) ? `<span class="lchip ${x.billed ? 'billed' : 'paid'}" title="${x.billed ? 'הוגש, טרם שולם' : 'שולם'}">${k + 1} · ${fmtMoney(x.amount)}</span>` : '')).join('');
+    const rowHtml = ({ r, i }) => {
+      const paid = ledPaid(r); const billed = ledBilled(r); const total = Number(r.total) || 0;
+      const pct = total ? Math.min(100, Math.round((paid / total) * 100)) : null;
+      const contact = [r.person && r.person !== r.name ? r.person : '', r.phone].filter(Boolean).join(' · ');
+      return `<tr data-row="${i}">
+        <td>${esc(r.field || r.service || '')}${r.field && r.service ? `<div class="hint">${esc(r.service)}</div>` : ''}</td>
+        <td>${esc(r.name || '')}${contact ? `<div class="hint">${esc(contact)}</div>` : ''}</td>
+        <td class="num">${r.total == null ? '' : fmtMoney(total)}</td>
+        <td><div class="lchips">${chips(r) || '<span class="hint">אין חשבונות</span>'}</div></td>
+        <td class="num">${paid ? fmtMoney(paid) : ''}</td>
+        <td class="num" style="color:var(--amber)">${billed ? fmtMoney(billed) : ''}</td>
+        <td class="num">${total ? fmtMoney(Math.max(0, total - paid)) : ''}</td>
+        <td>${pct == null ? '' : `<div style="display:flex;gap:6px;align-items:center"><div class="progress ${pct >= 100 ? 'done' : ''}" style="flex:1"><span style="width:${pct}%"></span></div><span class="hint">${pct}%</span></div>`}</td>
+        <td class="actions"><button class="icon-btn" data-ledit title="עריכה">✏️</button></td></tr>`;
+    };
+    const dep = (L.deposits || []).filter((d) => Number(d.amount));
+    const depTotal = dep.reduce((a, d) => a + Number(d.amount), 0);
+    return `<div class="card card-pad ledger" data-pid="${esc(p.id)}" style="margin-bottom:16px">
+      <div class="proj-head">
+        <div class="grow">
+          <h2 style="font-size:18px"><a class="ov-name" href="${projectHref(p)}">${esc(p.name)}</a></h2>
+          <div class="hint">${L.file ? '📊 ' + esc(L.file) : ''}${L.fileDate ? ' · עודכן ' + fmtDate(L.fileDate) : ''}${L.edited ? ' · נערך באתר' : ''}</div>
+        </div>
+        <div class="acts">
+          <button class="btn sm" data-lreimport>עדכון מאקסל</button>
+          <button class="btn sm" data-ladd>+ שורה</button>
+          <button class="btn sm" data-ltoggle>${open ? 'הסתרת פירוט' : `הצגת פירוט (${L.rows.length})`}</button>
+        </div>
+      </div>
+      <div class="led-kpis">
+        <span>עלות כוללת <strong>${fmtMoney(s.total)}</strong></span>
+        <span>שולם <strong style="color:var(--green)">${fmtMoney(s.paid)}</strong></span>
+        ${s.billed ? `<span>הוגש וממתין <strong style="color:var(--amber)">${fmtMoney(s.billed)}</strong></span>` : ''}
+        <span>יתרה <strong>${fmtMoney(s.left)}</strong></span>
+        ${depTotal ? `<span>הפקדות יזם <strong>${fmtMoney(depTotal)}</strong></span>` : ''}
+      </div>
+      <div class="progress ${s.pct >= 100 ? 'done' : ''}" style="margin:8px 0 4px"><span style="width:${s.pct}%"></span></div>
+      <div class="hint">${s.pct}% מעלות התכנון שולמו</div>
+      ${open ? `<div class="table-wrap" style="margin-top:12px"><table class="led-table">
+        <thead><tr><th>תחום</th><th>יועץ / ספק</th><th class="num">עלות כולל מע״מ</th><th>חשבונות</th><th class="num">שולם</th><th class="num">הוגש וממתין</th><th class="num">יתרה</th><th>%</th><th></th></tr></thead>
+        <tbody>${groups.map((g) => {
+          const gs = ledSum(g.items.map((x) => x.r));
+          return `${groups.length > 1 || g.g !== ledGroupLabel('') ? `<tr class="lgroup"><td colspan="9">${esc(g.g)}</td></tr>` : ''}${g.items.map(rowHtml).join('')}
+            ${groups.length > 1 ? `<tr class="lsub"><td colspan="2">סה״כ ${esc(g.g)}</td><td class="num">${fmtMoney(gs.total)}</td><td></td><td class="num">${fmtMoney(gs.paid)}</td><td class="num">${gs.billed ? fmtMoney(gs.billed) : ''}</td><td class="num">${fmtMoney(gs.left)}</td><td colspan="2"></td></tr>` : ''}`;
+        }).join('') || '<tr><td colspan="9" class="empty">לא נמצאו שורות</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="2">סה״כ הפרויקט</td><td class="num">${fmtMoney(s.total)}</td><td></td><td class="num">${fmtMoney(s.paid)}</td><td class="num">${s.billed ? fmtMoney(s.billed) : ''}</td><td class="num">${fmtMoney(s.left)}</td><td colspan="2"></td></tr></tfoot>
+      </table></div>
+      ${dep.length ? `<div class="led-dep"><strong>הפקדות יזם לפמי:</strong> ${dep.map((d) => `<span class="lchip paid">${d.label ? 'חשבון ' + esc(d.label) + ' · ' : ''}${d.date ? esc(d.date) + ' · ' : ''}${fmtMoney(d.amount)}</span>`).join('')} <span>סה״כ <strong>${fmtMoney(depTotal)}</strong></span></div>` : ''}` : ''}
+    </div>`;
+  }
+
+  function bindLedgerCards(box) {
+    $$('.ledger', box).forEach((card) => {
+      const p = byId(db.projects, card.dataset.pid);
+      if (!p) return;
+      $('[data-ltoggle]', card).addEventListener('click', () => { ui.ledOpen = ui.ledOpen || {}; ui.ledOpen[p.id] = (ui.ledOpen[p.id] === false); render(); });
+      $('[data-lreimport]', card).addEventListener('click', () => openLedgerImport(p.id));
+      $('[data-ladd]', card).addEventListener('click', () => openLedgerRowForm(p, -1));
+      $$('tr[data-row]', card).forEach((tr) => $('[data-ledit]', tr).addEventListener('click', () => openLedgerRowForm(p, Number(tr.dataset.row))));
+    });
+  }
+
+  function openLedgerRowForm(p, idx) {
+    const L = p.ledger;
+    const r = idx >= 0 ? L.rows[idx] : { group: (L.rows[0] && L.rows[0].group) || '', field: '', name: '', total: '', payments: [] };
+    const pays = (r.payments || []).filter((x) => x && Number(x.amount));
+    const slots = Math.max(4, pays.length + 2);
+    const groups = Array.from(new Set(L.rows.map((x) => x.group || '')));
+    openModal(idx >= 0 ? 'עריכת שורת יועץ' : 'יועץ / תשלום חדש', `
+      <div class="field"><label>תחום</label><input class="input" name="field" value="${esc(r.field)}"></div>
+      <div class="field"><label>יועץ / ספק</label><input class="input" name="name" value="${esc(r.name)}"></div>
+      <div class="field"><label>סוג השירות</label><input class="input" name="service" value="${esc(r.service || '')}"></div>
+      <div class="field"><label>קבוצה</label><input class="input" name="group" list="ledGroups" value="${esc(r.group || '')}" placeholder="${esc(ledGroupLabel(''))}"><datalist id="ledGroups">${groups.filter(Boolean).map((g) => `<option value="${esc(g)}">`).join('')}</datalist></div>
+      <div class="field"><label>עלות תכנון כוללת, כולל מע״מ (₪)</label><input class="input" type="number" step="0.01" min="0" name="total" value="${r.total == null ? '' : esc(r.total)}"></div>
+      <div class="field"><label>איש קשר</label><input class="input" name="person" value="${esc(r.person || '')}"></div>
+      <div class="field"><label>טלפון</label><input class="input" name="phone" dir="ltr" value="${esc(r.phone || '')}"></div>
+      <div class="field"><label>מייל</label><input class="input" name="email" dir="ltr" value="${esc(r.email || '')}"></div>
+      <div class="field full"><label>חשבונות (סכום כולל מע״מ)</label>
+        <div class="led-pays">${Array.from({ length: slots }, (_, k) => { const x = pays[k] || {}; return `<div><span class="hint">חשבון ${k + 1}</span><input class="input" type="number" step="0.01" min="0" name="pay${k}" value="${x.amount ? esc(x.amount) : ''}"><label class="hint"><input type="checkbox" name="billed${k}" ${x.billed ? 'checked' : ''}> הוגש, טרם שולם</label></div>`; }).join('')}</div></div>`,
+    (data) => {
+      const out = Object.assign({}, idx >= 0 ? r : {}, { group: data.group, field: data.field, name: data.name, total: data.total === '' ? null : Number(data.total), payments: [] });
+      ['service', 'person', 'phone', 'email'].forEach((k) => { if (data[k]) out[k] = data[k]; else delete out[k]; });
+      for (let k = 0; k < slots; k++) { const a = Number(data['pay' + k]); if (a) out.payments.push(data['billed' + k] ? { amount: a, billed: true } : { amount: a }); }
+      if (idx >= 0) L.rows[idx] = out; else L.rows.push(out);
+      L.edited = true; save(); render(); toast(idx >= 0 ? 'השורה עודכנה' : 'השורה נוספה');
+    },
+    idx >= 0 ? () => { L.rows.splice(idx, 1); L.edited = true; save(); render(); toast('השורה נמחקה'); } : null);
+  }
+
+  // Picks the project whose name shares the most words with the file name ("חשבונות שמידמן.xlsx" -> שמידמן 3).
+  function guessLedgerProject(fileName) {
+    const f = fileName.replace(/\.[^.]+$/, '').replace(/[_\-.]+/g, ' ');
+    let best = null; let score = 0;
+    db.projects.forEach((p) => {
+      const n = (p.name || '').split(/[\s\-–,()]+/).filter((w) => w.length >= 3 && !/^(בית|ספר|בתי|מתחם|פרויקט)$/.test(w)).filter((w) => f.includes(w)).length;
+      if (n > score) { score = n; best = p; }
+    });
+    return best;
+  }
+
+  function openLedgerImport(projectId) {
+    const p0 = projectId ? byId(db.projects, projectId) : null;
+    openModal('ייבוא חשבונות יועצים מאקסל', `
+      <div class="field full"><label>קובץ אקסל (xlsx) *</label><input class="input" type="file" id="ledFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></div>
+      <div class="field full"><label>פרויקט *</label><select class="input" name="projectId" id="ledProj" required>${projectOptions(projectId || '', 'בחירת פרויקט')}</select></div>
+      <div class="field full hint">הקובץ צריך להיות בתבנית החשבונות של המשרד: שורת כותרות עם "עלות תכנון" ו"חשבון 1", "חשבון 2"... ושורה לכל יועץ. חשבונות שצבועים בצבע "הוגש חשבון" יסומנו כממתינים לתשלום.${p0 && p0.ledger ? ' <strong>החשבונות הקיימים של הפרויקט יוחלפו בנתונים מהקובץ.</strong>' : ''}</div>
+      <div class="field full" id="ledPreview"></div>`,
+    (data) => { if (pendingLedger && data.projectId) applyLedgerImport(data.projectId, pendingLedger); else toast('הקובץ לא נקרא, החשבונות לא עודכנו'); });
+    let pendingLedger = null;
+    const fileInp = $('#ledFile');
+    fileInp.addEventListener('change', async () => {
+      const f = fileInp.files[0]; const pv = $('#ledPreview');
+      pendingLedger = null; if (!f) { pv.innerHTML = ''; return; }
+      pv.innerHTML = '<span class="hint">קורא את הקובץ...</span>';
+      try {
+        const JSZip = await loadJSZip();
+        const led = await window.FemyLedger.ledgerFromXlsx(await f.arrayBuffer(), JSZip);
+        led.file = f.name; led.fileDate = f.lastModified ? toISO(new Date(f.lastModified)) : todayStr();
+        pendingLedger = led;
+        const s = ledSum(led.rows);
+        pv.innerHTML = `<div class="led-preview">נמצאו <strong>${led.rows.length}</strong> שורות · עלות כוללת ${fmtMoney(s.total)} · שולם ${fmtMoney(s.paid)}${s.billed ? ' · הוגש וממתין ' + fmtMoney(s.billed) : ''}${led.deposits.length ? ' · ' + led.deposits.length + ' הפקדות יזם' : ''}</div>`;
+        const sel = $('#ledProj');
+        if (!sel.value) { const g = guessLedgerProject(f.name); if (g) sel.value = g.id; }
+      } catch (e) {
+        pv.innerHTML = `<div class="led-preview err">לא הצלחתי לקרוא את הקובץ: ${esc(e.message || e)}</div>`;
+      }
+    });
+  }
+  function applyLedgerImport(projectId, led) {
+    const p = byId(db.projects, projectId);
+    if (!p) return;
+    p.ledger = Object.assign({}, led, { importedAt: new Date().toISOString() });
+    ui.accTab = 'ledgers'; ui.ledClient = '';
+    save(); render(); toast(`נטענו ${led.rows.length} שורות חשבונות לפרויקט ${p.name}`);
+  }
+
+  function exportLedgersCsv(list) {
+    const rows = [['לקוח', 'פרויקט', 'קבוצה', 'תחום', 'יועץ / ספק', 'עלות כולל מעמ', 'חשבון 1', 'חשבון 2', 'חשבון 3', 'חשבון 4', 'חשבון 5', 'שולם', 'הוגש וממתין', 'יתרה', 'אחוז ששולם']];
+    list.forEach((p) => p.ledger.rows.forEach((r) => {
+      const pays = (r.payments || []).map((x) => (x && Number(x.amount) ? x.amount + (x.billed ? ' (הוגש)' : '') : ''));
+      const total = Number(r.total) || 0; const paid = ledPaid(r);
+      rows.push([p.client || '', p.name, ledGroupLabel(r.group), r.field || r.service || '', r.name || '', r.total == null ? '' : total, pays[0] || '', pays[1] || '', pays[2] || '', pays[3] || '', pays[4] || '', paid, ledBilled(r), total ? Math.max(0, total - paid) : '', total ? Math.round((paid / total) * 100) + '%' : '']);
+    }));
+    const csv = '﻿' + rows.map((r) => r.map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    download('חשבונות-יועצים-' + todayStr() + '.csv', csv, 'text/csv;charset=utf-8');
+  }
+
   // ---------- Protocols ----------
   // Three templates, built from the protocols the office has sent so far:
   //  meeting     - "סיכום פגישה" (planning / coordination / consultants): header table + נושא | סיכום/החלטות | לוח זמנים | באחריות
@@ -1649,7 +1968,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   // The document model every output (card, PDF, Word, email) is drawn from.
   // A cell is a list of lines: [{ t: text, b: bold }].
-  const cellOf = (s, bold) => (s || '').split('\n').map((x) => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && i < a.length - 1)).map((t) => ({ t, b: !!bold }));
+  const cellOf = (s, bold, flags) => (s || '').split('\n').map((x) => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && i < a.length - 1)).map((t) => Object.assign({ t, b: !!bold }, flags));
   function protoDoc(pr) {
     const t = protoTpl(pr);
     const proj = byId(db.projects, pr.projectId);
@@ -1660,43 +1979,113 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (pr.summary) blocks.push({ kind: 'section', title: 'סיכום הדיון', paras: protoLines(pr.summary) });
       if (protoLines(pr.decisions).length) blocks.push({ kind: 'section', title: 'החלטות', list: protoLines(pr.decisions) });
       if (protoLines(pr.actions).length) blocks.push({ kind: 'section', title: 'משימות להמשך', list: protoLines(pr.actions) });
-      return { heading: protoHeading(pr), blocks };
+      return { tpl: 'legacy', heading: protoHeading(pr), blocks };
     }
     const subject = [proj && proj.name, pr.template === 'supervision' ? 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '') : pr.title].filter(Boolean).join('\n');
+    const date = fmtDate(pr.date).replace(/\/\d{2}(\d{2})$/, '/$1'); // 15/11/26, as on the documents sent so far
     let meta;
-    if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', fmtDate(pr.date)], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
-    else if (pr.template === 'supervision') meta = [['תאריך', fmtDate(pr.date)], ['הנדון', subject], ['סטטוס פרויקט', pr.status], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקי הדוח', pr.copies]];
-    else meta = [['תאריך', fmtDate(pr.date)], ['הנדון', subject], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
-    blocks.push({ kind: 'kv', rows: meta.filter((m) => m[1]).map((m) => [m[0], cellOf(m[1], m[0] === 'הנדון' || m[0] === 'שם הפרויקט')]) });
-    if (pr.template === 'supervision') {
-      const st = [['עבודות שבוצעו', pr.doneWork], ['הספקים לשבוע הקרוב', pr.nextWork], ['עבודות בהספק השבועי האחרון שלא בוצעו', pr.notDone]].filter((x) => (x[1] || '').trim());
-      if (st.length) blocks.push({ kind: 'kv', title: 'סטטוס כללי', rows: st.map((x) => [x[0], cellOf(x[1])]) });
-    }
+    if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', date], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
+    else if (pr.template === 'supervision') meta = [['תאריך', date], ['הנדון', subject], ['סטטוס פרויקט', pr.status], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקי הדוח', pr.copies]];
+    else meta = [['תאריך', date], ['הנדון', subject], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
+    // The header table, as on the documents sent so far: the date row grey, the subject row light blue.
+    blocks.push({ kind: 'kv', head: true, rows: meta.filter((m) => m[1]).map((m) => [m[0],
+      cellOf(m[1], m[0] === 'הנדון' || m[0] === 'שם הפרויקט', m[0] === 'שם הפרויקט' ? { u: true } : null),
+      m[0] === 'תאריך' ? 'date' : m[0] === 'הנדון' ? 'subj' : '']) });
     const items = (pr.items || []).filter((i) => t.cols.some((c) => (i[c[0]] || '').trim()));
-    if (items.length) {
-      if (pr.template === 'tour') {
-        blocks.push({ kind: 'table', title: 'סיכום החלטות, הבהרות והנחיות', cols: [['מס"ד', 800], ['תיאור', 7500]],
-          rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', b: true }] : []), ...cellOf(it.details)]]) });
-      } else {
-        const cols = (t.numbered ? [['', 500]] : []).concat(t.cols.map((c) => [c[1], c[2]]));
-        blocks.push({ kind: 'table', cols,
-          rows: items.map((it, n) => (t.numbered ? [cellOf(String(n + 1) + '.')] : []).concat(t.cols.map((c) => cellOf(it[c[0]], c[0] === 'topic' || c[0] === 'instructions')))) });
+    if (pr.template === 'tour') {
+      if (items.length) blocks.push({ kind: 'table', title: 'סיכום החלטות, הבהרות והנחיות', cols: [['מס"ד', 800, 'num'], ['תיאור', 7500, 'details']],
+        rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', u: true }] : []), ...cellOf(it.details)]]) });
+    } else {
+      // Supervision: "סטטוס כללי" is the first row of the table, the works not done in red.
+      let status = null;
+      if (pr.template === 'supervision') {
+        const st = [['עבודות שבוצעו:', pr.doneWork], ['הספקים לשבוע הקרוב:', pr.nextWork], ['עבודות בהספק השבועי האחרון שלא בוצעו:', pr.notDone, true]].filter((x) => (x[1] || '').trim());
+        if (st.length) status = [].concat(...st.map((x) => [{ t: x[0], b: true, r: !!x[2] }].concat(cellOf(x[1], false, x[2] ? { r: true } : null))));
+      }
+      // A topic with nothing else filled in is a section row across the table (a building, a street).
+      const isSection = (it) => !t.cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
+      if (items.length || status) {
+        const cols = (t.numbered ? [['', 500, 'num']] : []).concat(t.cols
+          .filter((c) => c[0] !== 'due' || items.some((it) => (it.due || '').trim()))
+          .map((c) => [c[1], c[2], c[0]]));
+        const rows = [];
+        if (status) rows.push(cols.map((c) => (c[2] === 'topic' ? cellOf('סטטוס כללי') : c[2] === 'details' ? status : [])));
+        let n = 0;
+        items.forEach((it) => {
+          if (isSection(it)) { rows.push({ section: it.topic }); return; }
+          n++;
+          rows.push(cols.map((c) => (c[2] === 'num' ? cellOf(n + '.')
+            : cellOf(it[c[2]], (c[2] === 'topic' && pr.template === 'meeting') || c[2] === 'instructions', c[2] === 'instructions' ? { r: true } : null))));
+        });
+        blocks.push({ kind: 'table', cols, rows });
       }
     }
     if (pr.notes) blocks.push({ kind: 'section', title: 'הערות', paras: protoLines(pr.notes) });
     if (t.footer) blocks.push({ kind: 'note', text: t.footer });
-    return { heading: protoHeading(pr), blocks };
+    return { tpl: pr.template, heading: protoHeading(pr), blocks };
   }
 
+  // The look of the documents the office has sent so far (Google Docs / Word on the letterhead):
+  // black borders, a coloured header row, grey section rows with dark blue text, instructions in red.
+  // Shared by the card on the site, the live preview and the print / PDF view, so all three look the same.
+  const PROTO_DOC_CSS = `
+    .fdoc { font-family: Arial, "Assistant", sans-serif; color: #000; font-size: 11pt; line-height: 1.4; text-align: right; direction: rtl; }
+    .fdoc table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 14px; }
+    .fdoc th, .fdoc td { border: 1px solid #000; color: #000; padding: 3px 6px; vertical-align: top; text-align: right; font-weight: normal; word-wrap: break-word; overflow-wrap: anywhere; }
+    .fdoc tr { break-inside: avoid; }
+    .fdoc thead { display: table-row-group; }
+    .fdoc .pd-h1 { font-size: 1.5em; font-weight: bold; text-align: center; margin: 0 0 12px; }
+    .fdoc.t-tour .pd-h1 { font-weight: normal; color: #4472c4; text-decoration: underline; margin-bottom: 18px; }
+    .fdoc .pd-head { width: 64%; }
+    .fdoc .pd-head th { width: 27%; background: #e7e6e6; }
+    .fdoc .pd-head td { text-align: center; }
+    .fdoc.t-meeting .pd-head th::after { content: " :"; }
+    .fdoc .pd-head tr.r-date td { background: #e7e6e6; }
+    .fdoc .pd-head tr.r-subj th, .fdoc .pd-head tr.r-subj td { background: #bdd7ee; }
+    .fdoc .pd-head tr.r-subj td { font-size: 1.12em; padding: 5px 6px 9px; }
+    .fdoc.t-tour .pd-head { width: 86%; margin: 0 auto 26px; }
+    .fdoc.t-tour .pd-head th { width: 22%; background: #d9d9d9; }
+    .fdoc.t-tour .pd-head td { text-align: right; }
+    .fdoc .pd-kv th { width: 24%; background: #e7e6e6; }
+    .fdoc .pd-main thead th { background: #6666ef; color: #fff; font-weight: bold; text-align: center; vertical-align: middle; }
+    .fdoc.t-supervision .pd-main thead th { background: #3c78d8; }
+    .fdoc.t-tour .pd-main thead th, .fdoc.t-legacy .pd-main thead th { background: #d9d9d9; color: #000; font-weight: normal; }
+    .fdoc.t-tour .pd-main tr.pd-cap th { background: #bfbfbf; }
+    .fdoc .pd-main td.c-topic, .fdoc .pd-main td.c-owner, .fdoc .pd-main td.c-due { text-align: center; vertical-align: middle; }
+    .fdoc .pd-main td.c-num { text-align: center; vertical-align: middle; }
+    .fdoc.t-supervision .pd-main td.c-num { background: #ccc; }
+    .fdoc.t-tour .pd-main td.c-num { vertical-align: top; padding-top: 8px; }
+    .fdoc.t-tour .pd-main td.c-details { padding: 8px 10px; }
+    .fdoc .pd-main td.c-instructions { font-size: .88em; }
+    .fdoc .pd-main tr.pd-sec td { background: #d9d9d9; color: #1f4e79; font-size: 1.55em; text-align: center; padding: 1px 6px 3px; }
+    .fdoc .red { color: #ff0000; }
+    .fdoc .pd-title { font-weight: bold; margin: 14px 0 6px; break-after: avoid; }
+    .fdoc .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
+    .fdoc p { margin: 0 0 6px; white-space: pre-wrap; } .fdoc ol { margin: 0; padding-inline-start: 22px; } .fdoc li { margin-bottom: 3px; }`;
+  document.head.insertAdjacentHTML('beforeend', '<style>' + PROTO_DOC_CSS + '</style>');
+
   // HTML for the card and for the PDF print view.
-  const cellHtml = (cell) => cell.map((l) => (l.b ? `<b>${esc(l.t)}</b>` : esc(l.t))).join('<br>');
+  const cellHtml = (cell) => cell.map((l) => {
+    let h = esc(l.t);
+    if (l.u) h = `<u>${h}</u>`;
+    if (l.b) h = `<b>${h}</b>`;
+    return l.r ? `<span class="red">${h}</span>` : h;
+  }).join('<br>');
   function protoDocHtml(doc) {
-    return doc.blocks.map((bl) => {
-      if (bl.kind === 'kv') return `${bl.title ? `<div class="pd-title">${esc(bl.title)}</div>` : ''}<table class="pd-table pd-kv">${bl.rows.map((r) => `<tr><th>${esc(r[0])}</th><td>${cellHtml(r[1])}</td></tr>`).join('')}</table>`;
-      if (bl.kind === 'table') return `${bl.title ? `<div class="pd-title">${esc(bl.title)}</div>` : ''}<table class="pd-table"><colgroup>${bl.cols.map((c) => `<col style="width:${(c[1] / 83).toFixed(1)}%">`).join('')}</colgroup><thead><tr>${bl.cols.map((c) => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${bl.rows.map((r) => `<tr>${r.map((c) => `<td>${cellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const head = doc.tpl === 'tour' || doc.tpl === 'legacy' ? `<h1 class="pd-h1">${esc(doc.heading)}</h1>` : '';
+    return `<div class="fdoc t-${doc.tpl}">${head}${doc.blocks.map((bl) => {
+      const title = bl.title && bl.kind !== 'table' ? `<div class="pd-title">${esc(bl.title)}</div>` : '';
+      if (bl.kind === 'kv') return `${title}<table class="${bl.head ? 'pd-head' : 'pd-kv'}">${bl.rows.map((r) => `<tr${r[2] ? ` class="r-${r[2]}"` : ''}><th>${esc(r[0])}</th><td>${cellHtml(r[1])}</td></tr>`).join('')}</table>`;
+      if (bl.kind === 'table') {
+        const sum = bl.cols.reduce((a, c) => a + c[1], 0); const span = bl.cols.length;
+        return `<table class="pd-main"><colgroup>${bl.cols.map((c) => `<col style="width:${(c[1] * 100 / sum).toFixed(1)}%">`).join('')}</colgroup>
+          <thead>${bl.title ? `<tr class="pd-cap"><th colspan="${span}">${esc(bl.title)}</th></tr>` : ''}<tr>${bl.cols.map((c) => `<th>${esc(c[0])}</th>`).join('')}</tr></thead>
+          <tbody>${bl.rows.map((r) => (r.section ? `<tr class="pd-sec"><td colspan="${span}">${esc(r.section)}</td></tr>`
+            : `<tr>${r.map((c, i) => `<td class="c-${bl.cols[i][2]}">${cellHtml(c)}</td>`).join('')}</tr>`)).join('')}</tbody></table>`;
+      }
       if (bl.kind === 'note') return `<p class="pd-note">${esc(bl.text)}</p>`;
-      return `<div class="pd-title">${esc(bl.title)}</div>${bl.list ? `<ol>${bl.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : bl.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`;
-    }).join('');
+      return `${title}${bl.list ? `<ol>${bl.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : bl.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`;
+    }).join('')}</div>`;
   }
 
   // Plain text, for email and the calendar.
@@ -1709,6 +2098,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       else if (bl.kind === 'table') {
         t += '\n' + (bl.title ? bl.title + '\n' : '');
         bl.rows.forEach((r) => {
+          if (r.section) { t += '\n' + r.section + '\n'; return; }
           const parts = r.map((c, i) => [bl.cols[i][0], flat(c)]).filter((x) => x[1] && x[0] !== '' && x[0] !== 'מס"ד');
           const num = bl.cols[0][0] === '' || bl.cols[0][0] === 'מס"ד' ? flat(r[0]) + ' ' : '';
           t += num + parts.map((x, i) => (i ? x[0] + ': ' : '') + x[1]).join('\n   ') + '\n';
@@ -1815,12 +2205,31 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   const dpProject = (it) => byId(db.projects, it.projectId) || (it.projectFolder ? db.projects.find((p) => p.driveFolder === it.projectFolder) : null) || null;
   const dpUrl = (f) => (DP ? DP.fileUrl(f) : '#');
+  // The sync server's copy comes first (no Google account needed); the user's own Google account is the
+  // fallback, while the server is not set up.
   async function syncDriveProtos(manual) {
-    if (!GOOGLE || !DP || dprot.syncing) return;
-    if (!manual && (!G.silent() || Date.now() - Math.max(dprot.at, dprot.tried) < 15 * 60 * 1000)) return;
+    if (!DP || dprot.syncing) return;
+    const server = useSync(manual);
+    const direct = GOOGLE && (G.silent() || (manual && !SYNC));
+    if (!server && !direct) return;
+    if (!manual && Date.now() - Math.max(dprot.at, dprot.tried) < (server ? 5 : 15) * 60 * 1000) return;
     dprot.syncing = true; dprot.tried = Date.now(); dprot.err = ''; showDriveProtoStatus();
     try {
-      if (manual) await G.token(); // may ask to connect, straight from the click
+      if (server) {
+        try {
+          if (manual) await syncRefresh();
+          const d = await (await syncFetch('/data/drive')).json();
+          if (!d || !Array.isArray(d.files)) throw new Error('no_data');
+          dprot.items = DP.buildItems(d.files, d.folders || {}, d.root, db.projects);
+          dprot.at = d.at || Date.now();
+          try { localStorage.setItem(DRIVE_PROTO_KEY, JSON.stringify({ at: dprot.at, items: dprot.items, folders: dprot.folders })); } catch (e) {}
+          if (manual) toast(`סונכרנו ${dprot.items.length} סיכומי פגישות ודוחות מה-Drive`);
+          return;
+        } catch (e) {
+          if (!(GOOGLE && G.silent())) throw e;
+        }
+      }
+      if (manual && !server) await G.token(); // may ask to connect, straight from the click
       const rootId = await G.drive.projectsRoot();
       const files = await G.drive.search(DP.driveQuery());
       const folders = Object.assign({}, (dprot.base && dprot.base.folders) || {}, dprot.folders);
@@ -1856,7 +2265,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const n = dprot.items.length;
     const when = dprot.syncing ? 'מסנכרן מה-Drive...' : dprot.at ? 'עודכן ' + agoText(dprot.at) : dprot.base ? 'לפי הרשימה מ-' + fmtDate(dprot.base.version) : '';
     return `☁️ ${n} מסמכים מתיקיית "פרויקטים פמי" · ${esc(when)}${dprot.err && !dprot.syncing ? ` · <span class="overdue">${esc(dprot.err)}</span>` : ''}
-      ${GOOGLE && !dprot.syncing ? ' · <a href="#" data-dpsync>🔄 סנכרון עכשיו</a>' : ''}`;
+      ${(GOOGLE || SYNC) && !dprot.syncing ? ' · <a href="#" data-dpsync>🔄 סנכרון עכשיו</a>' : ''}`;
   }
   function showDriveProtoStatus() {
     $$('.dp-status').forEach((b) => { b.innerHTML = driveProtoStatusHtml(); });
@@ -1893,8 +2302,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   const protoKind = (pr) => (pr.template === 'supervision' ? 'report' : 'meeting');
   const PROTO_KINDS = { meeting: 'סיכומי פגישות', report: 'דוחות ביצוע ופיקוח' };
-  const GROUP_SHOW = 6;
-
+  
   function renderProtocols(el) {
     syncDriveProtos(false);
     const kind = ui.protoKind === 'report' ? 'report' : 'meeting';
@@ -1908,10 +2316,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       && (!src || (src === 'drive' ? e.drive : src === '_other' ? e.site && !protoTpl(e.site) : e.site && e.site.template === src)))
       .sort((a, b) => b.date.localeCompare(a.date));
     const cardHtml = (e, o) => (e.site ? protoCardHtml(e.site, o) : driveProtoHtml(e.drive, o));
-    ui.protoMore = ui.protoMore || {};
     let body;
     if (ui.protoGroup !== 'date') {
-      // One section per project (or client folder), the one with the most recent document first.
+      // One group per project (or client folder), the one with the most recent document first.
       const map = new Map();
       list.forEach((e) => {
         const k = e.p ? e.p.id : e.drive && e.drive.group ? 'g:' + e.drive.group : '_none';
@@ -1919,15 +2326,33 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         map.get(k).items.push(e);
       });
       const groups = Array.from(map.values()).sort((a, b) => (a.k === '_none') - (b.k === '_none') || (b.items[0].date || '').localeCompare(a.items[0].date || ''));
-      body = groups.map((g) => {
-        const more = !q && g.items.length > GROUP_SHOW + 1 && !ui.protoMore[g.k];
-        const shown = more ? g.items.slice(0, GROUP_SHOW) : g.items;
-        return `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.label)}</a>` : esc(g.label)}</h2>
-          <span class="count">${g.items.length} ${kind === 'report' ? 'דוחות' : 'סיכומים'}${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
-          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ ${kind === 'report' ? 'דוח פיקוח' : 'סיכום פגישה'}</button>` : ''}</div>
-          ${shown.map((e) => cardHtml(e, { hideProject: true })).join('')}
-          ${more ? `<button class="btn sm ghost" data-more="${esc(g.k)}" style="margin-bottom:8px">הצגת כל ה-${g.items.length}</button>` : ''}`;
-      }).join('');
+      const noun = kind === 'report' ? 'דוחות' : 'סיכומים';
+      const groupHead = (g) => `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.label)}</a>` : esc(g.label)}</h2>
+          <span class="count">${g.items.length} ${noun}${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
+          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ ${kind === 'report' ? 'דוח פיקוח' : 'סיכום פגישה'}</button>` : ''}</div>`;
+      const openG = ui.protoOpenGroup && groups.find((g) => g.k === ui.protoOpenGroup);
+      if (openG) {
+        // One project opened from its tile: all of its documents.
+        body = `<button class="btn sm ghost" data-tilesback style="margin-bottom:10px">→ חזרה לכל הפרויקטים</button>
+          ${groupHead(openG)}${openG.items.map((e) => cardHtml(e, { hideProject: true })).join('')}`;
+      } else if (q || ui.protoProject) {
+        body = groups.map((g) => groupHead(g) + g.items.map((e) => cardHtml(e, { hideProject: true })).join('')).join('');
+      } else {
+        // A dense grid: one small tile per project with its 3 latest documents, as many projects on screen as fit.
+        const shortDate = (dt) => (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) + '.' + dt.slice(2, 4) : '');
+        const row = (e) => {
+          const title = e.site ? (e.site.title || protoHeading(e.site)) : (e.drive.title || e.drive.label);
+          return e.drive
+            ? `<li><a href="${esc(dpUrl(e.drive.files[0]))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive"><span class="d">${shortDate(e.date)}</span><span class="t">${esc(title)}</span></a></li>`
+            : `<li><a href="#" data-tileproto="${esc(e.site.id)}"><span class="d">${shortDate(e.date)}</span><span class="t">${esc(title)}</span></a></li>`;
+        };
+        body = `<div class="prtiles">${groups.map((g) => `<div class="card prtile" data-tile="${esc(g.k)}" title="כל ה${noun} של ${esc(g.label)}">
+          <div class="prtile-head"><b>${esc(g.label)}</b><span class="n">${g.items.length}</span></div>
+          ${g.p && g.p.client ? `<div class="prtile-client">${esc(g.p.client)}</div>` : ''}
+          <ul>${g.items.slice(0, 3).map(row).join('')}</ul>
+          ${g.items.length > 3 ? `<div class="prtile-more">עוד ${g.items.length - 3} ←</div>` : ''}
+        </div>`).join('')}</div>`;
+      }
     } else {
       // By date: one section per month, newest first.
       const map = new Map();
@@ -1954,12 +2379,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       </div>
       <div class="dp-status hint">${driveProtoStatusHtml()}</div>
       <div id="protoList">${body || `<div class="card empty">${q || ui.protoProject || src ? 'לא נמצאו מסמכים' : 'אין עדיין ' + PROTO_KINDS[kind] + '.'}</div>`}</div>`;
-    $$('[data-kind]', el).forEach((b) => b.addEventListener('click', () => { ui.protoKind = b.dataset.kind; ui.protoTpl = ''; renderProtocols(el); }));
-    $$('.toolbar .seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; renderProtocols(el); }));
-    $$('[data-more]', el).forEach((b) => b.addEventListener('click', () => { ui.protoMore[b.dataset.more] = true; renderProtocols(el); }));
+    $$('[data-kind]', el).forEach((b) => b.addEventListener('click', () => { ui.protoKind = b.dataset.kind; ui.protoTpl = ''; ui.protoOpenGroup = ''; renderProtocols(el); }));
+    $$('.toolbar .seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; ui.protoOpenGroup = ''; renderProtocols(el); }));
+    $$('[data-tile]', el).forEach((t) => t.addEventListener('click', (e) => {
+      if (e.target.closest('a[target]')) return; // a Drive document opens in its own tab
+      e.preventDefault();
+      const a = e.target.closest('[data-tileproto]');
+      ui.protoOpenGroup = t.dataset.tile; if (a) ui.openProto = a.dataset.tileproto;
+      renderProtocols(el); window.scrollTo(0, 0);
+    }));
+    const back = $('[data-tilesback]', el);
+    if (back) back.addEventListener('click', () => { ui.protoOpenGroup = ''; renderProtocols(el); });
     $$('[data-newtpl]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { template: b.dataset.newtpl })));
     $$('[data-newfor]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { projectId: b.dataset.newfor, template: kind === 'report' ? 'supervision' : 'meeting' })));
-    $('#pp', el).addEventListener('change', (e) => { ui.protoProject = e.target.value; renderProtocols(el); });
+    $('#pp', el).addEventListener('change', (e) => { ui.protoProject = e.target.value; ui.protoOpenGroup = ''; renderProtocols(el); });
     $('#pt', el).addEventListener('change', (e) => { ui.protoTpl = e.target.value; renderProtocols(el); });
     $('#pq', el).addEventListener('input', (e) => { ui.protoQ = e.target.value; renderProtocols(el); const i = $('#pq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
     bindProtoCards($('#protoList', el));
@@ -1999,8 +2432,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     const vis = (tpls) => `data-tpls="${tpls}" style="${tpls.split(' ').includes(p.template) ? '' : 'display:none'}"`;
     openModal(proto ? 'עריכת ' + PROTO_TPL[p.template].label : 'פרוטוקול חדש', `
-      <div class="field full pv-bar"><button type="button" class="btn sm" data-preview>👁️ תצוגה מקדימה</button><span class="hint" data-pvhint>רואים את המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span></div>
-      <div class="field full pv-pane" style="display:none"><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
+      <div class="pv-pane"><div class="pv-bar"><b>👁️ תצוגה מקדימה</b><span class="hint">המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span><span class="spacer" style="flex:1"></span><button type="button" class="btn sm" data-preview>הסתרה</button></div><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
+      <div class="pv-form">
       <div class="field"><label>תבנית</label><select class="input" name="template">${PROTO_TPL_KEYS.map((k) => `<option value="${k}" ${k === p.template ? 'selected' : ''}>${esc(PROTO_TPL[k].label)}</option>`).join('')}</select></div>
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
@@ -2017,25 +2450,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="spacer"></span><button type="button" class="btn sm" data-prev>העתקת נושאים מהפרוטוקול הקודם</button></div>
         <div id="protoItems"></div>
         <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
-        <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא בלי תוכן לא יופיע במסמך. מלאו "באחריות" כדי ליצור ממנו משימה.'}</span></div>
-      <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>`,
+        <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא מהרשימה הקבועה בלי תוכן לא יופיע במסמך. נושא חדש בלי תוכן יופיע כשורת כותרת אפורה לרוחב הטבלה (למשל שם רחוב או מבנה). מלאו "באחריות" כדי ליצור משימה.'}</span></div>
+      <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>
+      </div>`,
     (data) => {
       protoFormFinish(data);
       if (proto) Object.assign(proto, data); else { const n = Object.assign({ id: uid() }, data); db.protocols.push(n); ui.openProto = n.id; }
       save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
     },
     proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
-    $('#modalForm').classList.add('wide');
+    $('#modalForm').classList.add('wide', 'with-pv');
     const body = $('#modalBody');
     const tplSel = $('[name="template"]', body);
     const projSel = $('[name="projectId"]', body);
     let curTpl = p.template;
     drawProtoItems(curTpl, p.items || []);
-    // Live preview at the top of the form.
-    const pvPane = $('.pv-pane', body); const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
+    // Live preview, always open: on the left beside the form (on top of it on narrow screens).
+    const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
     let pvTimer = null;
     const drawPreview = () => {
-      if (pvPane.style.display === 'none') return;
+      if (pvFrame.style.display === 'none') return;
       const data = {}; new FormData($('#modalForm')).forEach((v, k) => { data[k] = v; });
       const keep = pvFrame.contentWindow ? pvFrame.contentWindow.scrollY : 0;
       pvFrame.onload = () => { try { pvFrame.contentWindow.scrollTo(0, keep); } catch (e) {} };
@@ -2043,12 +2477,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     };
     const schedulePreview = () => { clearTimeout(pvTimer); pvTimer = setTimeout(drawPreview, 350); };
     pvBtn.addEventListener('click', () => {
-      const show = pvPane.style.display === 'none';
-      pvPane.style.display = show ? '' : 'none';
-      pvBtn.textContent = show ? '✕ סגירת התצוגה המקדימה' : '👁️ תצוגה מקדימה';
-      pvBtn.classList.toggle('primary', show);
+      const show = pvFrame.style.display === 'none';
+      pvFrame.style.display = show ? '' : 'none';
+      pvBtn.textContent = show ? 'הסתרה' : 'הצגה';
       if (show) drawPreview();
     });
+    drawPreview();
     body.addEventListener('input', schedulePreview);
     body.addEventListener('change', schedulePreview);
     body.addEventListener('click', (e) => { if (e.target.closest('button') && !e.target.closest('[data-preview]')) schedulePreview(); });
@@ -2138,29 +2572,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function protoPrintHtml(pr, preview) {
     const doc = protoDoc(pr);
     const bg = new URL('docs/letterhead.jpg', location.href).href;
-    const body = `<h1>${esc(doc.heading)}</h1>${protoDocHtml(doc)}`;
+    const body = protoDocHtml(doc);
     const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(protoFileName(pr, 'pdf').replace(/\.pdf$/, ''))}</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
         @page { size: A4; margin: 0; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
-        body { font-family: Arial, "Assistant", sans-serif; color: #111; font-size: 10.5pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .bg { position: fixed; inset: 0; width: 210mm; height: 297mm; z-index: -1; }
         .bg img { width: 100%; height: 100%; display: block; }
         table.page { width: 210mm; border-collapse: collapse; }
-        thead td.pad { height: 67.5mm; } tfoot td.pad { height: 22.5mm; }
-        td.content { padding: 0 31.7mm; vertical-align: top; }
-        h1 { font-size: 16pt; margin: 0 0 10px; text-align: center; }
-        .pd-title { font-weight: bold; font-size: 11.5pt; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid #52bd76; break-after: avoid; }
-        .pd-table { width: 100%; border-collapse: collapse; margin: 0 0 10px; table-layout: fixed; }
-        .pd-table th, .pd-table td { border: 1px solid #9aa3ad; padding: 4px 6px; vertical-align: top; text-align: right; word-wrap: break-word; }
-        .pd-table thead th { background: #e4f4ea; }
-        .pd-table thead { display: table-header-group; }
-        .pd-table tr { break-inside: avoid; }
-        .pd-kv th { width: 24%; background: #f1f5f3; }
-        .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
-        p { margin: 0 0 6px; white-space: pre-wrap; } ol { margin: 0; padding-inline-start: 22px; } li { margin-bottom: 3px; }
+        thead td.pad { height: 61mm; } tfoot td.pad { height: 27mm; }
+        td.content { padding: 0 11mm; vertical-align: top; }
+        ${PROTO_DOC_CSS}
         .bar { position: fixed; top: 0; left: 0; right: 0; background: #15253d; color: #fff; padding: 10px 16px; display: flex; gap: 10px; align-items: center; font-family: Arial, sans-serif; z-index: 10; }
         .bar button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; background: #52bd76; color: #fff; font-weight: bold; cursor: pointer; }
         @media screen { body { background: #888; padding-top: 52px; } table.page { margin: 16px auto; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.3); position: relative; } .bg { position: absolute; } .sheet { position: relative; width: 210mm; margin: 0 auto; } }
@@ -2193,7 +2618,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const sz = o.size ? `<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>` : '';
     const b = o.bold ? '<w:b/><w:bCs/>' : '';
     const color = o.color ? `<w:color w:val="${o.color}"/>` : '';
-    return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b}${color}${sz}<w:rtl/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+    const u = o.u ? '<w:u w:val="single"/>' : '';
+    return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b}${color}${u}${sz}<w:rtl/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
   }
   function wPara(runs, o) {
     o = o || {};
@@ -2202,32 +2628,59 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const jc = o.center ? '<w:jc w:val="center"/>' : '';
     return `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${bdr}<w:bidi/><w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 100 : o.after}"/>${ind}${jc}</w:pPr>${runs}</w:p>`;
   }
-  // A bordered right-to-left table. rows: [[cell, ...]], cell: [{ t, b }]; opts.header: first row repeats and is shaded.
-  function wTable(widths, rows, opts) {
-    const o = opts || {};
-    const bd = (s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="9AA3AD"/>`;
-    const grid = widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('');
-    const tr = rows.map((r, ri) => {
-      const head = o.header && ri === 0;
-      return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}</w:trPr>${r.map((cell, ci) => {
-        const fill = head ? 'E4F4EA' : (o.shadeFirstCol && ci === 0 ? 'F1F5F3' : '');
-        const paras = (cell.length ? cell : [{ t: '' }]).map((l) => wPara(wRun(l.t, { bold: l.b || head || (o.shadeFirstCol && ci === 0), size: 20 }), { after: 20 })).join('');
-        return `<w:tc><w:tcPr><w:tcW w:w="${widths[ci]}" w:type="dxa"/>${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''}</w:tcPr>${paras}</w:tc>`;
-      }).join('')}</w:tr>`;
-    }).join('');
-    return `<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(bd).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${tr}</w:tbl>` + wPara('', { after: 80 });
+  // Tables in the look of the documents sent so far: black borders, coloured header row, grey section rows.
+  // A cell is a list of lines [{ t, b, u, r }]; o: fill, color, bold, size, center, vcenter, span.
+  function wCell(w, lines, o) {
+    o = o || {};
+    const paras = (lines && lines.length ? lines : [{ t: '' }]).map((l) => wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
+    return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${o.span ? `<w:gridSpan w:val="${o.span}"/>` : ''}${o.blank ? '<w:tcBorders><w:top w:val="nil"/><w:start w:val="nil"/><w:bottom w:val="nil"/><w:end w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/></w:tcBorders>' : ''}${o.fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.fill}"/>` : ''}${o.vcenter ? '<w:vAlign w:val="center"/>' : ''}</w:tcPr>${paras}</w:tc>`;
   }
+  const wRow = (cells) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells}</w:tr>`;
+  // The template's margins hold the letterhead in place, so wide tables reach past them (W_IND) instead.
+  function wTbl(widths, rows, center) {
+    const bd = (s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`;
+    const grid = widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('');
+    return `<w:tbl><w:tblPr><w:bidiVisual/>${center ? '<w:jc w:val="center"/>' : ''}<w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/>${center ? '' : `<w:tblInd w:w="${W_IND}" w:type="dxa"/>`}<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(bd).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${rows.join('')}</w:tbl>` + wPara('', { after: 120 });
+  }
+  const W_FULL = 10546; // A4 width less 12 mm on each side, in twips
+  const W_IND = -1120; // from the template's 1800 twips margin to 680
   async function buildProtocolDocx(pr) {
       const [JSZip, tpl] = await Promise.all([loadJSZip(), fetch('docs/blank-template.docx').then((r) => { if (!r.ok) throw new Error('template'); return r.arrayBuffer(); })]);
       const zip = await JSZip.loadAsync(tpl);
       const docXml = await zip.file('word/document.xml').async('string');
       const doc = protoDoc(pr);
-      let body = wPara(wRun(doc.heading, { bold: true, size: 32 }), { after: 160, center: true });
+      const tour = doc.tpl === 'tour';
+      const head = { meeting: ['6666EF', 'FFFFFF'], supervision: ['3C78D8', 'FFFFFF'] }[doc.tpl] || ['D9D9D9', ''];
+      let body = '';
+      if (tour || doc.tpl === 'legacy') body += wPara(wRun(doc.heading, { size: 32, bold: !tour, u: tour, color: tour ? '4472C4' : '' }), { after: 240, center: true });
       doc.blocks.forEach((bl) => {
-        if (bl.title) body += wPara(wRun(bl.title, { bold: true, size: 24 }), { before: 160, after: 80, border: true, keepNext: true });
-        if (bl.kind === 'kv') body += wTable([2000, 6300], bl.rows.map((r) => [[{ t: r[0], b: true }], r[1]]), { shadeFirstCol: true });
-        else if (bl.kind === 'table') body += wTable(bl.cols.map((c) => c[1]), [bl.cols.map((c) => [{ t: c[0], b: true }])].concat(bl.rows), { header: true });
-        else if (bl.kind === 'note') body += wPara(wRun(bl.text, { bold: true }), { before: 200, center: true });
+        if (bl.title && bl.kind !== 'table') body += wPara(wRun(bl.title, { bold: true, size: 22 }), { before: 160, after: 80, keepNext: true });
+        if (bl.kind === 'kv') {
+          // The header table sits at the right, about two thirds wide: a borderless cell fills the rest
+          // (Word and LibreOffice place a narrower right-to-left table differently).
+          const widths = !bl.head ? [2400, W_FULL - 2400] : tour ? [2000, 7100] : [1820, 4930, W_FULL - 6750];
+          body += wTbl(widths, bl.rows.map((r) => {
+            const fill = r[2] === 'subj' ? 'BDD7EE' : r[2] === 'date' ? 'E7E6E6' : '';
+            return wRow(wCell(widths[0], [{ t: r[0] + (doc.tpl === 'meeting' ? ' :' : '') }], { fill: fill || (tour ? 'D9D9D9' : 'E7E6E6') })
+              + wCell(widths[1], r[1], { fill, center: bl.head && !tour, size: r[2] === 'subj' ? 23 : 0 })
+              + (widths[2] ? wCell(widths[2], [], { blank: true }) : ''));
+          }), tour);
+        } else if (bl.kind === 'table') {
+          const sum = bl.cols.reduce((a, c) => a + c[1], 0);
+          const widths = bl.cols.map((c) => Math.round(c[1] * W_FULL / sum));
+          const rows = [];
+          if (bl.title) rows.push(wRow(wCell(W_FULL, [{ t: bl.title }], { fill: 'BFBFBF', center: true, span: widths.length })));
+          rows.push(wRow(bl.cols.map((c, i) => wCell(widths[i], [{ t: c[0] }], { fill: head[0], color: head[1], bold: !!head[1], center: true, vcenter: true })).join('')));
+          bl.rows.forEach((r) => {
+            if (r.section) { rows.push(wRow(wCell(W_FULL, [{ t: r.section }], { fill: 'D9D9D9', color: '1F4E79', size: 32, center: true, span: widths.length }))); return; }
+            rows.push(wRow(r.map((c, i) => {
+              const k = bl.cols[i][2];
+              const mid = !tour && (k === 'num' || k === 'topic' || k === 'owner' || k === 'due');
+              return wCell(widths[i], c, { fill: k === 'num' && doc.tpl === 'supervision' ? 'CCCCCC' : '', center: mid, vcenter: mid });
+            }).join('')));
+          });
+          body += wTbl(widths, rows);
+        } else if (bl.kind === 'note') body += wPara(wRun(bl.text, { bold: true }), { before: 200, center: true });
         else if (bl.list) bl.list.forEach((x, i) => { body += wPara(wRun((i + 1) + '.\t' + x), { indent: true, after: 60 }); });
         else bl.paras.forEach((x) => { body += wPara(wRun(x)); });
       });
@@ -2323,6 +2776,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       today: todayStr(),
       projects: db.projects.map((p) => ({ id: p.id, name: p.name, client: p.client, status: p.status, progress: p.progress, manager: p.manager, start: p.start, end: p.end, budget: p.budget })),
       tasks: db.tasks.map((t) => ({ id: t.id, title: t.title, project: pname(t.projectId), assignee: t.assignee, priority: t.priority, status: t.status, due: t.due, notes: t.notes })),
+      consultantAccounts: ledProjects().map((p) => ({ project: p.name, client: p.client, file: p.ledger.file, note: 'סכומים כולל מע"מ; billed=הוגש חשבון וטרם שולם', rows: p.ledger.rows.map((r) => ({ group: r.group, field: r.field || r.service, name: r.name, total: r.total, payments: r.payments, paid: ledPaid(r) })) })),
       invoices: db.invoices.map((i) => ({ number: i.number, type: i.type, party: i.party, project: pname(i.projectId), amountBeforeVat: i.amount, vat: i.vat, issueDate: i.issueDate, dueDate: i.dueDate, status: invoiceStatus(i) })),
       protocols: db.protocols.slice().sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({ title: p.title, date: p.date, type: p.type, project: pname(p.projectId), participants: p.participants, summary: p.summary, decisions: p.decisions, actions: p.actions, location: p.location, reportNo: p.reportNo, doneWork: p.doneWork, nextWork: p.nextWork, notDone: p.notDone, items: (p.items || []).map((i) => [i.topic, i.details, i.instructions, i.due && 'לו"ז: ' + i.due, i.owner && 'באחריות: ' + i.owner].filter(Boolean).join(' | ')) })),
     });
@@ -2640,7 +3094,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       },
       onData: (state) => {
         applyRemote(state);
-        if (first) { first = false; gate('ready'); }
+        if (first) { first = false; gate('ready'); importLedgers(false); }
       },
       onError: (e) => {
         if (e && e.code === 'permission-denied') toast('אין הרשאה לפעולה הזו');
@@ -3009,7 +3463,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   let modalSubmit = null; let modalDelete = null;
   function openModal(title, bodyHtml, onSubmit, onDelete, deleteNote) {
     $('#modalTitle').textContent = title;
-    $('#modalForm').classList.remove('wide');
+    $('#modalForm').classList.remove('wide', 'with-pv');
     $('#modalBody').innerHTML = bodyHtml;
     modalSubmit = onSubmit; modalDelete = onDelete;
     const del = $('#modalDelete');
@@ -3082,7 +3536,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $('#addBtn').addEventListener('click', () => {
       const v = currentView();
       if (v === 'projects') openProjectForm();
-      else if (v === 'accounts') openInvoiceForm();
+      else if (v === 'accounts') { if (ui.accTab === 'invoices') openInvoiceForm(); else openLedgerImport(); }
       else if (v === 'protocols') openProtocolForm();
       else if (v === 'project') openTaskForm(null, { projectId: ui.projectId });
       else openTaskForm();
@@ -3100,7 +3554,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
       if (!localStorage.getItem(STORE_KEY)) save();
       render();
-      importDriveProjects(false).then(() => syncTaskSheet(false));
+      importDriveProjects(false).then(() => importLedgers(false)).then(() => syncTaskSheet(false));
       setInterval(() => syncTaskSheet(false), 10 * 60 * 1000);
       document.addEventListener('visibilitychange', () => {
         const st = settings().sheetSync;

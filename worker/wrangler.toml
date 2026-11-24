@@ -8,6 +8,14 @@ compatibility_date = "2025-06-01"
 GOOGLE_CLIENT_ID = "380692332592-oq3d6q4vkbrnftmm03v4si5co6rptjqe.apps.googleusercontent.com"
 # כתובות האתר שמותר להן לפנות לשרת, מופרדות בפסיק
 ALLOWED_ORIGINS = "https://femiengineering.github.io,http://localhost:8000"
+# סנכרון ברקע מה-Drive (בלי חשבון Google מחובר במכשיר): תיקיית "פרויקטים פמי" והגיליון "משימות פמי".
+# השרת קורא אותם עם החשבון שכבר חובר באתר. ראו docs/GOOGLE-SETUP.md שלב 8.
+PROJECTS_FOLDER_ID = "1rb3m55bbrVh0rFku9uRB5GaCBsR-VLCV"
+TASKS_SHEET_ID = "1kwUxnrAQ6zAz2AkFjsR5rHEIKzQGbjo2_Qr0Sm8gSwQ"
+
+# הסנכרון רץ כל 15 דקות.
+[triggers]
+crons = ["*/15 * * * *"]
 
 # מזהה ה-KV מהפקודה: npx wrangler kv namespace create TOKENS
 [[kv_namespaces]]
@@ -17,3 +25,4 @@ id = "d81ec9722bd445079855e960e2e363a2"
 # GOOGLE_CLIENT_SECRET ו-ENC_KEY הם סודות. הם לא נכתבים בקובץ הזה, אלא עם:
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET
 #   npx wrangler secret put ENC_KEY
+#   npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_KEY   (אופציונלי, גיבוי בלבד: קובץ JSON של Service Account)
