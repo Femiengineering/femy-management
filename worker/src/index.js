@@ -24,6 +24,8 @@
 //   sync:drive   { at, root, files, folders }  the protocol documents in the projects folder and every
 //                folder between them and it, for FemyDriveProtocols.buildItems() on the site
 //   sync:sheet   the tasks sheet ("משימות פמי") exported as .xlsx, for FemySheet on the site
+//   sync:tree    { at, root, folders } every folder under the projects folder ({ id: [parent, name] }),
+//                so GET /data/folder?id= can list one of them live for the folder browser on the site
 //   sync:status  { at, ok, error, ... } of the last run
 //   sync:account the KV key (u:<hash>) of the sync account, chosen as the first stored account that can
 //                open the projects folder. If its token can no longer be renewed, the run is logged and
@@ -71,6 +73,7 @@ export default {
         return new Response(value, { headers: Object.assign({ 'Content-Type': XLSX, 'Cache-Control': 'no-store', 'X-Synced-At': String((metadata && metadata.at) || '') }, cors) });
       }
       if (req.method === 'GET' && path === '/api/sync-data') return reply(...(await syncData(env)));
+      if (req.method === 'GET' && path === '/data/folder') return reply(...(await listFolder(env, new URL(req.url).searchParams.get('id') || '')));
       if (req.method === 'GET' && path === '/data/status') return reply(200, JSON.parse((await env.TOKENS.get('sync:status')) || '{}'));
       if (req.method === 'POST' && path === '/data/refresh') return reply(...(await refresh(env)));
     } catch (e) {
@@ -242,6 +245,11 @@ async function syncDrive(env) {
         };
         const docs = files.filter((f) => DP.DOC_MIMES[f.mimeType] && inRoot((f.parents || [])[0]))
           .map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, modifiedTime: f.modifiedTime, createdTime: f.createdTime }));
+        // Every folder under the projects folder, so /data/folder knows which folders it may list.
+        const tree = {};
+        flist.forEach((f) => { if (inRoot(f.id)) tree[f.id] = all[f.id]; });
+        await env.TOKENS.put('sync:tree', JSON.stringify({ at: status.at, root, folders: tree }));
+        status.tree = Object.keys(tree).length;
         if (!docs.length) throw new Error('no protocol documents found under the projects folder');
         await env.TOKENS.put('sync:drive', JSON.stringify({ at: status.at, root, files: docs, folders }));
         status.files = docs.length; status.folders = Object.keys(folders).length;
@@ -258,6 +266,39 @@ async function syncDrive(env) {
   }
   await env.TOKENS.put('sync:status', JSON.stringify(status));
   return status;
+}
+
+// One folder under the projects folder, listed live with the sync account (subfolders first), for the
+// folder browser on a project's page when the device has no Google account connected. Only the projects
+// folder itself and the folders under it (sync:tree) can be listed.
+async function listFolder(env, id) {
+  if (!/^[\w-]{10,80}$/.test(id)) return [400, { error: 'bad_id' }];
+  const tree = await env.TOKENS.get('sync:tree', 'json');
+  const root = env.PROJECTS_FOLDER_ID;
+  if (!root) return [404, { error: 'no_data' }];
+  if (id !== root && !(tree && tree.folders && tree.folders[id])) return [404, { error: tree ? 'not_found' : 'no_data' }];
+  const tok = await syncToken(env);
+  const files = []; let pageToken = '';
+  for (let i = 0; i < 5; i++) {
+    const p = new URLSearchParams({ q: `'${id}' in parents and trashed=false`, orderBy: 'folder,name', pageSize: '1000', fields: 'nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime,iconLink,size)', includeItemsFromAllDrives: 'true', supportsAllDrives: 'true' });
+    if (pageToken) p.set('pageToken', pageToken);
+    const j = await (await gfetch(tok, DRIVE + '?' + p)).json();
+    files.push(...(j.files || []));
+    if (!(pageToken = j.nextPageToken)) break;
+  }
+  files.forEach((f) => { f.folder = f.mimeType === FOLDER_MIME; });
+  const name = id === root ? '' : tree.folders[id][1];
+  return [200, { id, name, root, at: Date.now(), files }];
+}
+// The sync account's access token, kept (sealed) in KV for 50 minutes so browsing a folder costs one Drive call.
+async function syncToken(env) {
+  try {
+    const c = await env.TOKENS.get('sync:at');
+    if (c) { const t = JSON.parse(await open(env, c)); if (t.exp > Date.now() && t.tok) return t.tok; }
+  } catch (e) { /* renew below */ }
+  const { token } = await syncAuth(env);
+  await env.TOKENS.put('sync:at', await seal(env, JSON.stringify({ tok: token, exp: Date.now() + 50 * 60 * 1000 })), { expirationTtl: 3600 });
+  return token;
 }
 
 // An access token for the sync: the sync account's stored refresh token first, then every other
