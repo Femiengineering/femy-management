@@ -549,6 +549,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .g-copy:hover { background: var(--gray-soft); }
 .g-local { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .g-local select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--card, #fff); color: inherit; }
+.pd-list { max-height: 460px; overflow-y: auto; }
+.pd-dir { cursor: pointer; user-select: none; }
+.pd-crumbs .g-copy { text-decoration: none; }
 .g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
 .g-search .input { flex: 1; }
@@ -811,7 +814,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [] } };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1431,7 +1434,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="tg-meta">${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}${pill(PRIORITY, t.priority)}${pill(TASK_STATUS, t.status)}</span>
       </div>`;
     };
-    const showDrive = GOOGLE && p.driveFolder;
+    const showDrive = !!p.driveFolder && ((GOOGLE && G.valid()) || !!SYNC);
     syncDriveProtos(false);
     const dpDocs = dprot.items.filter((it) => dpProject(it) === p);
     el.innerHTML = `
@@ -1470,10 +1473,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           ${doneT.length ? `<a href="#" class="hint" data-toggle-done style="display:inline-block;padding-top:8px">${ui.projTaskDone ? 'הסתרת' : 'הצגת'} ${doneT.length} משימות שהושלמו</a>${ui.projTaskDone ? doneT.map(row).join('') : ''}` : ''}
         </div>
         <div class="card card-pad">
-          <div class="card-head"><h2>תיקיית הפרויקט</h2>${p.driveFolder ? `<a ${lpAttr(p)}>📋 העתק נתיב</a>` : ''}</div>
+          <div class="card-head"><h2>תיקיית הפרויקט</h2>${p.driveFolder ? `<a href="${esc(driveUrl(p))}" target="_blank" rel="noopener">פתיחה ב-Drive ↗</a>` : ''}</div>
           <div id="projDrive">${!p.driveFolder ? '<div class="hint">לפרויקט הזה עוד אין קישור לתיקייה ב-Drive. לחצו "עריכה" והדביקו את הקישור לתיקייה.</div>'
-            : !showDrive ? `<a class="btn" ${lpAttr(p)}>📋 העתק נתיב התיקייה</a>`
-            : !G.valid() ? `<div class="hint" style="margin-bottom:10px">כדי לראות כאן את הקבצים, חברו את חשבון ה-Google שלכם בלשונית <a href="#google">יומן, מייל ו-Drive</a>.</div><a class="btn" ${lpAttr(p)}>📋 העתק נתיב התיקייה</a>`
+            : !showDrive ? `<div class="hint" style="margin-bottom:10px">כדי לדפדף כאן בתיקיות, חברו את חשבון ה-Google שלכם בלשונית <a href="#google">יומן, מייל ו-Drive</a>.</div><a class="btn" ${lpAttr(p)}>📋 העתק נתיב התיקייה</a>`
             : '<div class="hint">טוען קבצים...</div>'}</div>
         </div>
       </div>
@@ -1505,17 +1507,91 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (dpa) dpa.addEventListener('click', () => { ui.protoProject = p.id; ui.protoGroup = 'project'; });
 
     const box = $('#projDrive', el);
-    if (showDrive && G.valid()) {
-      G.drive.browse(p.driveFolder, {}).then((res) => {
-        if (!document.body.contains(box)) return;
-        const when = (f) => `<small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>`;
-        box.innerHTML = res.files.slice(0, 40).map((f) => `<div class="g-file">${f.folder ? '<span>📁</span>' : f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a ${lpAttr(p, f.name)}>${esc(f.name)}</a>${when(f)}</div>`).join('')
-          + (res.files.length > 40 ? `<div class="hint" style="padding-top:8px">ועוד ${res.files.length - 40}. <a ${lpAttr(p)}>העתק נתיב התיקייה</a></div>` : '')
-          || '<div class="hint">התיקייה ריקה</div>';
-      }).catch((e) => {
-        if (document.body.contains(box)) box.innerHTML = `<div class="hint" style="margin-bottom:10px">לא ניתן לטעון את הקבצים (${esc(gErr(e))}).</div><a class="btn" ${lpAttr(p)}>📋 העתק נתיב התיקייה</a>`;
-      });
+    if (showDrive) {
+      if (ui.projDrive.pid !== p.id) ui.projDrive = { pid: p.id, path: [] };
+      renderProjDrive(p, box);
     }
+  }
+
+  // ---------- Project folder browser ----------
+  // Browses a project's Drive folder like a file explorer: a folder opens in place, the breadcrumb goes back.
+  // Lists live with the user's Google account when it is connected; otherwise through the sync server
+  // (GET /data/folder, with the Google account already connected there), and as a last resort from the
+  // folders and documents the protocols sync already knows.
+  const driveFolderUrl = (id) => 'https://drive.google.com/drive/folders/' + encodeURIComponent(id);
+  async function listDriveFolder(id) {
+    if (GOOGLE && G.valid()) {
+      try { const r = await G.drive.browse(id, {}); return { files: r.files, src: 'google' }; }
+      catch (e) { if (!SYNC) throw e; }
+    }
+    if (SYNC) {
+      try {
+        const r = await fetch(SYNC + '/data/folder?id=' + encodeURIComponent(id), { cache: 'no-store' });
+        if (r.ok) { const j = await r.json(); return { files: j.files || [], name: j.name || '', src: 'server' }; }
+      } catch (e) { /* fall back to the cache */ }
+    }
+    return cachedDriveFolder(id);
+  }
+  function cachedDriveFolder(id) {
+    const folders = Object.assign({}, (dprot.base && dprot.base.folders) || {}, dprot.folders);
+    const files = Object.keys(folders).filter((k) => folders[k][0] === id && folders[k][1])
+      .map((k) => ({ id: k, name: folders[k][1], folder: true }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    // The documents of this folder: those whose folder path under their project folder leads here.
+    const names = []; let at = id; let top = '';
+    for (let g = 0; at && g < 30; g++) {
+      if (db.projects.some((x) => x.driveFolder === at)) { top = at; break; }
+      if (!folders[at]) break;
+      names.unshift(folders[at][1]); at = folders[at][0];
+    }
+    if (top) {
+      const want = names.join(' / ');
+      dprot.items.filter((it) => it.projectFolder === top && (it.folder || '') === want)
+        .forEach((it) => it.files.forEach((f) => files.push({ id: f.id, name: f.name, webViewLink: dpUrl(f), modifiedTime: it.modified || it.date || '' })));
+    }
+    if (!files.length && !top) throw new Error('התיקייה עוד לא סונכרנה');
+    return { files, src: 'cache' };
+  }
+  function renderProjDrive(p, box) {
+    const st = ui.projDrive; const path = st.path;
+    const here = path.length ? path[path.length - 1].id : p.driveFolder;
+    const rootName = folderNames[p.driveFolder] || p.name;
+    const crumbs = [{ name: rootName }].concat(path);
+    const names = path.map((c) => c.name);
+    const copyBtn = (attr, label) => `<button type="button" class="g-copy" ${attr} title="העתקת הנתיב במחשב (Google Drive למחשב), להדבקה בסייר הקבצים עם Ctrl+L">📋${label ? ' ' + label : ''}</button>`;
+    const head = `<div class="g-crumbs pd-crumbs">${path.length ? '<button type="button" class="g-copy" data-up title="חזרה לתיקייה הקודמת">⬆</button>' : ''}
+      ${crumbs.map((c, i) => (i === crumbs.length - 1 ? `<b>${i ? '' : '📁 '}${esc(c.name)}</b>` : `<a href="#" data-crumb="${i}">${i ? '' : '📁 '}${esc(c.name)}</a>`)).join(' <span class="hint">›</span> ')}
+      <span style="flex:1"></span><a class="g-copy" href="${esc(driveFolderUrl(here))}" target="_blank" rel="noopener" title="פתיחת התיקייה ב-Google Drive">פתח ב-Drive ↗</a>${copyBtn('data-copyhere', 'העתק נתיב')}</div>`;
+    box.innerHTML = head + '<div class="hint" style="padding:8px 0">טוען...</div>';
+    const alive = () => document.body.contains(box) && ui.projDrive === st && st.path === path;
+    const go = (np) => { st.path = np; renderProjDrive(p, box); };
+    const open = (f) => go(path.concat([{ id: f.id, name: f.name }]));
+    const bindHead = () => {
+      $$('[data-crumb]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(path.slice(0, Number(a.dataset.crumb))); }));
+      const up = $('[data-up]', box); if (up) up.addEventListener('click', () => go(path.slice(0, -1)));
+      $('[data-copyhere]', box).addEventListener('click', () => copyProjectPath(p, names));
+    };
+    bindHead();
+    listDriveFolder(here).then((res) => {
+      if (!alive()) return;
+      if (!path.length && res.name && res.name !== rootName) { folderNames[p.driveFolder] = res.name; renderProjDrive(p, box); return; }
+      const when = (f) => (f.modifiedTime ? `<small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>` : '');
+      const fileUrl = (f) => f.webViewLink || ('https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view');
+      const rows = res.files.map((f, i) => (f.folder
+        ? `<div class="g-file pd-dir" data-i="${i}"><span>📁</span><a href="#" data-dir="${i}" title="פתיחת התיקייה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`
+        : `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<a href="${esc(fileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`)).join('');
+      const nf = res.files.filter((f) => f.folder).length;
+      box.innerHTML = head + `<div class="pd-list">${rows || '<div class="hint" style="padding:8px 0">התיקייה ריקה</div>'}</div>`
+        + `<div class="hint" style="padding-top:8px">${nf} תיקיות · ${res.files.length - nf} קבצים${res.src === 'cache' ? ' · מהסנכרון האחרון, רק תיקיות וסיכומים שכבר זוהו. לרשימה המלאה חברו את חשבון ה-Google בלשונית <a href="#google">יומן, מייל ו-Drive</a>' : ''}</div>`;
+      bindHead();
+      $$('[data-dir]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); open(res.files[Number(a.dataset.dir)]); }));
+      $$('.pd-dir', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; open(res.files[Number(r.dataset.i)]); }));
+      $$('[data-copy]', box).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); copyProjectPath(p, names.concat([res.files[Number(b.dataset.copy)].name])); }));
+    }).catch((e) => {
+      if (!alive()) return;
+      box.innerHTML = head + `<div class="hint" style="padding:8px 0">לא ניתן לטעון את התיקייה (${esc(gErr(e))}). אפשר לפתוח אותה ב-Drive או להעתיק את הנתיב.</div>`;
+      bindHead();
+    });
   }
 
   // Projects collected from the company's Drive folder ("פרויקטים פמי"), in projects/drive-projects.json.
@@ -2278,6 +2354,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           const d = await (await syncFetch('/data/drive')).json();
           if (!d || !Array.isArray(d.files)) throw new Error('no_data');
           dprot.items = DP.buildItems(d.files, d.folders || {}, d.root, db.projects);
+          Object.assign(dprot.folders, d.folders || {});
           dprot.at = d.at || Date.now();
           try { localStorage.setItem(DRIVE_PROTO_KEY, JSON.stringify({ at: dprot.at, items: dprot.items, folders: dprot.folders })); } catch (e) {}
           if (manual) toast(`סונכרנו ${dprot.items.length} סיכומי פגישות ודוחות מה-Drive`);
