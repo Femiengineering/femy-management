@@ -390,6 +390,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .led-pct { flex-direction: row; align-items: center; gap: 6px; min-width: 120px; }
 .led-pct .progress { flex: 1; min-width: 70px; }
 .led-table td, .led-table th { padding: 8px 10px; }
+.led-table tr.lmain { cursor: pointer; }
+.led-table tr.lmain:hover td { background: var(--surface-2); }
+.led-table tr.lmain.open td { border-bottom-color: transparent; font-weight: 600; }
+.led-table .larrow { display: inline-block; width: 14px; color: var(--muted); font-size: 12px; }
+.led-table tr.ldetail td { background: var(--surface-2); padding: 10px 16px 14px; }
+.led-contact { margin-top: 8px; font-size: 13.5px; }
 .led-table tr.lgroup td { background: var(--surface-2); font-weight: 700; font-size: 13.5px; }
 .led-table tr.lsub td, .led-table tfoot td { font-weight: 700; }
 .led-dep { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; font-size: 14px; }
@@ -1766,20 +1772,29 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const groups = [];
     rows.forEach((x) => { const g = ledGroupLabel(x.r.group); let gr = groups.find((y) => y.g === g); if (!gr) groups.push(gr = { g, items: [] }); gr.items.push(x); });
     const chips = (r) => (r.payments || []).map((x, k) => (x && Number(x.amount) ? `<span class="lchip ${x.billed ? 'billed' : 'paid'}" title="${x.billed ? 'הוגש, טרם שולם' : 'שולם'}">${k + 1} · ${fmtMoney(x.amount)}</span>` : '')).join('');
+    // Each consultant is one main line; clicking it opens its bills, contact details and edit button.
     const rowHtml = ({ r, i }) => {
       const paid = ledPaid(r); const billed = ledBilled(r); const total = Number(r.total) || 0;
       const pct = total ? Math.min(100, Math.round((paid / total) * 100)) : null;
-      const contact = [r.person && r.person !== r.name ? r.person : '', r.phone].filter(Boolean).join(' · ');
-      return `<tr data-row="${i}">
-        <td>${esc(r.field || r.service || '')}${r.field && r.service ? `<div class="hint">${esc(r.service)}</div>` : ''}</td>
-        <td>${esc(r.name || '')}${contact ? `<div class="hint">${esc(contact)}</div>` : ''}</td>
+      const key = p.id + '/' + i; const ro = !!(ui.ledRowOpen || {})[key];
+      const nb = ledPayments(r).length;
+      const contact = [r.person && r.person !== r.name ? '👤 ' + esc(r.person) : '', r.phone ? `📞 <a href="tel:${esc(r.phone.replace(/[^\d+]/g, ''))}">${esc(r.phone)}</a>` : '', r.phone2 ? esc(r.phone2) : '',
+        r.email ? '✉️ ' + r.email.split(/[,\s]+/).filter(Boolean).map((m) => `<a href="mailto:${esc(m)}">${esc(m)}</a>`).join(', ') : ''].filter(Boolean).join(' · ');
+      return `<tr data-row="${i}" class="lmain ${ro ? 'open' : ''}">
+        <td><span class="larrow">${ro ? '▾' : '◂'}</span> ${esc(r.field || r.service || '')}</td>
+        <td>${esc(r.name || '')}</td>
         <td class="num">${r.total == null ? '' : fmtMoney(total)}</td>
-        <td><div class="lchips">${chips(r) || '<span class="hint">אין חשבונות</span>'}</div></td>
-        <td class="num">${paid ? fmtMoney(paid) : ''}</td>
-        <td class="num" style="color:var(--amber)">${billed ? fmtMoney(billed) : ''}</td>
+        <td class="num">${paid ? fmtMoney(paid) : ''}${billed ? `<div class="hint" style="color:var(--amber)">+ ${fmtMoney(billed)} ממתין</div>` : ''}</td>
         <td class="num">${total ? fmtMoney(Math.max(0, total - paid)) : ''}</td>
         <td>${pct == null ? '' : `<div style="display:flex;gap:6px;align-items:center"><div class="progress ${pct >= 100 ? 'done' : ''}" style="flex:1"><span style="width:${pct}%"></span></div><span class="hint">${pct}%</span></div>`}</td>
-        <td class="actions"><button class="icon-btn" data-ledit title="עריכה">✏️</button></td></tr>`;
+        <td class="actions"><span class="hint">${nb === 1 ? 'חשבון אחד' : nb ? nb + ' חשבונות' : ''}</span></td></tr>
+        ${ro ? `<tr class="ldetail" data-row="${i}"><td colspan="7">
+          ${r.service && r.field ? `<div class="hint" style="margin-bottom:6px">סוג השירות: ${esc(r.service)}</div>` : ''}
+          <div class="lchips">${chips(r) || '<span class="hint">עדיין אין חשבונות</span>'}</div>
+          ${billed ? `<div class="hint" style="margin-top:6px">שולם ${fmtMoney(paid)} · הוגש וממתין ${fmtMoney(billed)}</div>` : ''}
+          ${contact ? `<div class="led-contact">${contact}</div>` : ''}
+          <div style="margin-top:8px"><button class="btn sm" data-ledit>✏️ עריכה</button></div>
+        </td></tr>` : ''}`;
     };
     const dep = (L.deposits || []).filter((d) => Number(d.amount));
     const depTotal = dep.reduce((a, d) => a + Number(d.amount), 0);
@@ -1817,13 +1832,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="progress ${s.pct >= 100 ? 'done' : ''}" style="margin:8px 0 4px"><span style="width:${s.pct}%"></span></div>
       <div class="hint">${s.pct}% מעלות התכנון שולמו</div>
       ${open ? `<div class="table-wrap" style="margin-top:12px"><table class="led-table">
-        <thead><tr><th>תחום</th><th>יועץ / ספק</th><th class="num">עלות כולל מע״מ</th><th>חשבונות</th><th class="num">שולם</th><th class="num">הוגש וממתין</th><th class="num">יתרה</th><th>%</th><th></th></tr></thead>
+        <thead><tr><th>תחום</th><th>יועץ / ספק</th><th class="num">עלות כולל מע״מ</th><th class="num">שולם</th><th class="num">יתרה</th><th>%</th><th></th></tr></thead>
         <tbody>${groups.map((g) => {
           const gs = ledSum(g.items.map((x) => x.r));
-          return `${groups.length > 1 || g.g !== ledGroupLabel('') ? `<tr class="lgroup"><td colspan="9">${esc(g.g)}</td></tr>` : ''}${g.items.map(rowHtml).join('')}
-            ${groups.length > 1 ? `<tr class="lsub"><td colspan="2">סה״כ ${esc(g.g)}</td><td class="num">${fmtMoney(gs.total)}</td><td></td><td class="num">${fmtMoney(gs.paid)}</td><td class="num">${gs.billed ? fmtMoney(gs.billed) : ''}</td><td class="num">${fmtMoney(gs.left)}</td><td colspan="2"></td></tr>` : ''}`;
-        }).join('') || '<tr><td colspan="9" class="empty">לא נמצאו שורות</td></tr>'}</tbody>
-        <tfoot><tr><td colspan="2">סה״כ הפרויקט</td><td class="num">${fmtMoney(s.total)}</td><td></td><td class="num">${fmtMoney(s.paid)}</td><td class="num">${s.billed ? fmtMoney(s.billed) : ''}</td><td class="num">${fmtMoney(s.left)}</td><td colspan="2"></td></tr></tfoot>
+          return `${groups.length > 1 || g.g !== ledGroupLabel('') ? `<tr class="lgroup"><td colspan="7">${esc(g.g)}</td></tr>` : ''}${g.items.map(rowHtml).join('')}
+            ${groups.length > 1 ? `<tr class="lsub"><td colspan="2">סה״כ ${esc(g.g)}</td><td class="num">${fmtMoney(gs.total)}</td><td class="num">${fmtMoney(gs.paid)}</td><td class="num">${fmtMoney(gs.left)}</td><td colspan="2"></td></tr>` : ''}`;
+        }).join('') || '<tr><td colspan="7" class="empty">לא נמצאו שורות</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="2">סה״כ הפרויקט</td><td class="num">${fmtMoney(s.total)}</td><td class="num">${fmtMoney(s.paid)}</td><td class="num">${fmtMoney(s.left)}</td><td colspan="2"></td></tr></tfoot>
       </table></div>
       ${dep.length ? `<div class="led-dep"><strong>הפקדות יזם לפמי:</strong> ${dep.map((d) => `<span class="lchip paid">${d.label ? 'חשבון ' + esc(d.label) + ' · ' : ''}${d.date ? esc(d.date) + ' · ' : ''}${fmtMoney(d.amount)}</span>`).join('')} <span>סה״כ <strong>${fmtMoney(depTotal)}</strong></span></div>` : ''}` : ''}
     </div>`;
@@ -1840,7 +1855,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       }
       $('[data-lreimport]', card).addEventListener('click', () => openLedgerImport(p.id));
       $('[data-ladd]', card).addEventListener('click', () => openLedgerRowForm(p, -1));
-      $$('tr[data-row]', card).forEach((tr) => $('[data-ledit]', tr).addEventListener('click', () => openLedgerRowForm(p, Number(tr.dataset.row))));
+      $$('tr.lmain', card).forEach((tr) => tr.addEventListener('click', (e) => {
+        if (e.target.closest('a, button')) return;
+        const key = p.id + '/' + tr.dataset.row; ui.ledRowOpen = ui.ledRowOpen || {}; ui.ledRowOpen[key] = !ui.ledRowOpen[key]; render();
+      }));
+      $$('tr.ldetail [data-ledit]', card).forEach((b) => b.addEventListener('click', () => openLedgerRowForm(p, Number(b.closest('tr').dataset.row))));
     });
   }
 
