@@ -353,6 +353,7 @@
     const parent = await folder(tok);
     return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form({ name, parents: [parent] }) })).json();
   }
+  async function folderName(id) { return (await json(`${DAPI}/${encodeURIComponent(id)}?fields=name&supportsAllDrives=true`)).name || ''; }
   // Downloads a Google file converted to another format (for example a Sheet as .xlsx).
   async function exportFile(id, mime) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`)).arrayBuffer(); }
   async function readFile(id) { return (await api(await token(), `${DAPI}/${id}?alt=media`)).text(); }
@@ -361,6 +362,6 @@
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, send, link: mailLink, findThread, searchLink },
-    drive: { exportFile, files, browse, projectsRoot, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
+    drive: { exportFile, files, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
   };
 })();

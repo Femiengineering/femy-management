@@ -432,6 +432,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .g-file img { width: 16px; height: 16px; flex-shrink: 0; }
 .g-file a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .g-file small { color: var(--muted); white-space: nowrap; }
+.g-copy { flex: 0 0 auto !important; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; cursor: pointer; font: inherit; font-size: 13px; color: inherit; white-space: nowrap; }
+.g-copy:hover { background: var(--gray-soft); }
+.g-local { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.g-local select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--card, #fff); color: inherit; }
 .g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
 .g-search .input { flex: 1; }
@@ -1143,6 +1147,29 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const STATUS_ORDER = ['active', 'planning', 'paused', 'done'];
   const statusRank = (p) => { const i = STATUS_ORDER.indexOf(p.status); return i < 0 ? 9 : i; };
   const driveUrl = (p) => (p && p.driveFolder ? 'https://drive.google.com/drive/folders/' + encodeURIComponent(p.driveFolder) : '');
+  // Local path of a Drive folder on this computer (Google Drive for desktop), to paste in Windows Explorer (Ctrl+L).
+  // Kept per computer in the browser, since the drive letter differs between computers.
+  const LOCAL_DRIVE_KEY = 'femy-local-drive';
+  const localDrive = () => {
+    let c = {}; try { c = JSON.parse(localStorage.getItem(LOCAL_DRIVE_KEY) || '{}') || {}; } catch (e) { c = {}; }
+    return { letter: /^[A-Z]$/.test(c.letter || '') ? c.letter : 'G', root: typeof c.root === 'string' && c.root.trim() ? c.root.trim() : 'My Drive\\' + ((window.FemyGoogle && FemyGoogle.drive.projectsName) || 'פרויקטים פמי') };
+  };
+  const setLocalDrive = (patch) => { try { localStorage.setItem(LOCAL_DRIVE_KEY, JSON.stringify(Object.assign(localDrive(), patch))); } catch (e) {} };
+  const localPath = (parts) => { const c = localDrive(); return [c.letter + ':', c.root.replace(/^[\\/]+|[\\/]+$/g, '')].concat(parts || []).filter(Boolean).join('\\'); };
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e2) {} document.body.removeChild(t);
+    }
+  }
+  const copyPath = (parts) => { const path = localPath(parts); copyText(path).then(() => toast('הנתיב הועתק, הדביקו בסייר הקבצים (Ctrl+L): \u2066' + path + '\u2069')); };
+  // A project's folder name in Drive (it can differ from the project name in the site); falls back to the project name.
+  async function copyProjectPath(p) {
+    let name = p.name;
+    if (GOOGLE && G.valid() && p.driveFolder) { try { name = (await G.drive.folderName(p.driveFolder)) || name; } catch (e) {} }
+    copyPath([name]);
+  }
   const projectProtocols = (p) => db.protocols.filter((x) => x.projectId === p.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   function projStats(p) {
     const tasks = db.tasks.filter((t) => t.projectId === p.id);
@@ -1242,6 +1269,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           </div>
           <div class="acts">
             ${p.driveFolder ? `<a class="btn primary" href="${driveUrl(p)}" target="_blank" rel="noopener">📁 תיקיית הפרויקט ב-Drive</a>` : '<button class="btn" data-pedit>📁 הוספת קישור לתיקיית Drive</button>'}
+            ${GOOGLE ? '<button class="btn" data-pcopy title="מעתיק את נתיב התיקייה במחשב (Google Drive למחשב), להדבקה בסייר הקבצים">📋 העתק נתיב</button>' : ''}
             <button class="btn" data-pedit>עריכה</button>
           </div>
         </div>
@@ -1277,6 +1305,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       </div>`;
 
     $$('[data-pedit]', el).forEach((b) => b.addEventListener('click', () => openProjectForm(p)));
+    const pc = $('[data-pcopy]', el);
+    if (pc) pc.addEventListener('click', () => copyProjectPath(p));
     $('[data-addtask]', el).addEventListener('click', () => openTaskForm(null, { projectId: p.id }));
     $('[data-addproto]', el).addEventListener('click', () => openProtocolForm(null, { projectId: p.id }));
     $$('#projTasks .tg-row', el).forEach((r) => {
@@ -2277,6 +2307,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="spacer"></span>
         ${tab === 'calendar' ? '<button class="btn primary" data-gnew>+ אירוע חדש</button>' : ''}
         ${tab === 'gmail' ? '<button class="btn primary" data-gnew>+ מייל חדש</button>' : ''}
+        ${tab === 'drive' ? `<label class="g-local" title="אות הכונן של Google Drive למחשב, לכפתורי העתקת הנתיב">כונן במחשב <select id="gLetter">${'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => `<option ${l === localDrive().letter ? 'selected' : ''}>${l}</option>`).join('')}</select>:</label>` : ''}
         ${tab === 'drive' && ui.gDrivePath.length ? '<label class="btn primary">⬆ העלאת קובץ לתיקייה<input type="file" id="gUpload" hidden></label>' : ''}
       </div>
       <div class="card card-pad" id="gArea"></div>`;
@@ -2288,6 +2319,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (nb) nb.addEventListener('click', () => (tab === 'calendar' ? openEventForm() : openComposeForm()));
     const sf = $('#gSearch', el);
     if (sf) sf.addEventListener('submit', (e) => { e.preventDefault(); if (tab === 'gmail') ui.gMailQ = $('#gq', el).value.trim(); else ui.gDriveQ = $('#gq', el).value.trim(); renderGoogle(el); });
+    const gl = $('#gLetter', el);
+    if (gl) gl.addEventListener('change', () => { setLocalDrive({ letter: gl.value }); toast('אות הכונן נשמרה: ' + gl.value + ':'); });
     const up = $('#gUpload', el);
     if (up) up.addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
@@ -2330,14 +2363,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         if (!alive()) return;
         const crumbs = [{ name: '📁 ' + G.drive.projectsName }].concat(path);
         const when = (f) => `<small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>`;
-        area.innerHTML = `<div class="g-crumbs">${crumbs.map((c, i) => i === crumbs.length - 1 ? `<b>${esc(c.name)}</b>` : `<a href="#" data-crumb="${i}">${esc(c.name)}</a>`).join(' <span class="hint">›</span> ')}</div>`
+        const copyBtn = (attr) => `<button type="button" class="g-copy" ${attr} title="העתקת הנתיב במחשב (Google Drive למחשב), להדבקה בסייר הקבצים עם Ctrl+L">📋 העתק נתיב</button>`;
+        area.innerHTML = `<div class="g-crumbs">${crumbs.map((c, i) => i === crumbs.length - 1 ? `<b>${esc(c.name)}</b>` : `<a href="#" data-crumb="${i}">${esc(c.name)}</a>`).join(' <span class="hint">›</span> ')}<span style="flex:1"></span>${copyBtn('data-copyhere')}</div>`
           + (res.files.map((f) => f.folder
-            ? `<div class="g-file"><span>📁</span><a href="#" data-dir="${esc(f.id)}">${esc(f.name)}</a>${when(f)}<a class="hint" href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener" title="פתיחה ב-Drive" style="flex:0">↗</a></div>`
+            ? `<div class="g-file"><span>📁</span><a href="#" data-dir="${esc(f.id)}">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${esc(f.name)}"`)}<a class="hint" href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener" title="פתיחה ב-Drive" style="flex:0">↗</a></div>`
             : `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a>${when(f)}</div>`).join('')
           || `<div class="empty">${ui.gDriveQ ? 'לא נמצא דבר בשם הזה' : here ? 'התיקייה ריקה' : 'אין תיקיות'}</div>`);
         $$('[data-dir]', area).forEach((a) => a.addEventListener('click', (e) => {
           e.preventDefault(); ui.gDrivePath = path.concat([{ id: a.dataset.dir, name: a.textContent }]); ui.gDriveQ = ''; renderGoogle(el);
         }));
+        const names = path.map((c) => c.name);
+        $$('[data-copy]', area).forEach((b) => b.addEventListener('click', () => copyPath(names.concat([b.dataset.copy]))));
+        const ch = $('[data-copyhere]', area);
+        if (ch) ch.addEventListener('click', () => copyPath(names));
         $$('[data-crumb]', area).forEach((a) => a.addEventListener('click', (e) => {
           e.preventDefault(); ui.gDrivePath = path.slice(0, Number(a.dataset.crumb)); ui.gDriveQ = ''; renderGoogle(el);
         }));
@@ -2346,9 +2384,22 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Settings ----------
+  function bindLocalDriveSettings(el) {
+    const b = $('#ldSave', el);
+    if (b) b.addEventListener('click', () => { setLocalDrive({ letter: $('#ldLetter', el).value, root: $('#ldRoot', el).value.trim() }); toast('נשמר: \u2066' + localPath([]) + '\u2069'); render(); });
+  }
   function renderSettings(el) {
     const st = settings();
-    el.innerHTML = cloudSettingsHtml() + googleSettingsHtml() + `
+    const ld = localDrive();
+    el.innerHTML = cloudSettingsHtml() + googleSettingsHtml() + (GOOGLE ? `
+      <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>נתיב Google Drive במחשב הזה</h2>
+        <p>כפתורי "📋 העתק נתיב" מעתיקים את נתיב התיקייה ב-Google Drive למחשב, כדי להדביק בסייר הקבצים (Ctrl+L). ההגדרה נשמרת רק בדפדפן הזה, כי אות הכונן יכולה להיות שונה בכל מחשב.</p>
+        <div class="row"><label>אות כונן <select class="input" id="ldLetter" style="width:auto">${'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => `<option ${l === ld.letter ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <input class="input" id="ldRoot" dir="ltr" style="flex:1;min-width:220px" value="${esc(ld.root)}" title="התיקייה של פרויקטים פמי, יחסית לכונן">
+        <button class="btn primary" id="ldSave">שמירה</button></div>
+        <div class="hint" dir="ltr" style="text-align:right">${esc(localPath(['שם הפרויקט']))}</div>
+      </div>` : '') + `
       <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>עוזר Claude</h2>
         <p>העוזר (הכפתור ✨ בפינה) עונה על שאלות על הנתונים במערכת, מסכם פרוטוקולים, ויכול ליצור ולעדכן משימות. הוא עובד עם מפתח API של Anthropic, וכל שיחה מחויבת בחשבון ה-API שלכם. ${CLOUD ? 'המפתח אישי: הוא נשמר בפרופיל הפרטי שלכם בענן, רק אתם יכולים לקרוא אותו, והוא זמין בכל המכשירים שבהם אתם מחוברים.' : 'המפתח נשמר רק בדפדפן הזה.'} הוא לא עולה לגיטהב ולא נכלל בקובץ הגיבוי. בכל שאלה נשלחים ל-Claude גם נתוני המערכת, כדי שיוכל לענות.</p>
@@ -2423,6 +2474,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (demo) demo.addEventListener('click', () => { if (confirm('נתוני הדוגמה יחליפו את הנתונים הנוכחיים. להמשיך?')) { db = demoData(); save(); render(); } });
     bindCloudSettings(el);
     bindGoogleSettings(el);
+    bindLocalDriveSettings(el);
     const ib = $('#installBtn', el);
     if (ib && deferredInstall) { ib.style.display = ''; ib.addEventListener('click', promptInstall); }
   }
