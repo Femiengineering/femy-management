@@ -305,6 +305,22 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 7px; margin-inline-end: 7px; vertical-align: 1px; background: var(--primary-soft); color: var(--primary); }
 .tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
+.proto-kinds { display: flex; width: 100%; margin-bottom: 12px; }
+.proto-kinds button { flex: 1; padding: 10px 12px; font-size: 15px; }
+.proto-kinds .n { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text); font-size: 12px; margin-inline-start: 4px; }
+.proto-kinds button.on .n { background: var(--primary); color: #fff; }
+.dp-status { margin: -4px 0 12px; }
+.dproto { display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.dproto .proto-head { flex: 1; min-width: 240px; text-decoration: none; color: inherit; }
+.dproto .proto-head:hover .proto-title { text-decoration: underline; }
+.dp-acts { display: flex; gap: 6px; padding: 0 14px 0 18px; flex-wrap: wrap; }
+.dp-src { color: var(--primary); }
+.dp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.dp-cols h3 { font-size: 15px; margin: 0 0 8px; }
+.dp-line { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.dp-line small { color: var(--muted); white-space: nowrap; }
+.dp-line a { flex: 1; min-width: 0; }
+@media (max-width: 760px) { .dp-cols { grid-template-columns: 1fr; } .dp-acts { padding: 0 14px 12px; } }
 .proto-doc { padding-top: 12px; overflow-x: auto; }
 .proto-doc .pd-title { font-weight: 700; margin: 12px 0 6px; color: var(--muted); font-size: 14px; }
 .proto-doc .pd-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13.5px; min-width: 520px; }
@@ -557,6 +573,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   <script src="google-config.js"></script>
   <script src="google.js"></script>
   <script src="sheet-sync.js"></script>
+  <script src="drive-protocols.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
@@ -719,7 +736,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'date', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -824,7 +841,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       location.hash = 'project/' + encodeURIComponent(tr.dataset.pid);
     }));
     $$('[data-task]', el).forEach((li) => li.addEventListener('click', () => openTaskForm(byId(db.tasks, li.dataset.task))));
-    $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; ui.protoGroup = 'date'; ui.protoProject = ''; ui.protoTpl = ''; ui.protoQ = ''; location.hash = 'protocols'; }));
+    $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; ui.protoGroup = 'date'; ui.protoKind = protoKind(byId(db.protocols, li.dataset.proto) || {}); ui.protoProject = ''; ui.protoTpl = ''; ui.protoQ = ''; location.hash = 'protocols'; }));
     const dc = $('#dashCal', el);
     if (dc) G.calendar.events(2).then((evs) => { if (document.body.contains(dc)) dc.innerHTML = eventsHtml(evs) || '<div class="empty">אין אירועים היום ומחר</div>'; })
       .catch(() => { if (document.body.contains(dc)) dc.innerHTML = '<div class="hint">לא ניתן לטעון את היומן כרגע</div>'; });
@@ -1326,6 +1343,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       </div>`;
     };
     const showDrive = GOOGLE && p.driveFolder;
+    syncDriveProtos(false);
+    const dpDocs = dprot.items.filter((it) => dpProject(it) === p);
     el.innerHTML = `
       <a href="#projects" class="back-link">→ כל הפרויקטים</a>
       <div class="card card-pad" style="margin-bottom:18px">
@@ -1367,8 +1386,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
       <div class="card card-pad" style="margin-bottom:18px">
         <div class="card-head"><h2>פרוטוקולים וסיכומים (${st.protos.length})</h2><button class="btn sm" data-addproto>+ פרוטוקול</button></div>
-        <div id="projProtos">${st.protos.map((pr) => protoCardHtml(pr, { hideProject: true })).join('') || '<div class="hint">עדיין אין פרוטוקולים לפרויקט הזה</div>'}</div>
-      </div>`;
+        <div id="projProtos">${st.protos.map((pr) => protoCardHtml(pr, { hideProject: true })).join('') || '<div class="hint">עדיין אין פרוטוקולים שנכתבו באתר לפרויקט הזה</div>'}</div>
+      </div>
+      ${dpDocs.length ? `<div class="card card-pad" style="margin-bottom:18px">
+        <div class="card-head"><h2>סיכומי פגישות ודוחות מה-Drive (${dpDocs.length})</h2><a href="#protocols" data-dpall>לעמוד הפרוטוקולים</a></div>
+        <div class="dp-cols">${['meeting', 'report'].map((k) => { const l = dpDocs.filter((it) => it.kind === k); return `<div><h3>${k === 'report' ? '🏗️' : '🤝'} ${PROTO_KINDS[k]} (${l.length})</h3>${l.map((it) => `<div class="dp-line"><small>${fmtDate(it.date)}</small><a href="${esc(dpUrl(it.files[0]))}" target="_blank" rel="noopener">${esc(it.title)}</a><a href="#" data-dppath="${esc(it.id)}" title="העתקת נתיב הקובץ במחשב" style="flex:0">📋</a></div>`).join('') || '<div class="hint">אין</div>'}</div>`; }).join('')}</div>
+        <div class="dp-status hint" style="margin:10px 0 0">${driveProtoStatusHtml()}</div>
+      </div>` : ''}`;
 
     $$('[data-pedit]', el).forEach((b) => b.addEventListener('click', () => openProjectForm(p)));
     $('[data-addtask]', el).addEventListener('click', () => openTaskForm(null, { projectId: p.id }));
@@ -1381,6 +1405,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const td = $('[data-toggle-done]', el);
     if (td) td.addEventListener('click', (e) => { e.preventDefault(); ui.projTaskDone = !ui.projTaskDone; render(); });
     bindProtoCards($('#projProtos', el));
+    const dpa = $('[data-dpall]', el);
+    if (dpa) dpa.addEventListener('click', () => { ui.protoProject = p.id; ui.protoGroup = 'project'; });
 
     const box = $('#projDrive', el);
     if (showDrive && G.valid()) {
@@ -1764,48 +1790,172 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     });
   }
 
+  // ---------- Protocols from Drive ----------
+  // Meeting summaries and execution reports kept in the "פרויקטים פמי" folder. The list in
+  // protocols/drive-protocols.json shows right away; when the user's Google account is connected the site
+  // scans the folder again (every 15 minutes at most, or on "סנכרון עכשיו") and keeps the result in this browser.
+  const DP = window.FemyDriveProtocols;
+  const DRIVE_PROTO_KEY = 'femy-drive-protos';
+  const dprot = { items: [], base: null, at: 0, tried: 0, syncing: false, err: '', folders: {} };
+  (function () {
+    try {
+      const c = JSON.parse(localStorage.getItem(DRIVE_PROTO_KEY) || 'null');
+      if (c && Array.isArray(c.items)) { dprot.items = c.items; dprot.at = c.at || 0; dprot.folders = c.folders || {}; }
+    } catch (e) {}
+  })();
+  function loadDriveProtos() {
+    return fetch('protocols/drive-protocols.json', { cache: 'no-cache' }).then((r) => r.json()).then((d) => {
+      dprot.base = d;
+      if (!dprot.at) dprot.items = d.items || [];
+      const v = currentView(); if (v === 'protocols' || v === 'project') render();
+    }).catch(() => {});
+  }
+  const dpProject = (it) => byId(db.projects, it.projectId) || (it.projectFolder ? db.projects.find((p) => p.driveFolder === it.projectFolder) : null) || null;
+  const dpUrl = (f) => (DP ? DP.fileUrl(f) : '#');
+  async function syncDriveProtos(manual) {
+    if (!GOOGLE || !DP || dprot.syncing) return;
+    if (!manual && (!G.silent() || Date.now() - Math.max(dprot.at, dprot.tried) < 15 * 60 * 1000)) return;
+    dprot.syncing = true; dprot.tried = Date.now(); dprot.err = ''; showDriveProtoStatus();
+    try {
+      if (manual) await G.token(); // may ask to connect, straight from the click
+      const rootId = await G.drive.projectsRoot();
+      const files = await G.drive.search(DP.driveQuery());
+      const folders = Object.assign({}, (dprot.base && dprot.base.folders) || {}, dprot.folders);
+      const stop = new Set([rootId].concat(db.projects.map((p) => p.driveFolder).filter(Boolean)));
+      const top = (f) => { let a = (f.parents || [])[0]; let g = 0; while (a && !stop.has(a) && folders[a] && g++ < 30) a = folders[a][0]; return a; };
+      // Walk up from each document to the projects folder, looking up the folders not seen before.
+      let budget = 400;
+      for (let round = 0; round < 15 && budget > 0; round++) {
+        const need = new Set();
+        files.forEach((f) => { const a = top(f); if (a && !stop.has(a) && !folders[a]) need.add(a); });
+        if (!need.size) break;
+        const ids = Array.from(need).slice(0, budget); budget -= ids.length;
+        for (let i = 0; i < ids.length; i += 20) {
+          await Promise.all(ids.slice(i, i + 20).map((id) => G.drive.meta(id)
+            .then((m) => { folders[id] = [(m.parents || [])[0] || '', m.name || '']; dprot.folders[id] = folders[id]; })
+            .catch(() => { folders[id] = ['', '']; })));
+        }
+      }
+      dprot.items = DP.buildItems(files, folders, rootId, db.projects);
+      dprot.at = Date.now();
+      try { localStorage.setItem(DRIVE_PROTO_KEY, JSON.stringify({ at: dprot.at, items: dprot.items, folders: dprot.folders })); } catch (e) {}
+      if (manual) toast(`סונכרנו ${dprot.items.length} סיכומי פגישות ודוחות מה-Drive`);
+    } catch (e) {
+      dprot.err = gErr(e);
+      if (manual) toast('הסנכרון מה-Drive נכשל: ' + dprot.err);
+    } finally {
+      dprot.syncing = false;
+      const v = currentView(); if (v === 'protocols' || v === 'project') render(); else showDriveProtoStatus();
+    }
+  }
+  const agoText = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'עכשיו' : m < 60 ? `לפני ${m} דק'` : m < 1440 ? `לפני ${Math.round(m / 60)} שע'` : fmtDate(new Date(t).toISOString().slice(0, 10)); };
+  function driveProtoStatusHtml() {
+    const n = dprot.items.length;
+    const when = dprot.syncing ? 'מסנכרן מה-Drive...' : dprot.at ? 'עודכן ' + agoText(dprot.at) : dprot.base ? 'לפי הרשימה מ-' + fmtDate(dprot.base.version) : '';
+    return `☁️ ${n} מסמכים מתיקיית "פרויקטים פמי" · ${esc(when)}${dprot.err && !dprot.syncing ? ` · <span class="overdue">${esc(dprot.err)}</span>` : ''}
+      ${GOOGLE && !dprot.syncing ? ' · <a href="#" data-dpsync>🔄 סנכרון עכשיו</a>' : ''}`;
+  }
+  function showDriveProtoStatus() {
+    $$('.dp-status').forEach((b) => { b.innerHTML = driveProtoStatusHtml(); });
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-dpsync]'); if (!a) return;
+    e.preventDefault(); syncDriveProtos(true);
+  });
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-dppath]'); if (!a) return;
+    e.preventDefault(); e.stopPropagation();
+    const it = dprot.items.find((x) => x.id === a.dataset.dppath); if (!it) return;
+    const f = it.files.find((x) => x.id === a.dataset.dpfile) || it.files[0];
+    const sub = (it.folder ? it.folder.split(' / ') : []).concat(f.ext === 'gdoc' ? [] : [f.name]);
+    const p = dpProject(it);
+    if (p) copyProjectPath(p, sub); else copyPath(sub);
+  }, true);
+  const DP_EXT = { pdf: 'PDF', gdoc: 'Google Docs', docx: 'Word', doc: 'Word' };
+  function driveProtoHtml(it, opts) {
+    const o = opts || {};
+    const p = dpProject(it);
+    const d = new Date((it.date || todayStr()) + 'T00:00:00');
+    const main = it.files[0];
+    const sub = [p && !o.hideProject ? p.name : (!p ? it.group : ''), it.folder && p ? it.folder : ''].filter(Boolean);
+    return `<div class="card dproto">
+      <a class="proto-head" href="${esc(dpUrl(main))}" target="_blank" rel="noopener" title="פתיחת המסמך ב-Google Drive">
+        <div class="proto-date">${d.getDate()}<small>${d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' })}</small></div>
+        <div style="flex:1;min-width:0"><div class="proto-title"><span class="tpl-tag ${it.kind === 'report' ? 'tpl-supervision' : it.label === 'סיור קבלנים' ? 'tpl-tour' : 'tpl-meeting'}">${esc(it.label)}</span>${esc(it.title)}</div>
+          <div class="proto-sub">${sub.map(esc).join(' · ')}${sub.length ? ' · ' : ''}<span class="dp-src">☁️ Drive</span></div></div>
+      </a>
+      <div class="dp-acts">${it.files.map((f) => `<a class="btn sm" href="${esc(dpUrl(f))}" target="_blank" rel="noopener">${DP_EXT[f.ext] || 'פתיחה'}</a>`).join('')}
+        <a class="btn sm" href="#" data-dppath="${esc(it.id)}" data-dpfile="${esc(main.id)}" title="מעתיק את נתיב הקובץ במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋</a></div>
+    </div>`;
+  }
+  const protoKind = (pr) => (pr.template === 'supervision' ? 'report' : 'meeting');
+  const PROTO_KINDS = { meeting: 'סיכומי פגישות', report: 'דוחות ביצוע ופיקוח' };
+  const GROUP_SHOW = 6;
+
   function renderProtocols(el) {
+    syncDriveProtos(false);
+    const kind = ui.protoKind === 'report' ? 'report' : 'meeting';
     const q = ui.protoQ.trim().toLowerCase();
-    const list = db.protocols.filter((p) => (!q || protoSearchText(p).includes(q))
-      && (!ui.protoTpl || (ui.protoTpl === '_other' ? !protoTpl(p) : p.template === ui.protoTpl))
-      && (!ui.protoProject || (ui.protoProject === '_none' ? !byId(db.projects, p.projectId) : p.projectId === ui.protoProject)))
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const withProtos = db.projects.filter((p) => db.protocols.some((x) => x.projectId === p.id)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'));
+    const src = ui.protoTpl; // '' all, 'drive', a template key, '_other' (site protocols from before the templates)
+    const matchProject = (pid, p) => !ui.protoProject || (ui.protoProject === '_none' ? !p : (p && p.id === ui.protoProject));
+    const site = db.protocols.filter((pr) => protoKind(pr) === kind).map((pr) => ({ site: pr, p: byId(db.projects, pr.projectId), date: pr.date || '', text: protoSearchText(pr) }));
+    const drive = dprot.items.filter((it) => it.kind === kind).map((it) => { const p = dpProject(it); return { drive: it, p, date: it.date || '', text: [it.title, it.label, it.folder, it.group, p ? p.name : '', p ? p.client : ''].join(' ').toLowerCase() }; });
+    const all = site.concat(drive);
+    const list = all.filter((e) => (!q || e.text.includes(q)) && matchProject('', e.p)
+      && (!src || (src === 'drive' ? e.drive : src === '_other' ? e.site && !protoTpl(e.site) : e.site && e.site.template === src)))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const cardHtml = (e, o) => (e.site ? protoCardHtml(e.site, o) : driveProtoHtml(e.drive, o));
+    ui.protoMore = ui.protoMore || {};
     let body;
-    if (ui.protoGroup === 'project') {
-      // One section per project, the project with the most recent meeting first.
+    if (ui.protoGroup !== 'date') {
+      // One section per project (or client folder), the one with the most recent document first.
       const map = new Map();
-      list.forEach((pr) => { const p = byId(db.projects, pr.projectId); const k = p ? p.id : '_none'; if (!map.has(k)) map.set(k, { p, items: [] }); map.get(k).items.push(pr); });
-      const groups = Array.from(map.values()).sort((a, b) => (a.p ? 0 : 1) - (b.p ? 0 : 1) || (b.items[0].date || '').localeCompare(a.items[0].date || ''));
-      body = groups.map((g) => `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.p.name)}</a>` : 'כללי / ללא פרויקט'}</h2>
-          <span class="count">${g.items.length} פרוטוקולים${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
-          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ פרוטוקול</button>` : ''}</div>
-          ${g.items.map((pr) => protoCardHtml(pr, { hideProject: true })).join('')}`).join('');
+      list.forEach((e) => {
+        const k = e.p ? e.p.id : e.drive && e.drive.group ? 'g:' + e.drive.group : '_none';
+        if (!map.has(k)) map.set(k, { k, p: e.p, label: e.p ? e.p.name : e.drive && e.drive.group ? e.drive.group : 'כללי / ללא פרויקט', items: [] });
+        map.get(k).items.push(e);
+      });
+      const groups = Array.from(map.values()).sort((a, b) => (a.k === '_none') - (b.k === '_none') || (b.items[0].date || '').localeCompare(a.items[0].date || ''));
+      body = groups.map((g) => {
+        const more = !q && g.items.length > GROUP_SHOW + 1 && !ui.protoMore[g.k];
+        const shown = more ? g.items.slice(0, GROUP_SHOW) : g.items;
+        return `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.label)}</a>` : esc(g.label)}</h2>
+          <span class="count">${g.items.length} ${kind === 'report' ? 'דוחות' : 'סיכומים'}${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
+          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ ${kind === 'report' ? 'דוח פיקוח' : 'סיכום פגישה'}</button>` : ''}</div>
+          ${shown.map((e) => cardHtml(e, { hideProject: true })).join('')}
+          ${more ? `<button class="btn sm ghost" data-more="${esc(g.k)}" style="margin-bottom:8px">הצגת כל ה-${g.items.length}</button>` : ''}`;
+      }).join('');
     } else {
       // By date: one section per month, newest first.
       const map = new Map();
-      list.forEach((pr) => { const k = (pr.date || '').slice(0, 7); if (!map.has(k)) map.set(k, []); map.get(k).push(pr); });
+      list.forEach((e) => { const k = (e.date || '').slice(0, 7); if (!map.has(k)) map.set(k, []); map.get(k).push(e); });
       body = Array.from(map.entries()).map(([k, items]) => {
         const label = k ? new Date(k + '-01T00:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' }) : 'ללא תאריך';
-        return `<div class="group-head"><h2>${esc(label)}</h2><span class="count">${items.length} פרוטוקולים</span></div>${items.map((pr) => protoCardHtml(pr)).join('')}`;
+        return `<div class="group-head"><h2>${esc(label)}</h2><span class="count">${items.length}</span></div>${items.map((e) => cardHtml(e)).join('')}`;
       }).join('');
     }
-    const counts = PROTO_TPL_KEYS.map((k) => [k, db.protocols.filter((p) => p.template === k).length]);
+    const withProtos = db.projects.filter((p) => all.some((e) => e.p === p)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'));
+    const kindCount = (k) => db.protocols.filter((pr) => protoKind(pr) === k).length + dprot.items.filter((it) => it.kind === k).length;
+    const tpls = PROTO_TPL_KEYS.filter((k) => (k === 'supervision') === (kind === 'report'));
     el.innerHTML = `
+      <div class="proto-kinds seg">${Object.keys(PROTO_KINDS).map((k) => `<button data-kind="${k}" class="${k === kind ? 'on' : ''}">${k === 'report' ? '🏗️' : '🤝'} ${PROTO_KINDS[k]} <span class="n">${kindCount(k)}</span></button>`).join('')}</div>
       <div class="proto-new">
-        <span class="hint">פרוטוקול חדש לפי תבנית:</span>
-        ${PROTO_TPL_KEYS.map((k) => `<button class="btn sm" data-newtpl="${k}">+ ${esc(PROTO_TPL[k].label)}</button>`).join('')}
+        <span class="hint">חדש לפי תבנית:</span>
+        ${tpls.map((k) => `<button class="btn sm" data-newtpl="${k}">+ ${esc(PROTO_TPL[k].label)}</button>`).join('')}
       </div>
       <div class="toolbar">
-        <div class="seg"><button data-g="date" class="${ui.protoGroup !== 'project' ? 'on' : ''}">לפי תאריך</button><button data-g="project" class="${ui.protoGroup === 'project' ? 'on' : ''}">לפי פרויקט</button></div>
-        <input class="input search" id="pq" placeholder="חיפוש בפרוטוקולים..." value="${esc(ui.protoQ)}">
+        <div class="seg"><button data-g="project" class="${ui.protoGroup !== 'date' ? 'on' : ''}">לפי פרויקט</button><button data-g="date" class="${ui.protoGroup === 'date' ? 'on' : ''}">לפי תאריך</button></div>
+        <input class="input search" id="pq" placeholder="חיפוש ב${PROTO_KINDS[kind]}..." value="${esc(ui.protoQ)}">
         <select class="input" id="pp"><option value="">כל הפרויקטים</option>${withProtos.map((p) => `<option value="${esc(p.id)}" ${p.id === ui.protoProject ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="_none" ${ui.protoProject === '_none' ? 'selected' : ''}>כללי / ללא פרויקט</option></select>
-        <select class="input" id="pt"><option value="">כל הסוגים</option>${counts.map(([k, n]) => `<option value="${k}" ${ui.protoTpl === k ? 'selected' : ''}>${esc(PROTO_TPL[k].label)} (${n})</option>`).join('')}<option value="_other" ${ui.protoTpl === '_other' ? 'selected' : ''}>סיכומים קודמים</option></select>
+        <select class="input" id="pt"><option value="">כל המקורות</option><option value="drive" ${src === 'drive' ? 'selected' : ''}>מה-Drive (${drive.length})</option>${tpls.map((k) => `<option value="${k}" ${src === k ? 'selected' : ''}>${esc(PROTO_TPL[k].label)} שנכתב באתר (${site.filter((e) => e.site.template === k).length})</option>`).join('')}${kind === 'meeting' ? `<option value="_other" ${src === '_other' ? 'selected' : ''}>סיכומים קודמים באתר</option>` : ''}</select>
       </div>
-      <div id="protoList">${body || `<div class="card empty">${q || ui.protoProject || ui.protoTpl ? 'לא נמצאו פרוטוקולים' : 'אין פרוטוקולים. בחרו תבנית למעלה כדי לתעד ישיבה, סיור או ביקור פיקוח.'}</div>`}</div>`;
-    $$('.seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; renderProtocols(el); }));
+      <div class="dp-status hint">${driveProtoStatusHtml()}</div>
+      <div id="protoList">${body || `<div class="card empty">${q || ui.protoProject || src ? 'לא נמצאו מסמכים' : 'אין עדיין ' + PROTO_KINDS[kind] + '.'}</div>`}</div>`;
+    $$('[data-kind]', el).forEach((b) => b.addEventListener('click', () => { ui.protoKind = b.dataset.kind; ui.protoTpl = ''; renderProtocols(el); }));
+    $$('.toolbar .seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; renderProtocols(el); }));
+    $$('[data-more]', el).forEach((b) => b.addEventListener('click', () => { ui.protoMore[b.dataset.more] = true; renderProtocols(el); }));
     $$('[data-newtpl]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { template: b.dataset.newtpl })));
-    $$('[data-newfor]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { projectId: b.dataset.newfor })));
+    $$('[data-newfor]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { projectId: b.dataset.newfor, template: kind === 'report' ? 'supervision' : 'meeting' })));
     $('#pp', el).addEventListener('change', (e) => { ui.protoProject = e.target.value; renderProtocols(el); });
     $('#pt', el).addEventListener('change', (e) => { ui.protoTpl = e.target.value; renderProtocols(el); });
     $('#pq', el).addEventListener('input', (e) => { ui.protoQ = e.target.value; renderProtocols(el); const i = $('#pq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
@@ -2903,6 +3053,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       else openTaskForm();
     });
     window.addEventListener('hashchange', render);
+    loadDriveProtos();
     G.onChange(() => { if (currentView() === 'google' || currentView() === 'settings') render(); });
     if (CLOUD) { render(); startCloud(); }
     else if (!localSession) { localGate(); }
