@@ -396,6 +396,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .led-table .larrow { display: inline-block; width: 14px; color: var(--muted); font-size: 12px; }
 .led-table tr.ldetail td { background: var(--surface-2); padding: 10px 16px 14px; }
 .led-contact { margin-top: 8px; font-size: 13.5px; }
+.led-table tr.lgroup { cursor: pointer; }
+.led-table tr.lgroup:hover td { background: var(--primary-soft); }
+.led-table tr.lmain td:first-child { padding-inline-start: 28px; }
 .led-table tr.lgroup td { background: var(--surface-2); font-weight: 700; font-size: 13.5px; }
 .led-table tr.lsub td, .led-table tfoot td { font-weight: 700; }
 .led-dep { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; font-size: 14px; }
@@ -1699,7 +1702,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     return o;
   }
   const ledProjects = () => db.projects.filter((p) => p.ledger && Array.isArray(p.ledger.rows));
-  const ledGroupLabel = (g) => g || 'יועצים ומתכננים';
+  // Category names as the office reads them: consultants, additional costs, paid directly by the developer.
+  const ledGroupLabel = (g) => (!g || /יועצ/.test(g) ? 'עלות יועצים' : /נוספ/.test(g) ? 'עלויות נוספות' : g);
 
   async function importLedgers(manual) {
     if (!isAdmin()) return;
@@ -1834,11 +1838,18 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       ${open ? `<div class="table-wrap" style="margin-top:12px"><table class="led-table">
         <thead><tr><th>תחום</th><th>יועץ / ספק</th><th class="num">עלות כולל מע״מ</th><th class="num">שולם</th><th class="num">יתרה</th><th>%</th><th></th></tr></thead>
         <tbody>${groups.map((g) => {
+          // One line per category (עלות יועצים / עלויות נוספות ...); clicking it opens the consultants in it.
           const gs = ledSum(g.items.map((x) => x.r));
-          return `${groups.length > 1 || g.g !== ledGroupLabel('') ? `<tr class="lgroup"><td colspan="7">${esc(g.g)}</td></tr>` : ''}${g.items.map(rowHtml).join('')}
-            ${groups.length > 1 ? `<tr class="lsub"><td colspan="2">סה״כ ${esc(g.g)}</td><td class="num">${fmtMoney(gs.total)}</td><td class="num">${fmtMoney(gs.paid)}</td><td class="num">${fmtMoney(gs.left)}</td><td colspan="2"></td></tr>` : ''}`;
+          const gk = p.id + '/' + g.g; const go = !!q || !!(ui.ledGrpOpen || {})[gk];
+          return `<tr class="lgroup" data-gk="${esc(gk)}"><td colspan="2"><span class="larrow">${go ? '▾' : '◂'}</span> ${esc(g.g)}</td>
+              <td class="num">${fmtMoney(gs.total)}</td>
+              <td class="num">${fmtMoney(gs.paid)}${gs.billed ? `<div class="hint" style="color:var(--amber)">+ ${fmtMoney(gs.billed)} ממתין</div>` : ''}</td>
+              <td class="num">${fmtMoney(gs.left)}</td>
+              <td><div style="display:flex;gap:6px;align-items:center"><div class="progress ${gs.pct >= 100 ? 'done' : ''}" style="flex:1"><span style="width:${gs.pct}%"></span></div><span class="hint">${gs.pct}%</span></div></td>
+              <td class="actions"><span class="hint">${g.items.length} שורות</span></td></tr>
+            ${go ? g.items.map(rowHtml).join('') : ''}`;
         }).join('') || '<tr><td colspan="7" class="empty">לא נמצאו שורות</td></tr>'}</tbody>
-        <tfoot><tr><td colspan="2">סה״כ הפרויקט</td><td class="num">${fmtMoney(s.total)}</td><td class="num">${fmtMoney(s.paid)}</td><td class="num">${fmtMoney(s.left)}</td><td colspan="2"></td></tr></tfoot>
+        <tfoot><tr><td colspan="2">סה״כ</td><td class="num">${fmtMoney(s.total)}</td><td class="num">${fmtMoney(s.paid)}${s.billed ? `<div class="hint" style="color:var(--amber)">+ ${fmtMoney(s.billed)} ממתין</div>` : ''}</td><td class="num">${fmtMoney(s.left)}</td><td><span class="hint">${s.pct}%</span></td><td></td></tr></tfoot>
       </table></div>
       ${dep.length ? `<div class="led-dep"><strong>הפקדות יזם לפמי:</strong> ${dep.map((d) => `<span class="lchip paid">${d.label ? 'חשבון ' + esc(d.label) + ' · ' : ''}${d.date ? esc(d.date) + ' · ' : ''}${fmtMoney(d.amount)}</span>`).join('')} <span>סה״כ <strong>${fmtMoney(depTotal)}</strong></span></div>` : ''}` : ''}
     </div>`;
@@ -1855,6 +1866,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       }
       $('[data-lreimport]', card).addEventListener('click', () => openLedgerImport(p.id));
       $('[data-ladd]', card).addEventListener('click', () => openLedgerRowForm(p, -1));
+      $$('tr.lgroup', card).forEach((tr) => tr.addEventListener('click', () => {
+        ui.ledGrpOpen = ui.ledGrpOpen || {}; ui.ledGrpOpen[tr.dataset.gk] = !ui.ledGrpOpen[tr.dataset.gk]; render();
+      }));
       $$('tr.lmain', card).forEach((tr) => tr.addEventListener('click', (e) => {
         if (e.target.closest('a, button')) return;
         const key = p.id + '/' + tr.dataset.row; ui.ledRowOpen = ui.ledRowOpen || {}; ui.ledRowOpen[key] = !ui.ledRowOpen[key]; render();
