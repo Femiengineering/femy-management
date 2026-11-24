@@ -375,6 +375,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .summary .card { padding: 12px 16px; }
 .summary .label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .summary .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.led-kpis { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.led-kpis strong { color: var(--text); font-variant-numeric: tabular-nums; margin-inline-start: 4px; }
+.lchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lchip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lchip.paid { background: var(--green-soft); color: var(--green); }
+.lchip.billed { background: var(--amber-soft); color: var(--amber); }
+.led-table td, .led-table th { padding: 8px 10px; }
+.led-table tr.lgroup td { background: var(--surface-2); font-weight: 700; font-size: 13.5px; }
+.led-table tr.lsub td, .led-table tfoot td { font-weight: 700; }
+.led-dep { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; font-size: 14px; }
+.led-pays { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.led-pays > div { display: flex; flex-direction: column; gap: 3px; }
+.led-preview { padding: 8px 10px; border-radius: 8px; background: var(--green-soft); color: var(--green); }
+.led-preview.err { background: var(--red-soft); color: var(--red); }
 
 /* Modal */
 .modal-bg {
@@ -598,6 +612,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   <script src="google.js"></script>
   <script src="sheet-sync.js"></script>
   <script src="drive-protocols.js"></script>
+  <script src="ledger-xlsx.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
@@ -1426,6 +1441,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ${p.notes ? `<h4 style="margin:14px 0 4px;font-size:14px;color:var(--muted)">סיכום מצב</h4><div style="white-space:pre-line">${esc(p.notes)}</div>` : ''}
       </div>
 
+      ${p.ledger && p.ledger.rows ? (() => { const ls = ledSum(p.ledger.rows); return `<div class="card card-pad" style="margin-bottom:18px">
+        <div class="card-head"><h2>חשבונות יועצים</h2><a href="#accounts" data-ledall>לפירוט המלא</a></div>
+        <div class="led-kpis" style="margin-top:0"><span>עלות כוללת <strong>${fmtMoney(ls.total)}</strong></span><span>שולם <strong style="color:var(--green)">${fmtMoney(ls.paid)}</strong></span>${ls.billed ? `<span>הוגש וממתין <strong style="color:var(--amber)">${fmtMoney(ls.billed)}</strong></span>` : ''}<span>יתרה <strong>${fmtMoney(ls.left)}</strong></span></div>
+        <div class="progress ${ls.pct >= 100 ? 'done' : ''}" style="margin:8px 0 4px"><span style="width:${ls.pct}%"></span></div><div class="hint">${ls.pct}% מעלות התכנון שולמו · ${p.ledger.rows.length} שורות${p.ledger.file ? ' · ' + esc(p.ledger.file) : ''}</div>
+      </div>`; })() : ''}
       <div class="grid-2">
         <div class="card card-pad" id="projTasks">
           <div class="card-head"><h2>משימות (${openT.length} פתוחות${st.overdue ? `, <span class="overdue">${st.overdue} באיחור</span>` : ''})</h2><button class="btn sm" data-addtask>+ משימה</button></div>
@@ -1462,6 +1482,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const td = $('[data-toggle-done]', el);
     if (td) td.addEventListener('click', (e) => { e.preventDefault(); ui.projTaskDone = !ui.projTaskDone; render(); });
     bindProtoCards($('#projProtos', el));
+    const lda = $('[data-ledall]', el);
+    if (lda) lda.addEventListener('click', () => { ui.accTab = 'ledgers'; ui.ledClient = p.client || 'ללא לקוח'; });
     const dpa = $('[data-dpall]', el);
     if (dpa) dpa.addEventListener('click', () => { ui.protoProject = p.id; ui.protoGroup = 'project'; });
 
@@ -1542,7 +1564,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Accounts ----------
+  // Two tabs: consultant ledgers per project (from the office's Excel sheets) and single invoices.
   function renderAccounts(el) {
+    const tab = ui.accTab === 'invoices' ? 'invoices' : 'ledgers';
+    el.innerHTML = `<div class="toolbar"><div class="seg" id="accTabs">${[['ledgers', 'חשבונות יועצים לפי פרויקט'], ['invoices', 'חשבוניות']].map(([k, l]) => `<button data-acc="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div id="accBody"></div>`;
+    $$('#accTabs button', el).forEach((b) => b.addEventListener('click', () => { ui.accTab = b.dataset.acc; renderAccounts(el); }));
+    if (tab === 'ledgers') renderLedgers($('#accBody', el)); else renderInvoiceList($('#accBody', el));
+  }
+  function renderInvoiceList(el) {
     const f = ui.invFilter;
     el.innerHTML = `
       <div class="summary" id="invSummary"></div>
@@ -1638,6 +1667,242 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     });
     const csv = '﻿' + rows.map((r) => r.map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
     download('חשבונות-' + todayStr() + '.csv', csv, 'text/csv;charset=utf-8');
+  }
+
+  // ---------- Consultant ledgers (חשבונות יועצים) ----------
+  // Each project can hold project.ledger, read from the office's "חשבונות ..." Excel sheet:
+  // { file, fileDate, title, rows: [{ group, field, name, service, total, payments: [{ amount, billed }], person, phone, email }], deposits }
+  // Amounts include VAT. A payment with billed: true was submitted but not paid yet.
+  // accounts/consultant-accounts.json holds the sheets already collected from Drive; importLedgers adds them once per version.
+  const ledPayments = (r) => (r.payments || []).filter((x) => x && Number(x.amount));
+  const ledPaid = (r) => ledPayments(r).filter((x) => !x.billed).reduce((s, x) => s + Number(x.amount), 0);
+  const ledBilled = (r) => ledPayments(r).filter((x) => x.billed).reduce((s, x) => s + Number(x.amount), 0);
+  function ledSum(rows) {
+    const o = { total: 0, paid: 0, billed: 0 };
+    rows.forEach((r) => { o.total += Number(r.total) || 0; o.paid += ledPaid(r); o.billed += ledBilled(r); });
+    o.left = Math.max(0, o.total - o.paid);
+    o.pct = o.total ? Math.min(100, Math.round((o.paid / o.total) * 100)) : 0;
+    return o;
+  }
+  const ledProjects = () => db.projects.filter((p) => p.ledger && Array.isArray(p.ledger.rows));
+  const ledGroupLabel = (g) => g || 'יועצים ומתכננים';
+
+  async function importLedgers(manual) {
+    if (!isAdmin()) return;
+    let data;
+    try { data = await (await fetch('accounts/consultant-accounts.json', { cache: 'no-cache' })).json(); }
+    catch (e) { if (manual) toast('טעינת חשבונות היועצים נכשלה'); return; }
+    if (!data || !Array.isArray(data.ledgers)) return;
+    if (!manual && settings().ledgerImport === data.version) return;
+    const norm = (x) => (x || '').replace(/\s+/g, ' ').trim();
+    let n = 0;
+    data.ledgers.forEach((l) => {
+      const p = byId(db.projects, l.projectId) || db.projects.find((x) => norm(x.name) === norm(l.projectName));
+      if (!p) return;
+      if (p.ledger && (p.ledger.edited || p.ledger.seed === data.version)) return;
+      const led = Object.assign({}, l, { seed: data.version });
+      delete led.projectId; delete led.projectName;
+      p.ledger = led; n++;
+    });
+    settings().ledgerImport = data.version;
+    save();
+    if (n) { render(); toast(`נוספו חשבונות יועצים ל-${n} פרויקטים`); }
+    else if (manual) toast('חשבונות היועצים כבר מעודכנים');
+  }
+
+  function renderLedgers(el) {
+    const all = ledProjects();
+    const clients = Array.from(new Set(all.map((p) => p.client || 'ללא לקוח')));
+    if (ui.ledClient && !clients.includes(ui.ledClient)) ui.ledClient = '';
+    const q = (ui.ledQ || '').trim().toLowerCase();
+    const list = all.filter((p) => !ui.ledClient || (p.client || 'ללא לקוח') === ui.ledClient);
+    const tot = ledSum(list.flatMap((p) => p.ledger.rows));
+    el.innerHTML = `
+      <div class="summary">
+        <div class="card"><div class="label">עלות תכנון כוללת (כולל מע״מ)</div><div class="value">${fmtMoney(tot.total)}</div></div>
+        <div class="card"><div class="label">שולם עד כה</div><div class="value" style="color:var(--green)">${fmtMoney(tot.paid)}</div></div>
+        <div class="card"><div class="label">הוגש וממתין לתשלום</div><div class="value" style="color:var(--amber)">${fmtMoney(tot.billed)}</div></div>
+        <div class="card"><div class="label">יתרה לתשלום</div><div class="value">${fmtMoney(tot.left)}</div></div>
+      </div>
+      <div class="toolbar">
+        <div class="seg" id="ledClients"><button data-c="" class="${!ui.ledClient ? 'on' : ''}">כל הלקוחות</button>${clients.map((c) => `<button data-c="${esc(c)}" class="${ui.ledClient === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+        <input class="input search" id="ledQ" placeholder="חיפוש יועץ או תחום..." value="${esc(ui.ledQ || '')}">
+        <span class="spacer"></span>
+        <button class="btn" id="ledCsv">ייצוא לאקסל (CSV)</button>
+        <button class="btn primary" id="ledImport">ייבוא מקובץ אקסל</button>
+      </div>
+      <div id="ledList">${list.length ? '' : `<div class="card card-pad empty">${all.length ? 'אין חשבונות ללקוח הזה' : 'עדיין אין חשבונות יועצים. לחצו "ייבוא מקובץ אקסל" ובחרו את קובץ החשבונות של הפרויקט.'}</div>`}</div>`;
+    const box = $('#ledList', el);
+    const byClient = {};
+    list.forEach((p) => { (byClient[p.client || 'ללא לקוח'] = byClient[p.client || 'ללא לקוח'] || []).push(p); });
+    box.insertAdjacentHTML('beforeend', Object.keys(byClient).map((c) => {
+      const ps = byClient[c]; const cs = ledSum(ps.flatMap((p) => p.ledger.rows));
+      return `<div class="group-head"><h2>${esc(c)}</h2><span class="count">${ps.length} פרויקטים · שולם ${fmtMoney(cs.paid)} מתוך ${fmtMoney(cs.total)}</span></div>
+        ${ps.map((p) => ledgerCardHtml(p, q)).join('')}`;
+    }).join(''));
+    $$('#ledClients button', el).forEach((b) => b.addEventListener('click', () => { ui.ledClient = b.dataset.c; renderLedgers(el); }));
+    $('#ledQ', el).addEventListener('input', (e) => {
+      ui.ledQ = e.target.value; const pos = e.target.selectionStart;
+      renderLedgers(el); const i = $('#ledQ', el); i.focus(); i.setSelectionRange(pos, pos);
+    });
+    $('#ledImport', el).addEventListener('click', () => openLedgerImport());
+    $('#ledCsv', el).addEventListener('click', () => exportLedgersCsv(list));
+    bindLedgerCards(box);
+  }
+
+  function ledgerCardHtml(p, q) {
+    const L = p.ledger; const s = ledSum(L.rows);
+    const open = (ui.ledOpen || {})[p.id] !== false;
+    const match = (r) => !q || [r.field, r.name, r.service, r.person, r.group].join(' ').toLowerCase().includes(q);
+    const rows = L.rows.map((r, i) => ({ r, i })).filter((x) => match(x.r));
+    const groups = [];
+    rows.forEach((x) => { const g = ledGroupLabel(x.r.group); let gr = groups.find((y) => y.g === g); if (!gr) groups.push(gr = { g, items: [] }); gr.items.push(x); });
+    const chips = (r) => (r.payments || []).map((x, k) => (x && Number(x.amount) ? `<span class="lchip ${x.billed ? 'billed' : 'paid'}" title="${x.billed ? 'הוגש, טרם שולם' : 'שולם'}">${k + 1} · ${fmtMoney(x.amount)}</span>` : '')).join('');
+    const rowHtml = ({ r, i }) => {
+      const paid = ledPaid(r); const billed = ledBilled(r); const total = Number(r.total) || 0;
+      const pct = total ? Math.min(100, Math.round((paid / total) * 100)) : null;
+      const contact = [r.person && r.person !== r.name ? r.person : '', r.phone].filter(Boolean).join(' · ');
+      return `<tr data-row="${i}">
+        <td>${esc(r.field || r.service || '')}${r.field && r.service ? `<div class="hint">${esc(r.service)}</div>` : ''}</td>
+        <td>${esc(r.name || '')}${contact ? `<div class="hint">${esc(contact)}</div>` : ''}</td>
+        <td class="num">${r.total == null ? '' : fmtMoney(total)}</td>
+        <td><div class="lchips">${chips(r) || '<span class="hint">אין חשבונות</span>'}</div></td>
+        <td class="num">${paid ? fmtMoney(paid) : ''}</td>
+        <td class="num" style="color:var(--amber)">${billed ? fmtMoney(billed) : ''}</td>
+        <td class="num">${total ? fmtMoney(Math.max(0, total - paid)) : ''}</td>
+        <td>${pct == null ? '' : `<div style="display:flex;gap:6px;align-items:center"><div class="progress ${pct >= 100 ? 'done' : ''}" style="flex:1"><span style="width:${pct}%"></span></div><span class="hint">${pct}%</span></div>`}</td>
+        <td class="actions"><button class="icon-btn" data-ledit title="עריכה">✏️</button></td></tr>`;
+    };
+    const dep = (L.deposits || []).filter((d) => Number(d.amount));
+    const depTotal = dep.reduce((a, d) => a + Number(d.amount), 0);
+    return `<div class="card card-pad ledger" data-pid="${esc(p.id)}" style="margin-bottom:16px">
+      <div class="proj-head">
+        <div class="grow">
+          <h2 style="font-size:18px"><a class="ov-name" href="${projectHref(p)}">${esc(p.name)}</a></h2>
+          <div class="hint">${L.file ? '📊 ' + esc(L.file) : ''}${L.fileDate ? ' · עודכן ' + fmtDate(L.fileDate) : ''}${L.edited ? ' · נערך באתר' : ''}</div>
+        </div>
+        <div class="acts">
+          <button class="btn sm" data-lreimport>עדכון מאקסל</button>
+          <button class="btn sm" data-ladd>+ שורה</button>
+          <button class="btn sm" data-ltoggle>${open ? 'הסתרת פירוט' : `הצגת פירוט (${L.rows.length})`}</button>
+        </div>
+      </div>
+      <div class="led-kpis">
+        <span>עלות כוללת <strong>${fmtMoney(s.total)}</strong></span>
+        <span>שולם <strong style="color:var(--green)">${fmtMoney(s.paid)}</strong></span>
+        ${s.billed ? `<span>הוגש וממתין <strong style="color:var(--amber)">${fmtMoney(s.billed)}</strong></span>` : ''}
+        <span>יתרה <strong>${fmtMoney(s.left)}</strong></span>
+        ${depTotal ? `<span>הפקדות יזם <strong>${fmtMoney(depTotal)}</strong></span>` : ''}
+      </div>
+      <div class="progress ${s.pct >= 100 ? 'done' : ''}" style="margin:8px 0 4px"><span style="width:${s.pct}%"></span></div>
+      <div class="hint">${s.pct}% מעלות התכנון שולמו</div>
+      ${open ? `<div class="table-wrap" style="margin-top:12px"><table class="led-table">
+        <thead><tr><th>תחום</th><th>יועץ / ספק</th><th class="num">עלות כולל מע״מ</th><th>חשבונות</th><th class="num">שולם</th><th class="num">הוגש וממתין</th><th class="num">יתרה</th><th>%</th><th></th></tr></thead>
+        <tbody>${groups.map((g) => {
+          const gs = ledSum(g.items.map((x) => x.r));
+          return `${groups.length > 1 || g.g !== ledGroupLabel('') ? `<tr class="lgroup"><td colspan="9">${esc(g.g)}</td></tr>` : ''}${g.items.map(rowHtml).join('')}
+            ${groups.length > 1 ? `<tr class="lsub"><td colspan="2">סה״כ ${esc(g.g)}</td><td class="num">${fmtMoney(gs.total)}</td><td></td><td class="num">${fmtMoney(gs.paid)}</td><td class="num">${gs.billed ? fmtMoney(gs.billed) : ''}</td><td class="num">${fmtMoney(gs.left)}</td><td colspan="2"></td></tr>` : ''}`;
+        }).join('') || '<tr><td colspan="9" class="empty">לא נמצאו שורות</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="2">סה״כ הפרויקט</td><td class="num">${fmtMoney(s.total)}</td><td></td><td class="num">${fmtMoney(s.paid)}</td><td class="num">${s.billed ? fmtMoney(s.billed) : ''}</td><td class="num">${fmtMoney(s.left)}</td><td colspan="2"></td></tr></tfoot>
+      </table></div>
+      ${dep.length ? `<div class="led-dep"><strong>הפקדות יזם לפמי:</strong> ${dep.map((d) => `<span class="lchip paid">${d.label ? 'חשבון ' + esc(d.label) + ' · ' : ''}${d.date ? esc(d.date) + ' · ' : ''}${fmtMoney(d.amount)}</span>`).join('')} <span>סה״כ <strong>${fmtMoney(depTotal)}</strong></span></div>` : ''}` : ''}
+    </div>`;
+  }
+
+  function bindLedgerCards(box) {
+    $$('.ledger', box).forEach((card) => {
+      const p = byId(db.projects, card.dataset.pid);
+      if (!p) return;
+      $('[data-ltoggle]', card).addEventListener('click', () => { ui.ledOpen = ui.ledOpen || {}; ui.ledOpen[p.id] = (ui.ledOpen[p.id] === false); render(); });
+      $('[data-lreimport]', card).addEventListener('click', () => openLedgerImport(p.id));
+      $('[data-ladd]', card).addEventListener('click', () => openLedgerRowForm(p, -1));
+      $$('tr[data-row]', card).forEach((tr) => $('[data-ledit]', tr).addEventListener('click', () => openLedgerRowForm(p, Number(tr.dataset.row))));
+    });
+  }
+
+  function openLedgerRowForm(p, idx) {
+    const L = p.ledger;
+    const r = idx >= 0 ? L.rows[idx] : { group: (L.rows[0] && L.rows[0].group) || '', field: '', name: '', total: '', payments: [] };
+    const pays = (r.payments || []).filter((x) => x && Number(x.amount));
+    const slots = Math.max(4, pays.length + 2);
+    const groups = Array.from(new Set(L.rows.map((x) => x.group || '')));
+    openModal(idx >= 0 ? 'עריכת שורת יועץ' : 'יועץ / תשלום חדש', `
+      <div class="field"><label>תחום</label><input class="input" name="field" value="${esc(r.field)}"></div>
+      <div class="field"><label>יועץ / ספק</label><input class="input" name="name" value="${esc(r.name)}"></div>
+      <div class="field"><label>סוג השירות</label><input class="input" name="service" value="${esc(r.service || '')}"></div>
+      <div class="field"><label>קבוצה</label><input class="input" name="group" list="ledGroups" value="${esc(r.group || '')}" placeholder="${esc(ledGroupLabel(''))}"><datalist id="ledGroups">${groups.filter(Boolean).map((g) => `<option value="${esc(g)}">`).join('')}</datalist></div>
+      <div class="field"><label>עלות תכנון כוללת, כולל מע״מ (₪)</label><input class="input" type="number" step="0.01" min="0" name="total" value="${r.total == null ? '' : esc(r.total)}"></div>
+      <div class="field"><label>איש קשר</label><input class="input" name="person" value="${esc(r.person || '')}"></div>
+      <div class="field"><label>טלפון</label><input class="input" name="phone" dir="ltr" value="${esc(r.phone || '')}"></div>
+      <div class="field"><label>מייל</label><input class="input" name="email" dir="ltr" value="${esc(r.email || '')}"></div>
+      <div class="field full"><label>חשבונות (סכום כולל מע״מ)</label>
+        <div class="led-pays">${Array.from({ length: slots }, (_, k) => { const x = pays[k] || {}; return `<div><span class="hint">חשבון ${k + 1}</span><input class="input" type="number" step="0.01" min="0" name="pay${k}" value="${x.amount ? esc(x.amount) : ''}"><label class="hint"><input type="checkbox" name="billed${k}" ${x.billed ? 'checked' : ''}> הוגש, טרם שולם</label></div>`; }).join('')}</div></div>`,
+    (data) => {
+      const out = Object.assign({}, idx >= 0 ? r : {}, { group: data.group, field: data.field, name: data.name, total: data.total === '' ? null : Number(data.total), payments: [] });
+      ['service', 'person', 'phone', 'email'].forEach((k) => { if (data[k]) out[k] = data[k]; else delete out[k]; });
+      for (let k = 0; k < slots; k++) { const a = Number(data['pay' + k]); if (a) out.payments.push(data['billed' + k] ? { amount: a, billed: true } : { amount: a }); }
+      if (idx >= 0) L.rows[idx] = out; else L.rows.push(out);
+      L.edited = true; save(); render(); toast(idx >= 0 ? 'השורה עודכנה' : 'השורה נוספה');
+    },
+    idx >= 0 ? () => { L.rows.splice(idx, 1); L.edited = true; save(); render(); toast('השורה נמחקה'); } : null);
+  }
+
+  // Picks the project whose name shares the most words with the file name ("חשבונות שמידמן.xlsx" -> שמידמן 3).
+  function guessLedgerProject(fileName) {
+    const f = fileName.replace(/\.[^.]+$/, '').replace(/[_\-.]+/g, ' ');
+    let best = null; let score = 0;
+    db.projects.forEach((p) => {
+      const n = (p.name || '').split(/[\s\-–,()]+/).filter((w) => w.length >= 3 && !/^(בית|ספר|בתי|מתחם|פרויקט)$/.test(w)).filter((w) => f.includes(w)).length;
+      if (n > score) { score = n; best = p; }
+    });
+    return best;
+  }
+
+  function openLedgerImport(projectId) {
+    const p0 = projectId ? byId(db.projects, projectId) : null;
+    openModal('ייבוא חשבונות יועצים מאקסל', `
+      <div class="field full"><label>קובץ אקסל (xlsx) *</label><input class="input" type="file" id="ledFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></div>
+      <div class="field full"><label>פרויקט *</label><select class="input" name="projectId" id="ledProj" required>${projectOptions(projectId || '', 'בחירת פרויקט')}</select></div>
+      <div class="field full hint">הקובץ צריך להיות בתבנית החשבונות של המשרד: שורת כותרות עם "עלות תכנון" ו"חשבון 1", "חשבון 2"... ושורה לכל יועץ. חשבונות שצבועים בצבע "הוגש חשבון" יסומנו כממתינים לתשלום.${p0 && p0.ledger ? ' <strong>החשבונות הקיימים של הפרויקט יוחלפו בנתונים מהקובץ.</strong>' : ''}</div>
+      <div class="field full" id="ledPreview"></div>`,
+    (data) => { if (pendingLedger && data.projectId) applyLedgerImport(data.projectId, pendingLedger); else toast('הקובץ לא נקרא, החשבונות לא עודכנו'); });
+    let pendingLedger = null;
+    const fileInp = $('#ledFile');
+    fileInp.addEventListener('change', async () => {
+      const f = fileInp.files[0]; const pv = $('#ledPreview');
+      pendingLedger = null; if (!f) { pv.innerHTML = ''; return; }
+      pv.innerHTML = '<span class="hint">קורא את הקובץ...</span>';
+      try {
+        const JSZip = await loadJSZip();
+        const led = await window.FemyLedger.ledgerFromXlsx(await f.arrayBuffer(), JSZip);
+        led.file = f.name; led.fileDate = f.lastModified ? toISO(new Date(f.lastModified)) : todayStr();
+        pendingLedger = led;
+        const s = ledSum(led.rows);
+        pv.innerHTML = `<div class="led-preview">נמצאו <strong>${led.rows.length}</strong> שורות · עלות כוללת ${fmtMoney(s.total)} · שולם ${fmtMoney(s.paid)}${s.billed ? ' · הוגש וממתין ' + fmtMoney(s.billed) : ''}${led.deposits.length ? ' · ' + led.deposits.length + ' הפקדות יזם' : ''}</div>`;
+        const sel = $('#ledProj');
+        if (!sel.value) { const g = guessLedgerProject(f.name); if (g) sel.value = g.id; }
+      } catch (e) {
+        pv.innerHTML = `<div class="led-preview err">לא הצלחתי לקרוא את הקובץ: ${esc(e.message || e)}</div>`;
+      }
+    });
+  }
+  function applyLedgerImport(projectId, led) {
+    const p = byId(db.projects, projectId);
+    if (!p) return;
+    p.ledger = Object.assign({}, led, { importedAt: new Date().toISOString() });
+    ui.accTab = 'ledgers'; ui.ledClient = '';
+    save(); render(); toast(`נטענו ${led.rows.length} שורות חשבונות לפרויקט ${p.name}`);
+  }
+
+  function exportLedgersCsv(list) {
+    const rows = [['לקוח', 'פרויקט', 'קבוצה', 'תחום', 'יועץ / ספק', 'עלות כולל מעמ', 'חשבון 1', 'חשבון 2', 'חשבון 3', 'חשבון 4', 'חשבון 5', 'שולם', 'הוגש וממתין', 'יתרה', 'אחוז ששולם']];
+    list.forEach((p) => p.ledger.rows.forEach((r) => {
+      const pays = (r.payments || []).map((x) => (x && Number(x.amount) ? x.amount + (x.billed ? ' (הוגש)' : '') : ''));
+      const total = Number(r.total) || 0; const paid = ledPaid(r);
+      rows.push([p.client || '', p.name, ledGroupLabel(r.group), r.field || r.service || '', r.name || '', r.total == null ? '' : total, pays[0] || '', pays[1] || '', pays[2] || '', pays[3] || '', pays[4] || '', paid, ledBilled(r), total ? Math.max(0, total - paid) : '', total ? Math.round((paid / total) * 100) + '%' : '']);
+    }));
+    const csv = '﻿' + rows.map((r) => r.map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    download('חשבונות-יועצים-' + todayStr() + '.csv', csv, 'text/csv;charset=utf-8');
   }
 
   // ---------- Protocols ----------
@@ -2511,6 +2776,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       today: todayStr(),
       projects: db.projects.map((p) => ({ id: p.id, name: p.name, client: p.client, status: p.status, progress: p.progress, manager: p.manager, start: p.start, end: p.end, budget: p.budget })),
       tasks: db.tasks.map((t) => ({ id: t.id, title: t.title, project: pname(t.projectId), assignee: t.assignee, priority: t.priority, status: t.status, due: t.due, notes: t.notes })),
+      consultantAccounts: ledProjects().map((p) => ({ project: p.name, client: p.client, file: p.ledger.file, note: 'סכומים כולל מע"מ; billed=הוגש חשבון וטרם שולם', rows: p.ledger.rows.map((r) => ({ group: r.group, field: r.field || r.service, name: r.name, total: r.total, payments: r.payments, paid: ledPaid(r) })) })),
       invoices: db.invoices.map((i) => ({ number: i.number, type: i.type, party: i.party, project: pname(i.projectId), amountBeforeVat: i.amount, vat: i.vat, issueDate: i.issueDate, dueDate: i.dueDate, status: invoiceStatus(i) })),
       protocols: db.protocols.slice().sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({ title: p.title, date: p.date, type: p.type, project: pname(p.projectId), participants: p.participants, summary: p.summary, decisions: p.decisions, actions: p.actions, location: p.location, reportNo: p.reportNo, doneWork: p.doneWork, nextWork: p.nextWork, notDone: p.notDone, items: (p.items || []).map((i) => [i.topic, i.details, i.instructions, i.due && 'לו"ז: ' + i.due, i.owner && 'באחריות: ' + i.owner].filter(Boolean).join(' | ')) })),
     });
@@ -2828,7 +3094,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       },
       onData: (state) => {
         applyRemote(state);
-        if (first) { first = false; gate('ready'); }
+        if (first) { first = false; gate('ready'); importLedgers(false); }
       },
       onError: (e) => {
         if (e && e.code === 'permission-denied') toast('אין הרשאה לפעולה הזו');
@@ -3270,7 +3536,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $('#addBtn').addEventListener('click', () => {
       const v = currentView();
       if (v === 'projects') openProjectForm();
-      else if (v === 'accounts') openInvoiceForm();
+      else if (v === 'accounts') { if (ui.accTab === 'invoices') openInvoiceForm(); else openLedgerImport(); }
       else if (v === 'protocols') openProtocolForm();
       else if (v === 'project') openTaskForm(null, { projectId: ui.projectId });
       else openTaskForm();
@@ -3288,7 +3554,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
       if (!localStorage.getItem(STORE_KEY)) save();
       render();
-      importDriveProjects(false).then(() => syncTaskSheet(false));
+      importDriveProjects(false).then(() => importLedgers(false)).then(() => syncTaskSheet(false));
       setInterval(() => syncTaskSheet(false), 10 * 60 * 1000);
       document.addEventListener('visibilitychange', () => {
         const st = settings().sheetSync;
