@@ -6,5 +6,8 @@ window.FEMY_GOOGLE = {
   clientId: '380692332592-oq3d6q4vkbrnftmm03v4si5co6rptjqe.apps.googleusercontent.com', // לדוגמה: '123456789-abc.apps.googleusercontent.com'
   // חיבור קבוע (בלי התנתקות כל שעה): כתובת שרת החיבור מהתיקייה worker/, ראו docs/GOOGLE-SETUP.md שלב 7.
   // כל עוד ריק, החיבור מתחדש בלחיצה כל שעה בערך.
+  // תיקיית הפרויקטים ב-Drive: בלשונית Drive באתר מוצג רק מה שבתוכה.
+  projectsFolderName: 'פרויקטים פמי',
+  projectsFolderId: '1rb3m55bbrVh0rFku9uRB5GaCBsR-VLCV',
   tokenServer: 'https://femy-google.femy-eng.workers.dev', // לדוגמה: 'https://femy-google.<שם-החשבון>.workers.dev'
 };
