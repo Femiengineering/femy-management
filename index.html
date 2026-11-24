@@ -286,6 +286,33 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .proto-body p { margin: 0; white-space: pre-wrap; }
 .proto-body ul { margin: 0; padding-inline-start: 20px; }
 .chev { transition: transform .15s; color: var(--muted); }
+.proto-new { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.tpl-tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 7px; margin-inline-end: 7px; vertical-align: 1px; background: var(--primary-soft); color: var(--primary); }
+.tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
+.tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
+.proto-doc { padding-top: 12px; overflow-x: auto; }
+.proto-doc .pd-title { font-weight: 700; margin: 12px 0 6px; color: var(--muted); font-size: 14px; }
+.proto-doc .pd-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13.5px; min-width: 520px; }
+.proto-doc .pd-kv { min-width: 0; }
+.proto-doc .pd-table th, .proto-doc .pd-table td { border: 1px solid var(--border); padding: 6px 8px; vertical-align: top; text-align: right; }
+.proto-doc .pd-table thead th { background: var(--primary-soft); color: var(--primary); }
+.proto-doc .pd-kv th { width: 130px; background: var(--bg); color: var(--muted); font-weight: 600; }
+.proto-doc .pd-note { font-weight: 700; text-align: center; margin: 10px 0 0; }
+.proto-doc p { margin: 0 0 4px; }
+.modal.wide { max-width: 940px; }
+.pi-head { display: flex; align-items: center; gap: 8px; }
+.pi-head .spacer { flex: 1; }
+.pi-row { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 8px; background: var(--bg); }
+.pi-top { display: flex; gap: 6px; align-items: center; }
+.pi-top .input { flex: 1; font-weight: 600; }
+.pi-num { min-width: 22px; text-align: center; color: var(--muted); font-weight: 700; }
+.pi-fields { display: grid; gap: 8px; margin-top: 6px; }
+.pi-fields.pi-meeting { grid-template-columns: 1fr 130px 150px; }
+.pi-fields.pi-supervision { grid-template-columns: 1fr 1fr 150px; }
+.pi-fields.pi-tour { grid-template-columns: 1fr; }
+.pi-f { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.pi-f textarea { min-height: 54px; resize: vertical; }
+@media (max-width: 700px) { .pi-fields.pi-meeting, .pi-fields.pi-supervision { grid-template-columns: 1fr 1fr; } .pi-fields .pi-details, .pi-fields .pi-instructions { grid-column: 1 / -1; } }
 .proto.open .chev { transform: rotate(-90deg); }
 
 /* Summary strip */
@@ -677,7 +704,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'recent', protoProject: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'date', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -782,7 +809,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       location.hash = 'project/' + encodeURIComponent(tr.dataset.pid);
     }));
     $$('[data-task]', el).forEach((li) => li.addEventListener('click', () => openTaskForm(byId(db.tasks, li.dataset.task))));
-    $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; ui.protoGroup = 'recent'; ui.protoProject = ''; ui.protoQ = ''; location.hash = 'protocols'; }));
+    $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; ui.protoGroup = 'date'; ui.protoProject = ''; ui.protoTpl = ''; ui.protoQ = ''; location.hash = 'protocols'; }));
     const dc = $('#dashCal', el);
     if (dc) G.calendar.events(2).then((evs) => { if (document.body.contains(dc)) dc.innerHTML = eventsHtml(evs) || '<div class="empty">אין אירועים היום ומחר</div>'; })
       .catch(() => { if (document.body.contains(dc)) dc.innerHTML = '<div class="hint">לא ניתן לטעון את היומן כרגע</div>'; });
@@ -1507,27 +1534,161 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Protocols ----------
+  // Three templates, built from the protocols the office has sent so far:
+  //  meeting     - "סיכום פגישה" (planning / coordination / consultants): header table + נושא | סיכום/החלטות | לוח זמנים | באחריות
+  //  supervision - "דוח פיקוח" (site supervision report, numbered): header + general status + נושא | פירוט | הנחיות | באחריות
+  //  tour        - "פרוטוקול סיור קבלנים" (tender tour): header + numbered clarifications with the standard clauses
+  // Protocols saved before the templates (summary / decisions / actions) still show and edit as before.
+  const PROTO_TPL = {
+    meeting: {
+      label: 'סיכום פגישה', short: 'סיכום פגישה',
+      cols: [['topic', 'נושא', 1500], ['details', 'סיכום / החלטות', 4300], ['due', 'לוח זמנים', 1100], ['owner', 'באחריות', 1400]],
+      topics: ['סטטוס פרויקט', 'אדריכלות', 'קונסטרוקציה', 'חשמל', 'מיזוג אוויר', 'אינסטלציה', 'בטיחות', 'נגישות', 'תקשורת', 'לוח זמנים'],
+    },
+    supervision: {
+      label: 'דוח פיקוח', short: 'דוח פיקוח', numbered: true,
+      cols: [['topic', 'נושא', 1300], ['details', 'פירוט', 2900], ['instructions', 'הנחיות', 2300], ['owner', 'באחריות / גורם מטפל', 1300]],
+      topics: ['אינסטלציה', 'חשמל', 'מיזוג אוויר', 'ריצוף', 'אלומיניום', 'בטיחות', 'לוח זמנים'],
+    },
+    tour: {
+      label: 'פרוטוקול סיור קבלנים', short: 'סיור קבלנים', numbered: true,
+      cols: [['topic', 'נושא', 0], ['details', 'תיאור', 7700]],
+      footer: 'מסמך זה מהווה חלק בלתי נפרד מהחוזה!',
+      rows: [
+        ['יזם', ''],
+        ['חומר המכרז', '- חומר המכרז כולל את החוזה ונספחיו.\n- התכניות, המפרטים, כתבי הכמויות ופרוטוקול זה.'],
+        ['הפרויקט', '- \n- עבודות הבינוי והמערכות הוצגו ע"י נציג המזמין ומנהל הפרויקט.\n- הובהר כי כל הנאמר והכתוב הינו בנוסף ובכפוף למסמכי המכרז.'],
+        ['אופי המכרז', '- המכרז הינו פאושלי לכלל העבודות והפרטים המופיעים בתכניות, ברשימות, במפרטים, בכתב הכמויות ובפרוטוקול זה.\n- כתבי הכמויות נמסרו לצורך עזרה בלבד. האחריות לבדיקת הכמויות ולהתאמתן לתכניות ולמפרטים חלה על הקבלן בלבד, ולא תשולם תוספת בגין כמויות נוספות הנדרשות להשלמת העבודה.\n- במקרה של סתירה בין התכניות, כתב הכמויות או המפרטים, מנהל הפרויקט ינחה את הקבלן לגבי אופן הביצוע. הנחיות אלו כלולות במחיר הפאושלי.'],
+        ['כללי', '- הקבלן הזוכה ישמש כקבלן ראשי לכל דבר ועניין, כולל מתן שירותים לכל קבלני המשנה והקבלנים הממונים של המזמין, ללא תשלום נוסף.\n- אין לבצע עבודות מעל הכמויות הרשומות בחוזה או עבודות חריגות ללא אישור בכתב מראש של מנהל הפרויקט.\n- כל הסעיפים במכרז כוללים אספקה, ביצוע והרכבה.'],
+        ['מסירת האתר לקבלן ותחילת עבודות', '- האתר יימסר לקבלן במצבו הקיים (AS IS). במסגרת הסיור הוצגו דרכי הגישה ונקודות חיבור התשתיות.\n- תוך שבועיים מחתימת ההסכם יגיש הקבלן את רשימת כל הציוד והחומרים לאישור המזמין. הסמכות למתן אישורים, לרבות שווה ערך, נתונה בידי המזמין או מנהל הפרויקט מטעמו.'],
+        ['אישורים באחריות הקבלן', '- אישור קונסטרוקטור לתכנון ולביצוע עבודות המסגרות והתקרות.\n- אישור חשמלאי לתקינות מערכות החשמל.\n- אישור פיקוח עליון של כלל היועצים והמתכננים.\n- אישור כיבוי אש ואישורי מעבדות בהתאם לדרישות הפיקוח והמתכננים.'],
+        ['מסירת האתר למזמין', '- התשלום הסופי יאושר כנגד מסירת מסמכי מעבדה, אישורי בטיחות ותיק מתקן מושלם, מודפס ובקבצים.'],
+        ['לוח זמנים', '- הקבלן יתחיל בעבודות מיד לאחר אישור רשימות הציוד והחומרים ואישור תחילת עבודה, בהתאם לחוזה.'],
+        ['שטח התארגנות', '- שטח ההתארגנות הוא בתוך שטח העבודה בלבד. אין להשאיר חומרים או פסולת מחוץ לשטח.'],
+        ['בטיחות', '- הקבלן אחראי באופן מלא לבטיחות באתר בהתאם להנחיות כלל הגופים הרגולטוריים. נדרש מנהל עבודה רשום לפרויקט.'],
+        ['פינוי פסולת משטח העבודה', '- פינוי הפסולת באמצעות מכולה מגודרת שתוצב בתיאום עם הרשות, באחריות הקבלן.\n- פינוי הפסולת לאתר מורשה בלבד.'],
+        ['תשלומים', '- מנגנון תמחור החריגים ותנאי התשלום לפי המפורט במסמכי המכרז.'],
+        ['עיון והבנת החומר למכרז', '- על המציע לוודא, בטרם הגיש הצעתו, כי עיין והבין את כל מסמכי המכרז והמסמכים המצורפים אליהם.\n- יש למסור בהגשה את החומר מודפס וחתום על כל נספחיו.'],
+        ['אופן הגשת ההצעה ומועד ההגשה', '- המועד האחרון להגשת הצעות המחיר: ____ עד השעה 12:00.'],
+        ['סיכום', '- ההנחיות שניתנו בסיור באות להשלים ולהדגיש, ואין בהן כדי לגרוע, להקל או לסתור את חוזה ההתקשרות, המפרטים, כתבי הכמויות והתכניות.\n- פרוטוקול סיור הקבלנים מהווה מסמך משפטי מחייב, והקבלן יחתום עליו כחלק ממסמכי המכרז.'],
+      ],
+    },
+  };
+  const PROTO_TPL_KEYS = Object.keys(PROTO_TPL);
+  const TOUR_PARTICIPANTS = 'נציגי המזמין: \nניהול פרויקט: \nהקבלנים שנכחו בסיור: ';
+  const protoTpl = (pr) => PROTO_TPL[pr && pr.template] || null;
+  const protoLines = (s) => (s || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  const protoProjName = (pr) => { const p = byId(db.projects, pr.projectId); return p ? p.name : ''; };
+  const protoHeading = (pr) => {
+    const t = protoTpl(pr);
+    if (!t) return 'פרוטוקול: ' + (pr.title || '');
+    if (pr.template === 'supervision') return t.label + (pr.reportNo ? ' - ' + pr.reportNo : '');
+    return t.label + (pr.title ? ' - ' + pr.title : '');
+  };
+  const protoFileName = (pr, ext) => {
+    const t = protoTpl(pr);
+    const parts = t ? [protoProjName(pr), t.short + (pr.template === 'supervision' && pr.reportNo ? ' ' + pr.reportNo : ''), pr.template === 'supervision' ? '' : pr.title]
+      : ['פרוטוקול', pr.title];
+    return (parts.filter(Boolean).join(' - ') + ' - ' + fmtDate(pr.date).replace(/\//g, '.')).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() + '.' + ext;
+  };
+  const protoSearchText = (p) => [p.title, p.participants, p.summary, p.decisions, p.actions, p.location, p.doneWork, p.nextWork, p.notDone,
+    protoProjName(p), (protoTpl(p) || {}).label, ...(p.items || []).map((i) => [i.topic, i.details, i.instructions, i.due, i.owner].join(' '))].join(' ').toLowerCase();
+
+  // The document model every output (card, PDF, Word, email) is drawn from.
+  // A cell is a list of lines: [{ t: text, b: bold }].
+  const cellOf = (s, bold) => (s || '').split('\n').map((x) => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && i < a.length - 1)).map((t) => ({ t, b: !!bold }));
+  function protoDoc(pr) {
+    const t = protoTpl(pr);
+    const proj = byId(db.projects, pr.projectId);
+    const blocks = [];
+    if (!t) {
+      const meta = [['תאריך', fmtDate(pr.date)], ['סוג', pr.type], ['פרויקט', proj && proj.name], ['משתתפים', pr.participants]].filter((x) => x[1]);
+      blocks.push({ kind: 'kv', rows: meta.map((m) => [m[0], cellOf(m[1])]) });
+      if (pr.summary) blocks.push({ kind: 'section', title: 'סיכום הדיון', paras: protoLines(pr.summary) });
+      if (protoLines(pr.decisions).length) blocks.push({ kind: 'section', title: 'החלטות', list: protoLines(pr.decisions) });
+      if (protoLines(pr.actions).length) blocks.push({ kind: 'section', title: 'משימות להמשך', list: protoLines(pr.actions) });
+      return { heading: protoHeading(pr), blocks };
+    }
+    const subject = [proj && proj.name, pr.template === 'supervision' ? 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '') : pr.title].filter(Boolean).join('\n');
+    let meta;
+    if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', fmtDate(pr.date)], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
+    else if (pr.template === 'supervision') meta = [['תאריך', fmtDate(pr.date)], ['הנדון', subject], ['סטטוס פרויקט', pr.status], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקי הדוח', pr.copies]];
+    else meta = [['תאריך', fmtDate(pr.date)], ['הנדון', subject], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
+    blocks.push({ kind: 'kv', rows: meta.filter((m) => m[1]).map((m) => [m[0], cellOf(m[1], m[0] === 'הנדון' || m[0] === 'שם הפרויקט')]) });
+    if (pr.template === 'supervision') {
+      const st = [['עבודות שבוצעו', pr.doneWork], ['הספקים לשבוע הקרוב', pr.nextWork], ['עבודות בהספק השבועי האחרון שלא בוצעו', pr.notDone]].filter((x) => (x[1] || '').trim());
+      if (st.length) blocks.push({ kind: 'kv', title: 'סטטוס כללי', rows: st.map((x) => [x[0], cellOf(x[1])]) });
+    }
+    const items = (pr.items || []).filter((i) => t.cols.some((c) => (i[c[0]] || '').trim()));
+    if (items.length) {
+      if (pr.template === 'tour') {
+        blocks.push({ kind: 'table', title: 'סיכום החלטות, הבהרות והנחיות', cols: [['מס"ד', 800], ['תיאור', 7500]],
+          rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', b: true }] : []), ...cellOf(it.details)]]) });
+      } else {
+        const cols = (t.numbered ? [['', 500]] : []).concat(t.cols.map((c) => [c[1], c[2]]));
+        blocks.push({ kind: 'table', cols,
+          rows: items.map((it, n) => (t.numbered ? [cellOf(String(n + 1) + '.')] : []).concat(t.cols.map((c) => cellOf(it[c[0]], c[0] === 'topic' || c[0] === 'instructions')))) });
+      }
+    }
+    if (pr.notes) blocks.push({ kind: 'section', title: 'הערות', paras: protoLines(pr.notes) });
+    if (t.footer) blocks.push({ kind: 'note', text: t.footer });
+    return { heading: protoHeading(pr), blocks };
+  }
+
+  // HTML for the card and for the PDF print view.
+  const cellHtml = (cell) => cell.map((l) => (l.b ? `<b>${esc(l.t)}</b>` : esc(l.t))).join('<br>');
+  function protoDocHtml(doc) {
+    return doc.blocks.map((bl) => {
+      if (bl.kind === 'kv') return `${bl.title ? `<div class="pd-title">${esc(bl.title)}</div>` : ''}<table class="pd-table pd-kv">${bl.rows.map((r) => `<tr><th>${esc(r[0])}</th><td>${cellHtml(r[1])}</td></tr>`).join('')}</table>`;
+      if (bl.kind === 'table') return `${bl.title ? `<div class="pd-title">${esc(bl.title)}</div>` : ''}<table class="pd-table"><colgroup>${bl.cols.map((c) => `<col style="width:${(c[1] / 83).toFixed(1)}%">`).join('')}</colgroup><thead><tr>${bl.cols.map((c) => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${bl.rows.map((r) => `<tr>${r.map((c) => `<td>${cellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      if (bl.kind === 'note') return `<p class="pd-note">${esc(bl.text)}</p>`;
+      return `<div class="pd-title">${esc(bl.title)}</div>${bl.list ? `<ol>${bl.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : bl.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`;
+    }).join('');
+  }
+
+  // Plain text, for email and the calendar.
+  function protocolText(pr) {
+    const doc = protoDoc(pr);
+    const flat = (cell) => cell.map((l) => l.t).join('\n');
+    let t = doc.heading + '\n';
+    doc.blocks.forEach((bl) => {
+      if (bl.kind === 'kv') t += (bl.title ? '\n' + bl.title + '\n' : '') + bl.rows.map((r) => r[0] + ': ' + flat(r[1]).replace(/\n/g, ', ')).join('\n') + '\n';
+      else if (bl.kind === 'table') {
+        t += '\n' + (bl.title ? bl.title + '\n' : '');
+        bl.rows.forEach((r) => {
+          const parts = r.map((c, i) => [bl.cols[i][0], flat(c)]).filter((x) => x[1] && x[0] !== '' && x[0] !== 'מס"ד');
+          const num = bl.cols[0][0] === '' || bl.cols[0][0] === 'מס"ד' ? flat(r[0]) + ' ' : '';
+          t += num + parts.map((x, i) => (i ? x[0] + ': ' : '') + x[1]).join('\n   ') + '\n';
+        });
+      } else if (bl.kind === 'note') t += '\n' + bl.text + '\n';
+      else t += '\n' + bl.title + '\n' + (bl.list ? bl.list.map((x, i) => (i + 1) + '. ' + x).join('\n') : bl.paras.join('\n')) + '\n';
+    });
+    return t + '\n--\nפמי הנדסה בע"מ | ייעוץ | ניהול פרויקטים\noffice@femy.co.il | ב.ס.ר 1 רמת גן\n';
+  }
+
   // One protocol as an expandable card, with its actions. Used on the protocols page and on a project page.
+  const protoTaskRows = (pr) => protoTpl(pr) ? (pr.items || []).filter((i) => (i.owner || '').trim() && (i.details || i.instructions || '').trim()) : [];
   function protoCardHtml(pr, opts) {
     const o = opts || {};
     const p = byId(db.projects, pr.projectId);
+    const t = protoTpl(pr);
     const d = new Date((pr.date || todayStr()) + 'T00:00:00');
-    const lines = protoLines;
+    const canTasks = t ? protoTaskRows(pr).length : protoLines(pr.actions).length;
+    const sub = [t ? t.label + (pr.template === 'supervision' && pr.reportNo ? ' ' + pr.reportNo : '') : pr.type, p && !o.hideProject ? p.name : '', (pr.participants || '').split('\n')[0]].filter(Boolean);
     return `<div class="card proto ${ui.openProto === pr.id ? 'open' : ''}" data-id="${pr.id}">
       <div class="proto-head">
         <div class="proto-date">${d.getDate()}<small>${d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' })}</small></div>
-        <div style="flex:1;min-width:0"><div class="proto-title">${esc(pr.title)}</div>
-          <div class="proto-sub">${esc(pr.type || '')}${p && !o.hideProject ? ' · ' + esc(p.name) : ''}${pr.participants ? ' · משתתפים: ' + esc(pr.participants) : ''}</div></div>
+        <div style="flex:1;min-width:0"><div class="proto-title">${t ? `<span class="tpl-tag tpl-${pr.template}">${esc(t.short)}</span>` : ''}${esc(pr.title || protoHeading(pr))}</div>
+          <div class="proto-sub">${sub.map(esc).join(' · ')}</div></div>
         <span class="chev">◀</span>
       </div>
       <div class="proto-body">
-        ${pr.summary ? `<h4>סיכום</h4><p>${esc(pr.summary)}</p>` : ''}
-        ${lines(pr.decisions).length ? `<h4>החלטות</h4><ul>${lines(pr.decisions).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-        ${lines(pr.actions).length ? `<h4>משימות להמשך</h4><ul>${lines(pr.actions).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        <div class="proto-doc">${protoDocHtml(protoDoc(pr))}</div>
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
           <button class="btn sm" data-edit>עריכה</button>
+          ${t ? '<button class="btn sm" data-dup>➕ פרוטוקול המשך</button>' : ''}
           ${p && !o.hideProject ? `<a class="btn sm" href="${projectHref(p)}">🏗️ לדף הפרויקט</a>` : ''}
-          ${lines(pr.actions).length ? '<button class="btn sm" data-mktasks>יצירת משימות מהפרוטוקול</button>' : ''}
+          ${canTasks ? '<button class="btn sm" data-mktasks>יצירת משימות מהפרוטוקול</button>' : ''}
           <button class="btn sm" data-mail>✉️ שליחה במייל</button>
           <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
           <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
@@ -1537,28 +1698,43 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         </div>
       </div></div>`;
   }
+  // "25.11.26", "25/11/2026" -> "2026-11-25"
+  function parseHeDate(s) {
+    const m = String(s || '').match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+    if (!m) return '';
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
   function bindProtoCards(root) {
     if (!root) return;
     $$('.proto', root).forEach((c) => {
       const pr = byId(db.protocols, c.dataset.id);
       $('.proto-head', c).addEventListener('click', () => { ui.openProto = ui.openProto === pr.id ? null : pr.id; c.classList.toggle('open'); });
       $('[data-edit]', c).addEventListener('click', () => openProtocolForm(pr));
+      const dup = $('[data-dup]', c);
+      if (dup) dup.addEventListener('click', () => openProtocolForm(null, protoFollowUp(pr)));
       $('[data-word]', c).addEventListener('click', () => exportProtocolWord(pr));
       $('[data-pdf]', c).addEventListener('click', () => exportProtocolPdf(pr));
       $('[data-mail]', c).addEventListener('click', () => emailProtocol(pr));
       const dv = $('[data-drive]', c);
       if (dv) dv.addEventListener('click', () => saveProtocolToDrive(pr));
       const cl = $('[data-cal]', c);
-      if (cl) cl.addEventListener('click', () => openEventForm({ title: pr.title, date: pr.date, description: protocolText(pr) }));
+      if (cl) cl.addEventListener('click', () => openEventForm({ title: pr.title || protoHeading(pr), date: pr.date, description: protocolText(pr) }));
       const mk = $('[data-mktasks]', c);
       if (mk) mk.addEventListener('click', () => {
-        const items = protoLines(pr.actions);
-        if (!confirm(`ליצור ${items.length} משימות חדשות מהפרוטוקול?`)) return;
-        items.forEach((line) => {
-          const m = line.match(/^([^:]{1,25}):\s*(.+)$/);
-          db.tasks.push({ id: uid(), title: m ? m[2] : line, assignee: m ? m[1].trim() : '', projectId: pr.projectId || '', priority: 'medium', status: 'todo', due: addDays(7), notes: 'נוצר מפרוטוקול: ' + pr.title + ' (' + fmtDate(pr.date) + ')' });
-        });
-        save(); updateBadge(); toast(items.length + ' משימות נוצרו');
+        const note = 'נוצר מפרוטוקול: ' + (pr.title || protoHeading(pr)) + ' (' + fmtDate(pr.date) + ')';
+        let tasks;
+        if (protoTpl(pr)) {
+          tasks = protoTaskRows(pr).map((it) => {
+            const what = protoLines(it.instructions || it.details)[0].replace(/^[-•*]\s*/, '');
+            return { title: ((it.topic ? it.topic + ': ' : '') + what).slice(0, 140), assignee: it.owner.trim(), due: parseHeDate(it.due) || addDays(7) };
+          });
+        } else {
+          tasks = protoLines(pr.actions).map((line) => { const m = line.match(/^([^:]{1,25}):\s*(.+)$/); return { title: m ? m[2] : line, assignee: m ? m[1].trim() : '', due: addDays(7) }; });
+        }
+        if (!confirm(`ליצור ${tasks.length} משימות חדשות מהפרוטוקול?`)) return;
+        tasks.forEach((x) => db.tasks.push({ id: uid(), title: x.title, assignee: x.assignee, projectId: pr.projectId || '', priority: 'medium', status: 'todo', due: x.due, notes: note }));
+        save(); updateBadge(); toast(tasks.length + ' משימות נוצרו');
         if (currentView() === 'project') render();
       });
     });
@@ -1566,7 +1742,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   function renderProtocols(el) {
     const q = ui.protoQ.trim().toLowerCase();
-    const list = db.protocols.filter((p) => (!q || [p.title, p.participants, p.summary, p.decisions, p.actions].join(' ').toLowerCase().includes(q))
+    const list = db.protocols.filter((p) => (!q || protoSearchText(p).includes(q))
+      && (!ui.protoTpl || (ui.protoTpl === '_other' ? !protoTpl(p) : p.template === ui.protoTpl))
       && (!ui.protoProject || (ui.protoProject === '_none' ? !byId(db.projects, p.projectId) : p.projectId === ui.protoProject)))
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const withProtos = db.projects.filter((p) => db.protocols.some((x) => x.projectId === p.id)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'));
@@ -1577,81 +1754,202 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       list.forEach((pr) => { const p = byId(db.projects, pr.projectId); const k = p ? p.id : '_none'; if (!map.has(k)) map.set(k, { p, items: [] }); map.get(k).items.push(pr); });
       const groups = Array.from(map.values()).sort((a, b) => (a.p ? 0 : 1) - (b.p ? 0 : 1) || (b.items[0].date || '').localeCompare(a.items[0].date || ''));
       body = groups.map((g) => `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.p.name)}</a>` : 'כללי / ללא פרויקט'}</h2>
-          <span class="count">${g.items.length} פרוטוקולים${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span></div>
+          <span class="count">${g.items.length} פרוטוקולים${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
+          ${g.p ? `<button class="btn sm" data-newfor="${esc(g.p.id)}">+ פרוטוקול</button>` : ''}</div>
           ${g.items.map((pr) => protoCardHtml(pr, { hideProject: true })).join('')}`).join('');
     } else {
-      body = list.map((pr) => protoCardHtml(pr)).join('');
+      // By date: one section per month, newest first.
+      const map = new Map();
+      list.forEach((pr) => { const k = (pr.date || '').slice(0, 7); if (!map.has(k)) map.set(k, []); map.get(k).push(pr); });
+      body = Array.from(map.entries()).map(([k, items]) => {
+        const label = k ? new Date(k + '-01T00:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' }) : 'ללא תאריך';
+        return `<div class="group-head"><h2>${esc(label)}</h2><span class="count">${items.length} פרוטוקולים</span></div>${items.map((pr) => protoCardHtml(pr)).join('')}`;
+      }).join('');
     }
+    const counts = PROTO_TPL_KEYS.map((k) => [k, db.protocols.filter((p) => p.template === k).length]);
     el.innerHTML = `
+      <div class="proto-new">
+        <span class="hint">פרוטוקול חדש לפי תבנית:</span>
+        ${PROTO_TPL_KEYS.map((k) => `<button class="btn sm" data-newtpl="${k}">+ ${esc(PROTO_TPL[k].label)}</button>`).join('')}
+      </div>
       <div class="toolbar">
-        <div class="seg"><button data-g="recent" class="${ui.protoGroup !== 'project' ? 'on' : ''}">אחרונים</button><button data-g="project" class="${ui.protoGroup === 'project' ? 'on' : ''}">לפי פרויקט</button></div>
+        <div class="seg"><button data-g="date" class="${ui.protoGroup !== 'project' ? 'on' : ''}">לפי תאריך</button><button data-g="project" class="${ui.protoGroup === 'project' ? 'on' : ''}">לפי פרויקט</button></div>
         <input class="input search" id="pq" placeholder="חיפוש בפרוטוקולים..." value="${esc(ui.protoQ)}">
         <select class="input" id="pp"><option value="">כל הפרויקטים</option>${withProtos.map((p) => `<option value="${esc(p.id)}" ${p.id === ui.protoProject ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="_none" ${ui.protoProject === '_none' ? 'selected' : ''}>כללי / ללא פרויקט</option></select>
+        <select class="input" id="pt"><option value="">כל הסוגים</option>${counts.map(([k, n]) => `<option value="${k}" ${ui.protoTpl === k ? 'selected' : ''}>${esc(PROTO_TPL[k].label)} (${n})</option>`).join('')}<option value="_other" ${ui.protoTpl === '_other' ? 'selected' : ''}>סיכומים קודמים</option></select>
       </div>
-      <div id="protoList">${body || `<div class="card empty">${q || ui.protoProject ? 'לא נמצאו פרוטוקולים' : 'אין פרוטוקולים. לחצו על "פרוטוקול חדש" כדי לתעד ישיבה.'}</div>`}</div>`;
+      <div id="protoList">${body || `<div class="card empty">${q || ui.protoProject || ui.protoTpl ? 'לא נמצאו פרוטוקולים' : 'אין פרוטוקולים. בחרו תבנית למעלה כדי לתעד ישיבה, סיור או ביקור פיקוח.'}</div>`}</div>`;
     $$('.seg button', el).forEach((b) => b.addEventListener('click', () => { ui.protoGroup = b.dataset.g; renderProtocols(el); }));
+    $$('[data-newtpl]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { template: b.dataset.newtpl })));
+    $$('[data-newfor]', el).forEach((b) => b.addEventListener('click', () => openProtocolForm(null, { projectId: b.dataset.newfor })));
     $('#pp', el).addEventListener('change', (e) => { ui.protoProject = e.target.value; renderProtocols(el); });
+    $('#pt', el).addEventListener('change', (e) => { ui.protoTpl = e.target.value; renderProtocols(el); });
     $('#pq', el).addEventListener('input', (e) => { ui.protoQ = e.target.value; renderProtocols(el); const i = $('#pq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
     bindProtoCards($('#protoList', el));
   }
+
+  // ---------- Protocol form ----------
+  const protoPrev = (tpl, projectId, exceptId) => db.protocols.filter((x) => x.template === tpl && x.projectId === projectId && x.id !== exceptId && projectId)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  const nextReportNo = (projectId) => String(db.protocols.filter((x) => x.template === 'supervision' && x.projectId === projectId && projectId).length + 1).padStart(2, '0');
+  const defaultItems = (tpl) => (PROTO_TPL[tpl].rows ? PROTO_TPL[tpl].rows.map((r) => ({ topic: r[0], details: r[1] })) : PROTO_TPL[tpl].topics.map((topic) => ({ topic })));
+  // A follow-up meeting / the next supervision visit: same project, participants and topics; the date is today.
+  function protoFollowUp(pr) {
+    const keep = ['template', 'projectId', 'title', 'location', 'participants', 'copies', 'status'];
+    const n = {}; keep.forEach((k) => { if (pr[k]) n[k] = pr[k]; });
+    n.items = (pr.items || []).map((i) => Object.assign({}, i));
+    if (pr.template === 'supervision') { n.reportNo = nextReportNo(pr.projectId); n.doneWork = pr.nextWork || ''; delete n.title; }
+    return n;
+  }
   function openProtocolForm(proto, defaults) {
-    const p = proto || Object.assign({ date: todayStr(), title: '', type: MEETING_TYPE[0], projectId: ui.protoProject && ui.protoProject !== '_none' ? ui.protoProject : '', participants: '', summary: '', decisions: '', actions: '' }, defaults || {});
-    openModal(proto ? 'עריכת פרוטוקול' : 'פרוטוקול חדש', `
+    if (proto && !protoTpl(proto)) { openLegacyProtocolForm(proto); return; }
+    const p = proto ? Object.assign({}, proto) : Object.assign({ date: todayStr(), template: 'meeting', title: '', projectId: ui.protoProject && ui.protoProject !== '_none' ? ui.protoProject : '', location: '', participants: '', copies: '', status: '', reportNo: '' }, defaults || {});
+    if (!proto && !p.items) p.items = defaultItems(p.template);
+    if (!proto && p.template === 'supervision' && !p.reportNo) p.reportNo = nextReportNo(p.projectId);
+    if (!proto && p.template === 'tour' && !p.participants) p.participants = TOUR_PARTICIPANTS;
+    if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
+    const vis = (tpls) => `data-tpls="${tpls}" style="${tpls.split(' ').includes(p.template) ? '' : 'display:none'}"`;
+    openModal(proto ? 'עריכת ' + PROTO_TPL[p.template].label : 'פרוטוקול חדש', `
+      <div class="field"><label>תבנית</label><select class="input" name="template">${PROTO_TPL_KEYS.map((k) => `<option value="${k}" ${k === p.template ? 'selected' : ''}>${esc(PROTO_TPL[k].label)}</option>`).join('')}</select></div>
+      <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
+      <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
+      <div class="field" ${vis('supervision')}><label>מספר דוח</label><input class="input" name="reportNo" value="${esc(p.reportNo)}" placeholder="01"></div>
+      <div class="field" ${vis('meeting tour')}><label data-lbl-title>${p.template === 'tour' ? 'תיאור העבודה (בכותרת)' : 'הנדון'}</label><input class="input" name="title" value="${esc(p.title)}" placeholder="${p.template === 'tour' ? 'למשל: בניית מרפאה / פירוקים והריסות' : 'למשל: סיכום פגישת תיאום תכנון'}"></div>
+      <div class="field" ${vis('supervision')}><label>סטטוס פרויקט</label><input class="input" name="status" value="${esc(p.status)}" placeholder="ביצוע" list="protoStatusList"><datalist id="protoStatusList"><option>תכנון</option><option>מכרז</option><option>ביצוע</option><option>מסירה</option></datalist></div>
+      <div class="field"><label>מיקום</label><input class="input" name="location" value="${esc(p.location)}" placeholder="משרד / זום / שטח הפרויקט"></div>
+      <div class="field full"><label>משתתפים</label><textarea class="input" name="participants" rows="3" style="min-height:60px" placeholder="גורם: שם, שורה לכל גורם. למשל: ניהול פרויקט: מוטי דיקמן">${esc(p.participants)}</textarea></div>
+      <div class="field full"><label>העתקים</label><input class="input" name="copies" value="${esc(p.copies)}"></div>
+      <div class="field full" ${vis('supervision')}><label>סטטוס כללי: עבודות שבוצעו</label><textarea class="input" name="doneWork" style="min-height:56px">${esc(p.doneWork)}</textarea></div>
+      <div class="field" ${vis('supervision')}><label>הספקים לשבוע הקרוב</label><textarea class="input" name="nextWork" style="min-height:56px">${esc(p.nextWork)}</textarea></div>
+      <div class="field" ${vis('supervision')}><label>עבודות בהספק האחרון שלא בוצעו</label><textarea class="input" name="notDone" style="min-height:56px">${esc(p.notDone)}</textarea></div>
+      <div class="field full"><div class="pi-head"><label data-lbl-items>${p.template === 'tour' ? 'סיכום החלטות, הבהרות והנחיות' : 'נושאים'}</label>
+        <span class="spacer"></span><button type="button" class="btn sm" data-prev>העתקת נושאים מהפרוטוקול הקודם</button></div>
+        <div id="protoItems"></div>
+        <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
+        <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא בלי תוכן לא יופיע במסמך. מלאו "באחריות" כדי ליצור ממנו משימה.'}</span></div>
+      <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>`,
+    (data) => {
+      const items = readProtoItems();
+      const t = PROTO_TPL[data.template];
+      const defaults = t.topics || [];
+      data.items = items.filter((i) => {
+        const filled = t.cols.some((c) => c[0] !== 'topic' && (i[c[0]] || '').trim());
+        return filled || (i.topic && !defaults.includes(i.topic));
+      });
+      data.type = t.label;
+      if (data.template !== 'supervision') data.reportNo = '';
+      if (proto) Object.assign(proto, data); else { const n = Object.assign({ id: uid() }, data); db.protocols.push(n); ui.openProto = n.id; }
+      save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
+    },
+    proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
+    $('#modalForm').classList.add('wide');
+    const body = $('#modalBody');
+    const tplSel = $('[name="template"]', body);
+    const projSel = $('[name="projectId"]', body);
+    let curTpl = p.template;
+    drawProtoItems(curTpl, p.items || []);
+    tplSel.addEventListener('change', () => {
+      const old = readProtoItems();
+      const newTpl = tplSel.value;
+      const oldDefaults = defaultItems(curTpl);
+      const untouched = old.every((i, n) => oldDefaults[n] && i.topic === oldDefaults[n].topic && (i.details || '') === (oldDefaults[n].details || '') && !i.instructions && !i.owner && !i.due) && old.length === oldDefaults.length;
+      curTpl = newTpl;
+      drawProtoItems(newTpl, untouched || !old.length ? defaultItems(newTpl) : old);
+      $$('[data-tpls]', body).forEach((f) => { f.style.display = f.dataset.tpls.split(' ').includes(newTpl) ? '' : 'none'; });
+      $('[data-lbl-title]', body).textContent = newTpl === 'tour' ? 'תיאור העבודה (בכותרת)' : 'הנדון';
+      $('[data-lbl-items]', body).textContent = newTpl === 'tour' ? 'סיכום החלטות, הבהרות והנחיות' : 'נושאים';
+      $('#modalTitle').textContent = (proto ? 'עריכת ' : 'פרוטוקול חדש: ') + PROTO_TPL[newTpl].label;
+      const rn = $('[name="reportNo"]', body);
+      if (newTpl === 'supervision' && !rn.value) rn.value = nextReportNo(projSel.value);
+      const part = $('[name="participants"]', body);
+      if (newTpl === 'tour' && !part.value.trim()) part.value = TOUR_PARTICIPANTS;
+      else if (newTpl !== 'tour' && part.value.trim() === TOUR_PARTICIPANTS.trim()) part.value = '';
+      const cp = $('[name="copies"]', body);
+      if (!proto && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט', ''].includes(cp.value.trim())) cp.value = newTpl === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
+    });
+    projSel.addEventListener('change', () => {
+      if (!proto && tplSel.value === 'supervision') $('[name="reportNo"]', body).value = nextReportNo(projSel.value);
+    });
+    $('[data-additem]', body).addEventListener('click', () => { const cur = readProtoItems(); cur.push({}); drawProtoItems(curTpl, cur); const last = $$('.pi-row', body).pop(); if (last) $('[data-k="topic"]', last).focus(); });
+    $('[data-prev]', body).addEventListener('click', () => {
+      const prev = protoPrev(curTpl, projSel.value, proto && proto.id);
+      if (!prev) { toast(projSel.value ? 'אין פרוטוקול קודם מאותו סוג בפרויקט הזה' : 'בחרו קודם פרויקט'); return; }
+      if (!confirm('להחליף את הנושאים בנושאים מהפרוטוקול מ-' + fmtDate(prev.date) + '?')) return;
+      drawProtoItems(curTpl, (prev.items || []).map((i) => Object.assign({}, i)));
+      ['participants', 'location', 'copies', 'status'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && !f.value.trim() && prev[k]) f.value = prev[k]; });
+      toast('הנושאים הועתקו מהפרוטוקול הקודם');
+    });
+  }
+  function drawProtoItems(tpl, items) {
+    const t = PROTO_TPL[tpl];
+    const box = $('#protoItems');
+    const fields = t.cols.filter((c) => c[0] !== 'topic');
+    box.innerHTML = items.map((it, n) => `<div class="pi-row">
+      <div class="pi-top"><span class="pi-num">${n + 1}</span><input class="input" data-k="topic" value="${esc(it.topic)}" placeholder="נושא">
+        <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm" data-del title="מחיקת נושא">✕</button></div>
+      <div class="pi-fields pi-${tpl}">${fields.map((c) => (c[0] === 'details' || c[0] === 'instructions'
+        ? `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><textarea class="input" data-k="${c[0]}" rows="${tpl === 'tour' ? 4 : 2}">${esc(it[c[0]])}</textarea></label>`
+        : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
+      ${Object.keys(it).filter((k) => k !== 'topic' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
+    </div>`).join('') || '<div class="hint">אין נושאים. לחצו "+ נושא".</div>';
+    $$('.pi-row', box).forEach((row, n) => {
+      const move = (d) => { const cur = readProtoItems(); const j = n + d; if (j < 0 || j >= cur.length) return; [cur[n], cur[j]] = [cur[j], cur[n]]; drawProtoItems(tpl, cur); };
+      $('[data-up]', row).addEventListener('click', () => move(-1));
+      $('[data-down]', row).addEventListener('click', () => move(1));
+      $('[data-del]', row).addEventListener('click', () => { const cur = readProtoItems(); cur.splice(n, 1); drawProtoItems(tpl, cur); });
+    });
+  }
+  function readProtoItems() {
+    return $$('#protoItems .pi-row').map((row) => {
+      const it = {};
+      $$('[data-k]', row).forEach((f) => { const v = f.value.replace(/\s+$/, ''); if (v) it[f.dataset.k] = v; });
+      return it;
+    });
+  }
+  // Protocols saved before the templates.
+  function openLegacyProtocolForm(proto) {
+    const p = proto;
+    openModal('עריכת פרוטוקול', `
       <div class="field full"><label>נושא הישיבה *</label><input class="input" name="title" required value="${esc(p.title)}"></div>
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
-      <div class="field"><label>סוג</label><select class="input" name="type">${MEETING_TYPE.map((t) => `<option ${t === p.type ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>סוג</label><select class="input" name="type">${MEETING_TYPE.concat(MEETING_TYPE.includes(p.type) || !p.type ? [] : [p.type]).map((t) => `<option ${t === p.type ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
       <div class="field"><label>משתתפים</label><input class="input" name="participants" value="${esc(p.participants)}" placeholder="שמות מופרדים בפסיק"></div>
       <div class="field full"><label>סיכום הדיון</label><textarea class="input" name="summary">${esc(p.summary)}</textarea></div>
       <div class="field full"><label>החלטות</label><textarea class="input" name="decisions" placeholder="החלטה בכל שורה">${esc(p.decisions)}</textarea></div>
       <div class="field full"><label>משימות להמשך</label><textarea class="input" name="actions" placeholder="משימה בכל שורה. למשל: דני: הזמנת ברזל">${esc(p.actions)}</textarea>
         <span class="hint">כתבו "שם: משימה" כדי שהאחראי ימולא אוטומטית כשיוצרים משימות מהפרוטוקול.</span></div>`,
-    (data) => {
-      if (proto) Object.assign(proto, data); else { const n = Object.assign({ id: uid() }, data); db.protocols.push(n); ui.openProto = n.id; }
-      save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
-    },
-    proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
-  }
-  // ---------- Protocol export (company letterhead) ----------
-  const protoLines = (s) => (s || '').split('\n').map((x) => x.trim()).filter(Boolean);
-  const protoFileName = (pr, ext) => ('פרוטוקול - ' + (pr.title || '') + ' - ' + fmtDate(pr.date).replace(/\//g, '.')).replace(/[\\/:*?"<>|]/g, '').trim() + '.' + ext;
-  function protoSections(pr) {
-    const p = byId(db.projects, pr.projectId);
-    const meta = [['תאריך', fmtDate(pr.date)], ['סוג', pr.type], ['פרויקט', p && p.name]].filter((x) => x[1]);
-    return {
-      meta,
-      sections: [
-        pr.participants ? { title: 'משתתפים', paras: [pr.participants] } : null,
-        pr.summary ? { title: 'סיכום הדיון', paras: protoLines(pr.summary) } : null,
-        protoLines(pr.decisions).length ? { title: 'החלטות', list: protoLines(pr.decisions) } : null,
-        protoLines(pr.actions).length ? { title: 'משימות להמשך', list: protoLines(pr.actions) } : null,
-      ].filter(Boolean),
-    };
+    (data) => { Object.assign(proto, data); save(); render(); toast('הפרוטוקול עודכן'); },
+    () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); });
   }
 
+  // ---------- Protocol export (company letterhead) ----------
   // PDF: opens a print view on the letterhead; choose "Save as PDF" in the print dialog.
   function exportProtocolPdf(pr) {
-    const { meta, sections } = protoSections(pr);
+    const doc = protoDoc(pr);
     const bg = new URL('docs/letterhead.jpg', location.href).href;
-    const body = `
-      <h1>פרוטוקול: ${esc(pr.title)}</h1>
-      <div class="meta">${meta.map((m) => `<span><b>${m[0]}:</b> ${esc(m[1])}</span>`).join('')}</div>
-      ${sections.map((sec) => `<h2>${sec.title}</h2>${sec.list ? `<ol>${sec.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : sec.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`).join('')}`;
+    const body = `<h1>${esc(doc.heading)}</h1>${protoDocHtml(doc)}`;
     const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(protoFileName(pr, 'pdf').replace(/\.pdf$/, ''))}</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
         @page { size: A4; margin: 0; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
-        body { font-family: Arial, "Assistant", sans-serif; color: #111; font-size: 11pt; line-height: 1.55; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: Arial, "Assistant", sans-serif; color: #111; font-size: 10.5pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .bg { position: fixed; inset: 0; width: 210mm; height: 297mm; z-index: -1; }
         .bg img { width: 100%; height: 100%; display: block; }
         table.page { width: 210mm; border-collapse: collapse; }
-        thead td { height: 67.5mm; } tfoot td { height: 22.5mm; }
+        thead td.pad { height: 67.5mm; } tfoot td.pad { height: 22.5mm; }
         td.content { padding: 0 31.7mm; vertical-align: top; }
-        h1 { font-size: 17pt; margin: 0 0 6px; }
-        .meta { color: #333; margin-bottom: 8px; } .meta span { margin-inline-end: 18px; display: inline-block; }
-        h2 { font-size: 12.5pt; margin: 16px 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid #52bd76; break-after: avoid; }
+        h1 { font-size: 16pt; margin: 0 0 10px; text-align: center; }
+        .pd-title { font-weight: bold; font-size: 11.5pt; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid #52bd76; break-after: avoid; }
+        .pd-table { width: 100%; border-collapse: collapse; margin: 0 0 10px; table-layout: fixed; }
+        .pd-table th, .pd-table td { border: 1px solid #9aa3ad; padding: 4px 6px; vertical-align: top; text-align: right; word-wrap: break-word; }
+        .pd-table thead th { background: #e4f4ea; }
+        .pd-table thead { display: table-header-group; }
+        .pd-table tr { break-inside: avoid; }
+        .pd-kv th { width: 24%; background: #f1f5f3; }
+        .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
         p { margin: 0 0 6px; white-space: pre-wrap; } ol { margin: 0; padding-inline-start: 22px; } li { margin-bottom: 3px; }
         .bar { position: fixed; top: 0; left: 0; right: 0; background: #15253d; color: #fff; padding: 10px 16px; display: flex; gap: 10px; align-items: center; font-family: Arial, sans-serif; z-index: 10; }
         .bar button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; background: #52bd76; color: #fff; font-weight: bold; cursor: pointer; }
@@ -1661,7 +1959,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       </style></head><body>
       <div class="bar"><button onclick="window.print()">שמירה כ-PDF / הדפסה</button><span>בחלון ההדפסה בחרו "שמירה כ-PDF"</span></div>
       <div class="sheet"><div class="bg"><img src="${bg}" alt=""></div>
-      <table class="page"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot>
+      <table class="page"><thead><tr><td class="pad"></td></tr></thead><tfoot><tr><td class="pad"></td></tr></tfoot>
       <tbody><tr><td class="content">${body}</td></tr></tbody></table></div>
       <script>var i=document.querySelector('.bg img');function go(){setTimeout(function(){window.print()},300)}if(i.complete)go();else{i.onload=go;i.onerror=go}<\/script>
       </body></html>`;
@@ -1692,19 +1990,37 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     o = o || {};
     const bdr = o.border ? '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="52BD76"/></w:pBdr>' : '';
     const ind = o.indent ? '<w:ind w:start="360" w:hanging="360"/>' : '';
-    return `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${bdr}<w:bidi/><w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 100 : o.after}"/>${ind}</w:pPr>${runs}</w:p>`;
+    const jc = o.center ? '<w:jc w:val="center"/>' : '';
+    return `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${bdr}<w:bidi/><w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 100 : o.after}"/>${ind}${jc}</w:pPr>${runs}</w:p>`;
+  }
+  // A bordered right-to-left table. rows: [[cell, ...]], cell: [{ t, b }]; opts.header: first row repeats and is shaded.
+  function wTable(widths, rows, opts) {
+    const o = opts || {};
+    const bd = (s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="9AA3AD"/>`;
+    const grid = widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('');
+    const tr = rows.map((r, ri) => {
+      const head = o.header && ri === 0;
+      return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}</w:trPr>${r.map((cell, ci) => {
+        const fill = head ? 'E4F4EA' : (o.shadeFirstCol && ci === 0 ? 'F1F5F3' : '');
+        const paras = (cell.length ? cell : [{ t: '' }]).map((l) => wPara(wRun(l.t, { bold: l.b || head || (o.shadeFirstCol && ci === 0), size: 20 }), { after: 20 })).join('');
+        return `<w:tc><w:tcPr><w:tcW w:w="${widths[ci]}" w:type="dxa"/>${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''}</w:tcPr>${paras}</w:tc>`;
+      }).join('')}</w:tr>`;
+    }).join('');
+    return `<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(bd).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${tr}</w:tbl>` + wPara('', { after: 80 });
   }
   async function buildProtocolDocx(pr) {
       const [JSZip, tpl] = await Promise.all([loadJSZip(), fetch('docs/blank-template.docx').then((r) => { if (!r.ok) throw new Error('template'); return r.arrayBuffer(); })]);
       const zip = await JSZip.loadAsync(tpl);
       const docXml = await zip.file('word/document.xml').async('string');
-      const { meta, sections } = protoSections(pr);
-      let body = wPara(wRun('פרוטוקול: ' + (pr.title || ''), { bold: true, size: 34 }), { after: 80 });
-      body += wPara(meta.map((m, i) => (i ? wRun('   |   ') : '') + wRun(m[0] + ': ', { bold: true }) + wRun(m[1])).join(''), { after: 160 });
-      sections.forEach((sec) => {
-        body += wPara(wRun(sec.title, { bold: true, size: 25 }), { before: 200, after: 100, border: true, keepNext: true });
-        if (sec.list) sec.list.forEach((x, i) => { body += wPara(wRun((i + 1) + '.\t' + x), { indent: true, after: 60 }); });
-        else sec.paras.forEach((x) => { body += wPara(wRun(x)); });
+      const doc = protoDoc(pr);
+      let body = wPara(wRun(doc.heading, { bold: true, size: 32 }), { after: 160, center: true });
+      doc.blocks.forEach((bl) => {
+        if (bl.title) body += wPara(wRun(bl.title, { bold: true, size: 24 }), { before: 160, after: 80, border: true, keepNext: true });
+        if (bl.kind === 'kv') body += wTable([2000, 6300], bl.rows.map((r) => [[{ t: r[0], b: true }], r[1]]), { shadeFirstCol: true });
+        else if (bl.kind === 'table') body += wTable(bl.cols.map((c) => c[1]), [bl.cols.map((c) => [{ t: c[0], b: true }])].concat(bl.rows), { header: true });
+        else if (bl.kind === 'note') body += wPara(wRun(bl.text, { bold: true }), { before: 200, center: true });
+        else if (bl.list) bl.list.forEach((x, i) => { body += wPara(wRun((i + 1) + '.\t' + x), { indent: true, after: 60 }); });
+        else bl.paras.forEach((x) => { body += wPara(wRun(x)); });
       });
       const i1 = docXml.indexOf('<w:body>') + '<w:body>'.length;
       const i2 = docXml.indexOf('<w:sectPr');
@@ -1719,18 +2035,6 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     } catch (e) {
       toast(navigator.onLine === false ? 'אין חיבור לרשת. ייצוא ל-Word דורש חיבור בפעם הראשונה' : 'ייצוא ל-Word נכשל');
     }
-  }
-
-  // Email: opens Gmail (or the phone's mail app) with the protocol as plain text.
-  function protocolText(pr) {
-    const { meta, sections } = protoSections(pr);
-    let t = 'פרוטוקול: ' + (pr.title || '') + '\n' + meta.map((m) => m[0] + ': ' + m[1]).join(' | ') + '\n';
-    sections.forEach((sec) => {
-      t += '\n' + sec.title + '\n';
-      t += sec.list ? sec.list.map((x, i) => (i + 1) + '. ' + x).join('\n') : sec.paras.join('\n');
-      t += '\n';
-    });
-    return t + '\n--\nפמי הנדסה בע"מ | ייעוץ | ניהול פרויקטים\noffice@femy.co.il | ב.ס.ר 1 רמת גן\n';
   }
   const cleanEmails = (s) => (s || '').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).join(',');
   function emailProtocol(pr) {
@@ -1811,7 +2115,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       projects: db.projects.map((p) => ({ id: p.id, name: p.name, client: p.client, status: p.status, progress: p.progress, manager: p.manager, start: p.start, end: p.end, budget: p.budget })),
       tasks: db.tasks.map((t) => ({ id: t.id, title: t.title, project: pname(t.projectId), assignee: t.assignee, priority: t.priority, status: t.status, due: t.due, notes: t.notes })),
       invoices: db.invoices.map((i) => ({ number: i.number, type: i.type, party: i.party, project: pname(i.projectId), amountBeforeVat: i.amount, vat: i.vat, issueDate: i.issueDate, dueDate: i.dueDate, status: invoiceStatus(i) })),
-      protocols: db.protocols.slice().sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({ title: p.title, date: p.date, type: p.type, project: pname(p.projectId), participants: p.participants, summary: p.summary, decisions: p.decisions, actions: p.actions })),
+      protocols: db.protocols.slice().sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({ title: p.title, date: p.date, type: p.type, project: pname(p.projectId), participants: p.participants, summary: p.summary, decisions: p.decisions, actions: p.actions, location: p.location, reportNo: p.reportNo, doneWork: p.doneWork, nextWork: p.nextWork, notDone: p.notDone, items: (p.items || []).map((i) => [i.topic, i.details, i.instructions, i.due && 'לו"ז: ' + i.due, i.owner && 'באחריות: ' + i.owner].filter(Boolean).join(' | ')) })),
     });
   }
   const AI_SYSTEM = `אתה עוזר במערכת הניהול הפנימית של "פמי הנדסה בע״מ", חברת ייעוץ וניהול פרויקטים בבנייה.
@@ -2496,6 +2800,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   let modalSubmit = null; let modalDelete = null;
   function openModal(title, bodyHtml, onSubmit, onDelete, deleteNote) {
     $('#modalTitle').textContent = title;
+    $('#modalForm').classList.remove('wide');
     $('#modalBody').innerHTML = bodyHtml;
     modalSubmit = onSubmit; modalDelete = onDelete;
     const del = $('#modalDelete');
