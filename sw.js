@@ -1,5 +1,5 @@
 // Service worker: lets the app open without a network connection.
-const CACHE = 'femy-v15';
+const CACHE = 'femy-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const ASSETS = [
   './google-config.js',
   './google.js',
   './sheet-sync.js',
+  './drive-protocols.js',
+  './protocols/drive-protocols.json',
   './projects/drive-projects.json',
   './manifest.webmanifest',
   './docs/logo.png',

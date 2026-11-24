@@ -353,6 +353,19 @@
     const parent = await folder(tok);
     return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form({ name, parents: [parent] }) })).json();
   }
+  // A search over every file the user can see (My Drive, shared with them and shared drives), page after page.
+  async function search(q, fields, maxPages) {
+    const out = []; let pageToken = '';
+    for (let i = 0; i < (maxPages || 10); i++) {
+      const p = new URLSearchParams({ q, pageSize: '1000', fields: `nextPageToken,files(${fields || 'id,name,mimeType,parents,modifiedTime,createdTime'})`, includeItemsFromAllDrives: 'true', supportsAllDrives: 'true', corpora: 'allDrives' });
+      if (pageToken) p.set('pageToken', pageToken);
+      const r = await json(DAPI + '?' + p);
+      out.push(...(r.files || []));
+      if (!(pageToken = r.nextPageToken)) break;
+    }
+    return out;
+  }
+  async function meta(id, fields) { return json(`${DAPI}/${encodeURIComponent(id)}?fields=${encodeURIComponent(fields || 'id,name,parents')}&supportsAllDrives=true`); }
   async function folderName(id) { return (await json(`${DAPI}/${encodeURIComponent(id)}?fields=name&supportsAllDrives=true`)).name || ''; }
   // Downloads a Google file converted to another format (for example a Sheet as .xlsx).
   async function exportFile(id, mime) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`)).arrayBuffer(); }
@@ -362,6 +375,6 @@
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, send, link: mailLink, findThread, searchLink },
-    drive: { exportFile, files, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
+    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
   };
 })();
