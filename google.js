@@ -115,6 +115,9 @@
     return connect();
   }
 
+  // True when a token can be had without a popup (for background work such as syncing).
+  const silent = () => !!(enabled && userKey && (fresh() || (persistent && rec && rec.device)));
+
   // Opens Google's popup and asks the user to approve. Call straight from a click.
   function connect() {
     if (!enabled) return token();
@@ -343,12 +346,14 @@
     const parent = await folder(tok);
     return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form({ name, parents: [parent] }) })).json();
   }
+  // Downloads a Google file converted to another format (for example a Sheet as .xlsx).
+  async function exportFile(id, mime) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`)).arrayBuffer(); }
   async function readFile(id) { return (await api(await token(), `${DAPI}/${id}?alt=media`)).text(); }
 
   window.FemyGoogle = {
-    enabled, init, status, valid, onChange, token, connect, disconnect, forget,
+    enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, send, link: mailLink },
-    drive: { files, browse, projectsRoot, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
+    drive: { exportFile, files, browse, projectsRoot, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
   };
 })();
