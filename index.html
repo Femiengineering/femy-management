@@ -665,8 +665,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // The signed-in user's own Google account (calendar, Gmail, Drive), via google.js.
   const G = window.FemyGoogle || { enabled: false, status: () => ({}), valid: () => false, init() {}, forget() {}, onChange() {} };
   const GOOGLE = !!G.enabled;
-  // The background sync server (worker/): it reads the company's Drive with its own service account every
-  // 15 minutes, so the tasks sheet and the protocols stay up to date even with no Google account connected.
+  // The background sync server (worker/): every 15 minutes it reads the company's Drive with the Google
+  // account already connected on the site (its stored token), so the tasks sheet and the protocols stay up to date even with no Google account connected.
   const SYNC = String((window.FEMY_GOOGLE && (window.FEMY_GOOGLE.syncServer || window.FEMY_GOOGLE.tokenServer)) || '').replace(/\/+$/, '');
   let syncDown = false; // the server has no data for us (not set up yet), so stop asking it this session
   async function syncFetch(path, opts) {

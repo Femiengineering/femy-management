@@ -18,15 +18,23 @@
 //   ENC_KEY               secret, any long random string (e.g. 32 random bytes in base64)
 //   ALLOWED_ORIGINS       comma separated, e.g. https://femiengineering.github.io
 //
-// Background Drive sync (no user signed in to Google): every 15 minutes (cron trigger) the worker
-// reads the company's Drive with its own Google service account and keeps a copy in KV:
-//   sync:drive  { at, root, files, folders }  the protocol documents in the projects folder and every
-//               folder above them, for FemyDriveProtocols.buildItems() on the site
-//   sync:sheet  the tasks sheet ("משימות פמי") exported as .xlsx, for FemySheet on the site
-// The site reads them with GET /data/drive and GET /data/sheet, and POST /data/refresh syncs now.
-//   GOOGLE_SERVICE_ACCOUNT_KEY  secret, the service account's JSON key file, pasted whole
-//   PROJECTS_FOLDER_ID          the "פרויקטים פמי" folder (shared with the service account)
-//   TASKS_SHEET_ID              the "משימות פמי" sheet (shared with the service account)
+// Background Drive sync (no user signed in to Google on the device): every 15 minutes (cron trigger)
+// the worker reads the company's Drive with the refresh token it already keeps for the account that
+// connected on the site (the "sync account"), and keeps a copy in KV:
+//   sync:drive   { at, root, files, folders }  the protocol documents in the projects folder and every
+//                folder between them and it, for FemyDriveProtocols.buildItems() on the site
+//   sync:sheet   the tasks sheet ("משימות פמי") exported as .xlsx, for FemySheet on the site
+//   sync:status  { at, ok, error, ... } of the last run
+//   sync:account the KV key (u:<hash>) of the sync account, chosen as the first stored account that can
+//                open the projects folder. If its token can no longer be renewed, the run is logged and
+//                the last good copy stays; the next sign-in on the site picks the account again.
+// Each part is replaced only after a good read, so the site always gets the last good copy.
+// The site reads them with GET /data/drive, GET /data/sheet or GET /api/sync-data (all in one),
+// and POST /data/refresh syncs now.
+//   PROJECTS_FOLDER_ID          the "פרויקטים פמי" folder
+//   TASKS_SHEET_ID              the "משימות פמי" sheet
+//   GOOGLE_SERVICE_ACCOUNT_KEY  optional secret: a service account JSON key, used only when no
+//                               connected account can read the folder
 
 import DP from '../../drive-protocols.js';
 
@@ -62,6 +70,7 @@ export default {
         if (!value) return reply(404, { error: (await syncError(env)) || 'no_data' });
         return new Response(value, { headers: Object.assign({ 'Content-Type': XLSX, 'Cache-Control': 'no-store', 'X-Synced-At': String((metadata && metadata.at) || '') }, cors) });
       }
+      if (req.method === 'GET' && path === '/api/sync-data') return reply(...(await syncData(env)));
       if (req.method === 'GET' && path === '/data/status') return reply(200, JSON.parse((await env.TOKENS.get('sync:status')) || '{}'));
       if (req.method === 'POST' && path === '/data/refresh') return reply(...(await refresh(env)));
     } catch (e) {
@@ -107,6 +116,8 @@ async function exchange(env, { code }) {
     await fetch(GOOGLE_REVOKE + '?token=' + encodeURIComponent(t.access_token), { method: 'POST' }).catch(() => {});
     return [409, { error: 'no_refresh_token' }];
   }
+  // No working sync account yet (first sign-in, or its token died): the next cron run tries this one first.
+  if (!(await env.TOKENS.get('sync:account'))) await env.TOKENS.put('sync:account', ukey);
   const device = b64url(crypto.getRandomValues(new Uint8Array(32)));
   await env.TOKENS.put('d:' + await hash(device), await seal(env, JSON.stringify({ email, at: Date.now() })));
   return [200, { device, access_token: t.access_token, expires_in: t.expires_in, scope: t.scope, email }];
@@ -163,7 +174,7 @@ async function load(env, device) {
   } catch (e) { return null; }
 }
 
-// ---------- Background Drive sync (service account) ----------
+// ---------- Background Drive sync (the connected account's stored token) ----------
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
@@ -173,10 +184,28 @@ async function refresh(env) {
   const st = JSON.parse((await env.TOKENS.get('sync:status')) || '{}');
   if (st.at && Date.now() - st.at < 60000) return [200, st];
   const r = await syncDrive(env);
-  return [r.ok ? 200 : 503, r];
+  // A failed run still leaves the last good copy, so the site can go on and read it.
+  const cached = r.ok || (await env.TOKENS.get('sync:drive')) !== null;
+  return [cached ? 200 : 503, r];
 }
 async function syncError(env) {
   try { return JSON.parse((await env.TOKENS.get('sync:status')) || '{}').error || ''; } catch (e) { return ''; }
+}
+
+// Everything in one answer: the last good copy of the protocols list and of the tasks sheet
+// (base64 .xlsx), with the status of the last run. Served from KV even when the last run failed.
+async function syncData(env) {
+  const [drive, sheet, status] = await Promise.all([
+    env.TOKENS.get('sync:drive', 'json'),
+    env.TOKENS.getWithMetadata('sync:sheet', 'arrayBuffer'),
+    env.TOKENS.get('sync:status', 'json'),
+  ]);
+  if (!drive && !sheet.value) return [404, { error: (status && status.error) || 'no_data', status: status || {} }];
+  return [200, {
+    status: status || {},
+    drive: drive || null,
+    sheet: sheet.value ? { at: (sheet.metadata && sheet.metadata.at) || 0, xlsx: b64(new Uint8Array(sheet.value)) } : null,
+  }];
 }
 
 // Reads the protocol documents (with their folders) and the tasks sheet, and keeps them in KV.
@@ -184,24 +213,38 @@ async function syncError(env) {
 async function syncDrive(env) {
   const status = { at: Date.now(), ok: true, error: '' };
   const fail = (what, e) => { status.ok = false; status.error = status.error || (what + ': ' + (e && e.message || e)); console.error('femy-google sync ' + what + ': ' + (e && e.stack || e)); };
-  let tok = '';
-  try { tok = await saToken(env); } catch (e) { fail('auth', e); }
-  if (tok) {
+  let auth = null;
+  try { auth = await syncAuth(env); } catch (e) { fail('auth', e); }
+  if (auth) {
+    const tok = auth.token;
+    status.via = auth.via;
     if (env.PROJECTS_FOLDER_ID) {
       try {
         const root = env.PROJECTS_FOLDER_ID;
-        // The service account sees only what was shared with it (the projects folder and what is inside),
-        // so one search for all folders gives every folder between a document and the projects folder.
+        // A user account sees its whole Drive, so search every folder and protocol document it can
+        // see, then keep only what sits under the projects folder (and the folders on the way there).
         const [files, flist] = await Promise.all([
           driveSearch(tok, DP.driveQuery(), 'id,name,mimeType,parents,modifiedTime,createdTime'),
           driveSearch(tok, `mimeType='${FOLDER_MIME}' and trashed=false`, 'id,name,parents'),
         ]);
-        const folders = {};
-        flist.forEach((f) => { folders[f.id] = [(f.parents || [])[0] || '', f.name || '']; });
-        const docs = files.filter((f) => DP.DOC_MIMES[f.mimeType]).map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, modifiedTime: f.modifiedTime, createdTime: f.createdTime }));
-        if (!flist.some((f) => f.id === root) && !docs.length) throw new Error('the projects folder is not shared with the service account');
+        const all = {};
+        flist.forEach((f) => { all[f.id] = [(f.parents || [])[0] || '', f.name || '']; });
+        const folders = {}; const under = new Map(); under.set(root, true);
+        const inRoot = (id) => {
+          const path = []; let at = id; let res = false;
+          for (let g = 0; at && g < 40; g++) {
+            if (under.has(at)) { res = under.get(at); break; }
+            if (!all[at]) break;
+            path.push(at); at = all[at][0];
+          }
+          path.forEach((p) => { under.set(p, res); if (res) folders[p] = all[p]; });
+          return res;
+        };
+        const docs = files.filter((f) => DP.DOC_MIMES[f.mimeType] && inRoot((f.parents || [])[0]))
+          .map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, modifiedTime: f.modifiedTime, createdTime: f.createdTime }));
+        if (!docs.length) throw new Error('no protocol documents found under the projects folder');
         await env.TOKENS.put('sync:drive', JSON.stringify({ at: status.at, root, files: docs, folders }));
-        status.files = docs.length; status.folders = flist.length;
+        status.files = docs.length; status.folders = Object.keys(folders).length;
       } catch (e) { fail('drive', e); }
     }
     if (env.TASKS_SHEET_ID) {
@@ -217,6 +260,52 @@ async function syncDrive(env) {
   return status;
 }
 
+// An access token for the sync: the sync account's stored refresh token first, then every other
+// connected account (the first that can open the projects folder becomes the sync account), and
+// last the optional service account. With none of them working, it throws and the cache stays.
+async function syncAuth(env) {
+  const tried = new Set(); const why = [];
+  const tryKey = async (ukey) => {
+    if (!ukey || tried.has(ukey)) return null;
+    tried.add(ukey);
+    try {
+      const sealed = await env.TOKENS.get(ukey);
+      if (!sealed) return null;
+      const { rt } = JSON.parse(await open(env, sealed));
+      const r = await fetch(GOOGLE_TOKEN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ refresh_token: rt, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, grant_type: 'refresh_token' }),
+      });
+      const t = await r.json();
+      if (!r.ok || !t.access_token) {
+        // invalid_grant: access removed in Google, password changed, or the grant expired. Nothing to do
+        // here but wait: the user's next sign-in on the site stores a new token.
+        console.warn('femy-google sync: stored token ' + ukey.slice(0, 10) + '… cannot be renewed (' + (t.error || r.status) + '), waiting for the next sign-in');
+        why.push(t.error || 'refresh_failed');
+        return null;
+      }
+      if (env.PROJECTS_FOLDER_ID) await gfetch(t.access_token, `${DRIVE}/${encodeURIComponent(env.PROJECTS_FOLDER_ID)}?fields=id&supportsAllDrives=true`);
+      return t.access_token;
+    } catch (e) { why.push(String(e && e.message || e)); return null; }
+  };
+  const current = await env.TOKENS.get('sync:account');
+  let tok = await tryKey(current);
+  if (tok) return { token: tok, via: 'account' };
+  let cursor;
+  do {
+    const page = await env.TOKENS.list({ prefix: 'u:', cursor });
+    for (const k of page.keys) {
+      tok = await tryKey(k.name);
+      if (tok) { await env.TOKENS.put('sync:account', k.name); return { token: tok, via: 'account' }; }
+    }
+    cursor = page.list_complete ? null : page.cursor;
+  } while (cursor);
+  if (current) await env.TOKENS.delete('sync:account');
+  if (env.GOOGLE_SERVICE_ACCOUNT_KEY) return { token: await saToken(env), via: 'service_account' };
+  throw new Error(tried.size ? 'no connected Google account can read the Drive (' + why.join(', ') + '); waiting for the next sign-in on the site' : 'no Google account is connected yet; sign in once on the site');
+}
+
 async function gfetch(tok, url) {
   const r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
   if (!r.ok) {
@@ -226,7 +315,7 @@ async function gfetch(tok, url) {
   }
   return r;
 }
-// Every page of a Drive search over all the files the service account can see.
+// Every page of a Drive search over all the files the account can see.
 async function driveSearch(tok, q, fields) {
   const out = []; let pageToken = '';
   for (let i = 0; i < 10; i++) {
@@ -261,6 +350,7 @@ async function saToken(env) {
 }
 
 // ---------- crypto helpers ----------
+function b64(bytes) { let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); }
 function b64url(bytes) { let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function fromB64(s) { return Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)); }
 async function hash(s) {
