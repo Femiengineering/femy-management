@@ -242,6 +242,13 @@
       date: Number(m.internalDate) || 0, unread: (m.labelIds || []).includes('UNREAD'),
     }));
   }
+  // The newest mail thread that matches a Gmail search, or null.
+  async function findThread(query) {
+    const q = new URLSearchParams({ maxResults: '1', q: query });
+    const m = ((await json(GM + '/messages?' + q)).messages || [])[0];
+    return m ? m.threadId : null;
+  }
+  const searchLink = (query) => 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent((rec && rec.email) || '') + '#search/' + encodeURIComponent(query);
   function decode(s) { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; }
   const mailLink = (m) => 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent((rec && rec.email) || '') + '#all/' + m.threadId;
 
@@ -353,7 +360,7 @@
   window.FemyGoogle = {
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
-    gmail: { inbox, send, link: mailLink },
+    gmail: { inbox, send, link: mailLink, findThread, searchLink },
     drive: { exportFile, files, browse, projectsRoot, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
   };
 })();
