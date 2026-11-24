@@ -352,14 +352,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .dp-line a { flex: 1; min-width: 0; }
 @media (max-width: 760px) { .dp-cols { grid-template-columns: 1fr; } .dp-acts { padding: 0 14px 12px; } }
 .proto-doc { padding-top: 12px; overflow-x: auto; }
-.proto-doc .pd-title { font-weight: 700; margin: 12px 0 6px; color: var(--muted); font-size: 14px; }
-.proto-doc .pd-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13.5px; min-width: 520px; }
-.proto-doc .pd-kv { min-width: 0; }
-.proto-doc .pd-table th, .proto-doc .pd-table td { border: 1px solid var(--border); padding: 6px 8px; vertical-align: top; text-align: right; }
-.proto-doc .pd-table thead th { background: var(--primary-soft); color: var(--primary); }
-.proto-doc .pd-kv th { width: 130px; background: var(--bg); color: var(--muted); font-weight: 600; }
-.proto-doc .pd-note { font-weight: 700; text-align: center; margin: 10px 0 0; }
-.proto-doc p { margin: 0 0 4px; }
+.proto-doc .fdoc { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 14px 12px 2px; min-width: 560px; font-size: 13px; }
 .modal.wide { max-width: 940px; }
 .pi-head { display: flex; align-items: center; gap: 8px; }
 .pi-head .spacer { flex: 1; }
@@ -1710,7 +1703,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   // The document model every output (card, PDF, Word, email) is drawn from.
   // A cell is a list of lines: [{ t: text, b: bold }].
-  const cellOf = (s, bold) => (s || '').split('\n').map((x) => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && i < a.length - 1)).map((t) => ({ t, b: !!bold }));
+  const cellOf = (s, bold, flags) => (s || '').split('\n').map((x) => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && i < a.length - 1)).map((t) => Object.assign({ t, b: !!bold }, flags));
   function protoDoc(pr) {
     const t = protoTpl(pr);
     const proj = byId(db.projects, pr.projectId);
@@ -1721,43 +1714,113 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (pr.summary) blocks.push({ kind: 'section', title: 'סיכום הדיון', paras: protoLines(pr.summary) });
       if (protoLines(pr.decisions).length) blocks.push({ kind: 'section', title: 'החלטות', list: protoLines(pr.decisions) });
       if (protoLines(pr.actions).length) blocks.push({ kind: 'section', title: 'משימות להמשך', list: protoLines(pr.actions) });
-      return { heading: protoHeading(pr), blocks };
+      return { tpl: 'legacy', heading: protoHeading(pr), blocks };
     }
     const subject = [proj && proj.name, pr.template === 'supervision' ? 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '') : pr.title].filter(Boolean).join('\n');
+    const date = fmtDate(pr.date).replace(/\/\d{2}(\d{2})$/, '/$1'); // 15/11/26, as on the documents sent so far
     let meta;
-    if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', fmtDate(pr.date)], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
-    else if (pr.template === 'supervision') meta = [['תאריך', fmtDate(pr.date)], ['הנדון', subject], ['סטטוס פרויקט', pr.status], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקי הדוח', pr.copies]];
-    else meta = [['תאריך', fmtDate(pr.date)], ['הנדון', subject], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
-    blocks.push({ kind: 'kv', rows: meta.filter((m) => m[1]).map((m) => [m[0], cellOf(m[1], m[0] === 'הנדון' || m[0] === 'שם הפרויקט')]) });
-    if (pr.template === 'supervision') {
-      const st = [['עבודות שבוצעו', pr.doneWork], ['הספקים לשבוע הקרוב', pr.nextWork], ['עבודות בהספק השבועי האחרון שלא בוצעו', pr.notDone]].filter((x) => (x[1] || '').trim());
-      if (st.length) blocks.push({ kind: 'kv', title: 'סטטוס כללי', rows: st.map((x) => [x[0], cellOf(x[1])]) });
-    }
+    if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', date], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
+    else if (pr.template === 'supervision') meta = [['תאריך', date], ['הנדון', subject], ['סטטוס פרויקט', pr.status], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקי הדוח', pr.copies]];
+    else meta = [['תאריך', date], ['הנדון', subject], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
+    // The header table, as on the documents sent so far: the date row grey, the subject row light blue.
+    blocks.push({ kind: 'kv', head: true, rows: meta.filter((m) => m[1]).map((m) => [m[0],
+      cellOf(m[1], m[0] === 'הנדון' || m[0] === 'שם הפרויקט', m[0] === 'שם הפרויקט' ? { u: true } : null),
+      m[0] === 'תאריך' ? 'date' : m[0] === 'הנדון' ? 'subj' : '']) });
     const items = (pr.items || []).filter((i) => t.cols.some((c) => (i[c[0]] || '').trim()));
-    if (items.length) {
-      if (pr.template === 'tour') {
-        blocks.push({ kind: 'table', title: 'סיכום החלטות, הבהרות והנחיות', cols: [['מס"ד', 800], ['תיאור', 7500]],
-          rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', b: true }] : []), ...cellOf(it.details)]]) });
-      } else {
-        const cols = (t.numbered ? [['', 500]] : []).concat(t.cols.map((c) => [c[1], c[2]]));
-        blocks.push({ kind: 'table', cols,
-          rows: items.map((it, n) => (t.numbered ? [cellOf(String(n + 1) + '.')] : []).concat(t.cols.map((c) => cellOf(it[c[0]], c[0] === 'topic' || c[0] === 'instructions')))) });
+    if (pr.template === 'tour') {
+      if (items.length) blocks.push({ kind: 'table', title: 'סיכום החלטות, הבהרות והנחיות', cols: [['מס"ד', 800, 'num'], ['תיאור', 7500, 'details']],
+        rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', u: true }] : []), ...cellOf(it.details)]]) });
+    } else {
+      // Supervision: "סטטוס כללי" is the first row of the table, the works not done in red.
+      let status = null;
+      if (pr.template === 'supervision') {
+        const st = [['עבודות שבוצעו:', pr.doneWork], ['הספקים לשבוע הקרוב:', pr.nextWork], ['עבודות בהספק השבועי האחרון שלא בוצעו:', pr.notDone, true]].filter((x) => (x[1] || '').trim());
+        if (st.length) status = [].concat(...st.map((x) => [{ t: x[0], b: true, r: !!x[2] }].concat(cellOf(x[1], false, x[2] ? { r: true } : null))));
+      }
+      // A topic with nothing else filled in is a section row across the table (a building, a street).
+      const isSection = (it) => !t.cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
+      if (items.length || status) {
+        const cols = (t.numbered ? [['', 500, 'num']] : []).concat(t.cols
+          .filter((c) => c[0] !== 'due' || items.some((it) => (it.due || '').trim()))
+          .map((c) => [c[1], c[2], c[0]]));
+        const rows = [];
+        if (status) rows.push(cols.map((c) => (c[2] === 'topic' ? cellOf('סטטוס כללי') : c[2] === 'details' ? status : [])));
+        let n = 0;
+        items.forEach((it) => {
+          if (isSection(it)) { rows.push({ section: it.topic }); return; }
+          n++;
+          rows.push(cols.map((c) => (c[2] === 'num' ? cellOf(n + '.')
+            : cellOf(it[c[2]], (c[2] === 'topic' && pr.template === 'meeting') || c[2] === 'instructions', c[2] === 'instructions' ? { r: true } : null))));
+        });
+        blocks.push({ kind: 'table', cols, rows });
       }
     }
     if (pr.notes) blocks.push({ kind: 'section', title: 'הערות', paras: protoLines(pr.notes) });
     if (t.footer) blocks.push({ kind: 'note', text: t.footer });
-    return { heading: protoHeading(pr), blocks };
+    return { tpl: pr.template, heading: protoHeading(pr), blocks };
   }
 
+  // The look of the documents the office has sent so far (Google Docs / Word on the letterhead):
+  // black borders, a coloured header row, grey section rows with dark blue text, instructions in red.
+  // Shared by the card on the site, the live preview and the print / PDF view, so all three look the same.
+  const PROTO_DOC_CSS = `
+    .fdoc { font-family: Arial, "Assistant", sans-serif; color: #000; font-size: 11pt; line-height: 1.4; text-align: right; direction: rtl; }
+    .fdoc table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 14px; }
+    .fdoc th, .fdoc td { border: 1px solid #000; color: #000; padding: 3px 6px; vertical-align: top; text-align: right; font-weight: normal; word-wrap: break-word; overflow-wrap: anywhere; }
+    .fdoc tr { break-inside: avoid; }
+    .fdoc thead { display: table-row-group; }
+    .fdoc .pd-h1 { font-size: 1.5em; font-weight: bold; text-align: center; margin: 0 0 12px; }
+    .fdoc.t-tour .pd-h1 { font-weight: normal; color: #4472c4; text-decoration: underline; margin-bottom: 18px; }
+    .fdoc .pd-head { width: 64%; }
+    .fdoc .pd-head th { width: 27%; background: #e7e6e6; }
+    .fdoc .pd-head td { text-align: center; }
+    .fdoc.t-meeting .pd-head th::after { content: " :"; }
+    .fdoc .pd-head tr.r-date td { background: #e7e6e6; }
+    .fdoc .pd-head tr.r-subj th, .fdoc .pd-head tr.r-subj td { background: #bdd7ee; }
+    .fdoc .pd-head tr.r-subj td { font-size: 1.12em; padding: 5px 6px 9px; }
+    .fdoc.t-tour .pd-head { width: 86%; margin: 0 auto 26px; }
+    .fdoc.t-tour .pd-head th { width: 22%; background: #d9d9d9; }
+    .fdoc.t-tour .pd-head td { text-align: right; }
+    .fdoc .pd-kv th { width: 24%; background: #e7e6e6; }
+    .fdoc .pd-main thead th { background: #6666ef; color: #fff; font-weight: bold; text-align: center; vertical-align: middle; }
+    .fdoc.t-supervision .pd-main thead th { background: #3c78d8; }
+    .fdoc.t-tour .pd-main thead th, .fdoc.t-legacy .pd-main thead th { background: #d9d9d9; color: #000; font-weight: normal; }
+    .fdoc.t-tour .pd-main tr.pd-cap th { background: #bfbfbf; }
+    .fdoc .pd-main td.c-topic, .fdoc .pd-main td.c-owner, .fdoc .pd-main td.c-due { text-align: center; vertical-align: middle; }
+    .fdoc .pd-main td.c-num { text-align: center; vertical-align: middle; }
+    .fdoc.t-supervision .pd-main td.c-num { background: #ccc; }
+    .fdoc.t-tour .pd-main td.c-num { vertical-align: top; padding-top: 8px; }
+    .fdoc.t-tour .pd-main td.c-details { padding: 8px 10px; }
+    .fdoc .pd-main td.c-instructions { font-size: .88em; }
+    .fdoc .pd-main tr.pd-sec td { background: #d9d9d9; color: #1f4e79; font-size: 1.55em; text-align: center; padding: 1px 6px 3px; }
+    .fdoc .red { color: #ff0000; }
+    .fdoc .pd-title { font-weight: bold; margin: 14px 0 6px; break-after: avoid; }
+    .fdoc .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
+    .fdoc p { margin: 0 0 6px; white-space: pre-wrap; } .fdoc ol { margin: 0; padding-inline-start: 22px; } .fdoc li { margin-bottom: 3px; }`;
+  document.head.insertAdjacentHTML('beforeend', '<style>' + PROTO_DOC_CSS + '</style>');
+
   // HTML for the card and for the PDF print view.
-  const cellHtml = (cell) => cell.map((l) => (l.b ? `<b>${esc(l.t)}</b>` : esc(l.t))).join('<br>');
+  const cellHtml = (cell) => cell.map((l) => {
+    let h = esc(l.t);
+    if (l.u) h = `<u>${h}</u>`;
+    if (l.b) h = `<b>${h}</b>`;
+    return l.r ? `<span class="red">${h}</span>` : h;
+  }).join('<br>');
   function protoDocHtml(doc) {
-    return doc.blocks.map((bl) => {
-      if (bl.kind === 'kv') return `${bl.title ? `<div class="pd-title">${esc(bl.title)}</div>` : ''}<table class="pd-table pd-kv">${bl.rows.map((r) => `<tr><th>${esc(r[0])}</th><td>${cellHtml(r[1])}</td></tr>`).join('')}</table>`;
-      if (bl.kind === 'table') return `${bl.title ? `<div class="pd-title">${esc(bl.title)}</div>` : ''}<table class="pd-table"><colgroup>${bl.cols.map((c) => `<col style="width:${(c[1] / 83).toFixed(1)}%">`).join('')}</colgroup><thead><tr>${bl.cols.map((c) => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${bl.rows.map((r) => `<tr>${r.map((c) => `<td>${cellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const head = doc.tpl === 'tour' || doc.tpl === 'legacy' ? `<h1 class="pd-h1">${esc(doc.heading)}</h1>` : '';
+    return `<div class="fdoc t-${doc.tpl}">${head}${doc.blocks.map((bl) => {
+      const title = bl.title && bl.kind !== 'table' ? `<div class="pd-title">${esc(bl.title)}</div>` : '';
+      if (bl.kind === 'kv') return `${title}<table class="${bl.head ? 'pd-head' : 'pd-kv'}">${bl.rows.map((r) => `<tr${r[2] ? ` class="r-${r[2]}"` : ''}><th>${esc(r[0])}</th><td>${cellHtml(r[1])}</td></tr>`).join('')}</table>`;
+      if (bl.kind === 'table') {
+        const sum = bl.cols.reduce((a, c) => a + c[1], 0); const span = bl.cols.length;
+        return `<table class="pd-main"><colgroup>${bl.cols.map((c) => `<col style="width:${(c[1] * 100 / sum).toFixed(1)}%">`).join('')}</colgroup>
+          <thead>${bl.title ? `<tr class="pd-cap"><th colspan="${span}">${esc(bl.title)}</th></tr>` : ''}<tr>${bl.cols.map((c) => `<th>${esc(c[0])}</th>`).join('')}</tr></thead>
+          <tbody>${bl.rows.map((r) => (r.section ? `<tr class="pd-sec"><td colspan="${span}">${esc(r.section)}</td></tr>`
+            : `<tr>${r.map((c, i) => `<td class="c-${bl.cols[i][2]}">${cellHtml(c)}</td>`).join('')}</tr>`)).join('')}</tbody></table>`;
+      }
       if (bl.kind === 'note') return `<p class="pd-note">${esc(bl.text)}</p>`;
-      return `<div class="pd-title">${esc(bl.title)}</div>${bl.list ? `<ol>${bl.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : bl.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`;
-    }).join('');
+      return `${title}${bl.list ? `<ol>${bl.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : bl.paras.map((x) => `<p>${esc(x)}</p>`).join('')}`;
+    }).join('')}</div>`;
   }
 
   // Plain text, for email and the calendar.
@@ -1770,6 +1833,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       else if (bl.kind === 'table') {
         t += '\n' + (bl.title ? bl.title + '\n' : '');
         bl.rows.forEach((r) => {
+          if (r.section) { t += '\n' + r.section + '\n'; return; }
           const parts = r.map((c, i) => [bl.cols[i][0], flat(c)]).filter((x) => x[1] && x[0] !== '' && x[0] !== 'מס"ד');
           const num = bl.cols[0][0] === '' || bl.cols[0][0] === 'מס"ד' ? flat(r[0]) + ' ' : '';
           t += num + parts.map((x, i) => (i ? x[0] + ': ' : '') + x[1]).join('\n   ') + '\n';
@@ -2121,7 +2185,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="spacer"></span><button type="button" class="btn sm" data-prev>העתקת נושאים מהפרוטוקול הקודם</button></div>
         <div id="protoItems"></div>
         <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
-        <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא בלי תוכן לא יופיע במסמך. מלאו "באחריות" כדי ליצור ממנו משימה.'}</span></div>
+        <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא מהרשימה הקבועה בלי תוכן לא יופיע במסמך. נושא חדש בלי תוכן יופיע כשורת כותרת אפורה לרוחב הטבלה (למשל שם רחוב או מבנה). מלאו "באחריות" כדי ליצור משימה.'}</span></div>
       <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>
       </div>`,
     (data) => {
@@ -2243,29 +2307,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function protoPrintHtml(pr, preview) {
     const doc = protoDoc(pr);
     const bg = new URL('docs/letterhead.jpg', location.href).href;
-    const body = `<h1>${esc(doc.heading)}</h1>${protoDocHtml(doc)}`;
+    const body = protoDocHtml(doc);
     const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(protoFileName(pr, 'pdf').replace(/\.pdf$/, ''))}</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
         @page { size: A4; margin: 0; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
-        body { font-family: Arial, "Assistant", sans-serif; color: #111; font-size: 10.5pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .bg { position: fixed; inset: 0; width: 210mm; height: 297mm; z-index: -1; }
         .bg img { width: 100%; height: 100%; display: block; }
         table.page { width: 210mm; border-collapse: collapse; }
-        thead td.pad { height: 67.5mm; } tfoot td.pad { height: 22.5mm; }
-        td.content { padding: 0 31.7mm; vertical-align: top; }
-        h1 { font-size: 16pt; margin: 0 0 10px; text-align: center; }
-        .pd-title { font-weight: bold; font-size: 11.5pt; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid #52bd76; break-after: avoid; }
-        .pd-table { width: 100%; border-collapse: collapse; margin: 0 0 10px; table-layout: fixed; }
-        .pd-table th, .pd-table td { border: 1px solid #9aa3ad; padding: 4px 6px; vertical-align: top; text-align: right; word-wrap: break-word; }
-        .pd-table thead th { background: #e4f4ea; }
-        .pd-table thead { display: table-header-group; }
-        .pd-table tr { break-inside: avoid; }
-        .pd-kv th { width: 24%; background: #f1f5f3; }
-        .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
-        p { margin: 0 0 6px; white-space: pre-wrap; } ol { margin: 0; padding-inline-start: 22px; } li { margin-bottom: 3px; }
+        thead td.pad { height: 61mm; } tfoot td.pad { height: 27mm; }
+        td.content { padding: 0 11mm; vertical-align: top; }
+        ${PROTO_DOC_CSS}
         .bar { position: fixed; top: 0; left: 0; right: 0; background: #15253d; color: #fff; padding: 10px 16px; display: flex; gap: 10px; align-items: center; font-family: Arial, sans-serif; z-index: 10; }
         .bar button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; background: #52bd76; color: #fff; font-weight: bold; cursor: pointer; }
         @media screen { body { background: #888; padding-top: 52px; } table.page { margin: 16px auto; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.3); position: relative; } .bg { position: absolute; } .sheet { position: relative; width: 210mm; margin: 0 auto; } }
@@ -2298,7 +2353,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const sz = o.size ? `<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>` : '';
     const b = o.bold ? '<w:b/><w:bCs/>' : '';
     const color = o.color ? `<w:color w:val="${o.color}"/>` : '';
-    return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b}${color}${sz}<w:rtl/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+    const u = o.u ? '<w:u w:val="single"/>' : '';
+    return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b}${color}${u}${sz}<w:rtl/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
   }
   function wPara(runs, o) {
     o = o || {};
@@ -2307,32 +2363,59 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const jc = o.center ? '<w:jc w:val="center"/>' : '';
     return `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${bdr}<w:bidi/><w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 100 : o.after}"/>${ind}${jc}</w:pPr>${runs}</w:p>`;
   }
-  // A bordered right-to-left table. rows: [[cell, ...]], cell: [{ t, b }]; opts.header: first row repeats and is shaded.
-  function wTable(widths, rows, opts) {
-    const o = opts || {};
-    const bd = (s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="9AA3AD"/>`;
-    const grid = widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('');
-    const tr = rows.map((r, ri) => {
-      const head = o.header && ri === 0;
-      return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}</w:trPr>${r.map((cell, ci) => {
-        const fill = head ? 'E4F4EA' : (o.shadeFirstCol && ci === 0 ? 'F1F5F3' : '');
-        const paras = (cell.length ? cell : [{ t: '' }]).map((l) => wPara(wRun(l.t, { bold: l.b || head || (o.shadeFirstCol && ci === 0), size: 20 }), { after: 20 })).join('');
-        return `<w:tc><w:tcPr><w:tcW w:w="${widths[ci]}" w:type="dxa"/>${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''}</w:tcPr>${paras}</w:tc>`;
-      }).join('')}</w:tr>`;
-    }).join('');
-    return `<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(bd).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${tr}</w:tbl>` + wPara('', { after: 80 });
+  // Tables in the look of the documents sent so far: black borders, coloured header row, grey section rows.
+  // A cell is a list of lines [{ t, b, u, r }]; o: fill, color, bold, size, center, vcenter, span.
+  function wCell(w, lines, o) {
+    o = o || {};
+    const paras = (lines && lines.length ? lines : [{ t: '' }]).map((l) => wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
+    return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${o.span ? `<w:gridSpan w:val="${o.span}"/>` : ''}${o.blank ? '<w:tcBorders><w:top w:val="nil"/><w:start w:val="nil"/><w:bottom w:val="nil"/><w:end w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/></w:tcBorders>' : ''}${o.fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.fill}"/>` : ''}${o.vcenter ? '<w:vAlign w:val="center"/>' : ''}</w:tcPr>${paras}</w:tc>`;
   }
+  const wRow = (cells) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells}</w:tr>`;
+  // The template's margins hold the letterhead in place, so wide tables reach past them (W_IND) instead.
+  function wTbl(widths, rows, center) {
+    const bd = (s) => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`;
+    const grid = widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('');
+    return `<w:tbl><w:tblPr><w:bidiVisual/>${center ? '<w:jc w:val="center"/>' : ''}<w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/>${center ? '' : `<w:tblInd w:w="${W_IND}" w:type="dxa"/>`}<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(bd).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${rows.join('')}</w:tbl>` + wPara('', { after: 120 });
+  }
+  const W_FULL = 10546; // A4 width less 12 mm on each side, in twips
+  const W_IND = -1120; // from the template's 1800 twips margin to 680
   async function buildProtocolDocx(pr) {
       const [JSZip, tpl] = await Promise.all([loadJSZip(), fetch('docs/blank-template.docx').then((r) => { if (!r.ok) throw new Error('template'); return r.arrayBuffer(); })]);
       const zip = await JSZip.loadAsync(tpl);
       const docXml = await zip.file('word/document.xml').async('string');
       const doc = protoDoc(pr);
-      let body = wPara(wRun(doc.heading, { bold: true, size: 32 }), { after: 160, center: true });
+      const tour = doc.tpl === 'tour';
+      const head = { meeting: ['6666EF', 'FFFFFF'], supervision: ['3C78D8', 'FFFFFF'] }[doc.tpl] || ['D9D9D9', ''];
+      let body = '';
+      if (tour || doc.tpl === 'legacy') body += wPara(wRun(doc.heading, { size: 32, bold: !tour, u: tour, color: tour ? '4472C4' : '' }), { after: 240, center: true });
       doc.blocks.forEach((bl) => {
-        if (bl.title) body += wPara(wRun(bl.title, { bold: true, size: 24 }), { before: 160, after: 80, border: true, keepNext: true });
-        if (bl.kind === 'kv') body += wTable([2000, 6300], bl.rows.map((r) => [[{ t: r[0], b: true }], r[1]]), { shadeFirstCol: true });
-        else if (bl.kind === 'table') body += wTable(bl.cols.map((c) => c[1]), [bl.cols.map((c) => [{ t: c[0], b: true }])].concat(bl.rows), { header: true });
-        else if (bl.kind === 'note') body += wPara(wRun(bl.text, { bold: true }), { before: 200, center: true });
+        if (bl.title && bl.kind !== 'table') body += wPara(wRun(bl.title, { bold: true, size: 22 }), { before: 160, after: 80, keepNext: true });
+        if (bl.kind === 'kv') {
+          // The header table sits at the right, about two thirds wide: a borderless cell fills the rest
+          // (Word and LibreOffice place a narrower right-to-left table differently).
+          const widths = !bl.head ? [2400, W_FULL - 2400] : tour ? [2000, 7100] : [1820, 4930, W_FULL - 6750];
+          body += wTbl(widths, bl.rows.map((r) => {
+            const fill = r[2] === 'subj' ? 'BDD7EE' : r[2] === 'date' ? 'E7E6E6' : '';
+            return wRow(wCell(widths[0], [{ t: r[0] + (doc.tpl === 'meeting' ? ' :' : '') }], { fill: fill || (tour ? 'D9D9D9' : 'E7E6E6') })
+              + wCell(widths[1], r[1], { fill, center: bl.head && !tour, size: r[2] === 'subj' ? 23 : 0 })
+              + (widths[2] ? wCell(widths[2], [], { blank: true }) : ''));
+          }), tour);
+        } else if (bl.kind === 'table') {
+          const sum = bl.cols.reduce((a, c) => a + c[1], 0);
+          const widths = bl.cols.map((c) => Math.round(c[1] * W_FULL / sum));
+          const rows = [];
+          if (bl.title) rows.push(wRow(wCell(W_FULL, [{ t: bl.title }], { fill: 'BFBFBF', center: true, span: widths.length })));
+          rows.push(wRow(bl.cols.map((c, i) => wCell(widths[i], [{ t: c[0] }], { fill: head[0], color: head[1], bold: !!head[1], center: true, vcenter: true })).join('')));
+          bl.rows.forEach((r) => {
+            if (r.section) { rows.push(wRow(wCell(W_FULL, [{ t: r.section }], { fill: 'D9D9D9', color: '1F4E79', size: 32, center: true, span: widths.length }))); return; }
+            rows.push(wRow(r.map((c, i) => {
+              const k = bl.cols[i][2];
+              const mid = !tour && (k === 'num' || k === 'topic' || k === 'owner' || k === 'due');
+              return wCell(widths[i], c, { fill: k === 'num' && doc.tpl === 'supervision' ? 'CCCCCC' : '', center: mid, vcenter: mid });
+            }).join('')));
+          });
+          body += wTbl(widths, rows);
+        } else if (bl.kind === 'note') body += wPara(wRun(bl.text, { bold: true }), { before: 200, center: true });
         else if (bl.list) bl.list.forEach((x, i) => { body += wPara(wRun((i + 1) + '.\t' + x), { indent: true, after: 60 }); });
         else bl.paras.forEach((x) => { body += wPara(wRun(x)); });
       });
