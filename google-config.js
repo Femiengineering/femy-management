@@ -3,7 +3,7 @@
 // אחרי יצירת OAuth Client ID (ראו docs/GOOGLE-SETUP.md), מדביקים אותו כאן.
 // הערך הזה אינו סודי: Google מאשרת רק בקשות שמגיעות מכתובות האתר שהוגדרו לו.
 window.FEMY_GOOGLE = {
-  clientId: '', // לדוגמה: '123456789-abc.apps.googleusercontent.com'
+  clientId: '380692332592-oq3d6q4vkbrnftmm03v4si5co6rptjqe.apps.googleusercontent.com', // לדוגמה: '123456789-abc.apps.googleusercontent.com'
   // חיבור קבוע (בלי התנתקות כל שעה): כתובת שרת החיבור מהתיקייה worker/, ראו docs/GOOGLE-SETUP.md שלב 7.
   // כל עוד ריק, החיבור מתחדש בלחיצה כל שעה בערך.
   tokenServer: '', // לדוגמה: 'https://femy-google.<שם-החשבון>.workers.dev'
