@@ -366,6 +366,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pi-fields.pi-tour { grid-template-columns: 1fr; }
 .pi-f { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
 .pi-f textarea { min-height: 54px; resize: vertical; }
+.pi-row.asking { border-color: #93c5fd; }
+.pi-ask, .pi-askbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; color: #1e3a8a; }
+.pi-askbar { margin: 8px 0 0; }
+.pi-ask-q { font-weight: 700; white-space: nowrap; }
+.pi-ask-txt { flex: 1 1 200px; min-width: 0; color: #334155; }
+.pi-ask-btns { display: flex; gap: 6px; margin-inline-start: auto; }
 @media (max-width: 700px) { .pv-form { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .pi-fields.pi-meeting, .pi-fields.pi-supervision { grid-template-columns: 1fr 1fr; } .pi-fields .pi-details, .pi-fields .pi-instructions { grid-column: 1 / -1; } }
 .proto.open .chev { transform: rotate(-90deg); }
@@ -2084,15 +2090,17 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const protoTpl = (pr) => PROTO_TPL[pr && pr.template] || null;
   const protoLines = (s) => (s || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const protoProjName = (pr) => { const p = byId(db.projects, pr.projectId); return p ? p.name : ''; };
+  // Supervision reports and meeting summaries are numbered per project ("דוח פיקוח 09", "סיכום פגישה 05").
+  const protoNo = (pr) => (pr && (pr.template === 'supervision' || pr.template === 'meeting') && pr.reportNo ? String(pr.reportNo) : '');
   const protoHeading = (pr) => {
     const t = protoTpl(pr);
     if (!t) return 'פרוטוקול: ' + (pr.title || '');
     if (pr.template === 'supervision') return t.label + (pr.reportNo ? ' - ' + pr.reportNo : '');
-    return t.label + (pr.title ? ' - ' + pr.title : '');
+    return t.label + (protoNo(pr) ? ' ' + protoNo(pr) : '') + (pr.title ? ' - ' + pr.title : '');
   };
   const protoFileName = (pr, ext) => {
     const t = protoTpl(pr);
-    const parts = t ? [protoProjName(pr), t.short + (pr.template === 'supervision' && pr.reportNo ? ' ' + pr.reportNo : ''), pr.template === 'supervision' ? '' : pr.title]
+    const parts = t ? [protoProjName(pr), t.short + (protoNo(pr) ? ' ' + protoNo(pr) : ''), pr.template === 'supervision' ? '' : pr.title]
       : ['פרוטוקול', pr.title];
     return (parts.filter(Boolean).join(' - ') + ' - ' + fmtDate(pr.date).replace(/\//g, '.')).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() + '.' + ext;
   };
@@ -2114,7 +2122,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (protoLines(pr.actions).length) blocks.push({ kind: 'section', title: 'משימות להמשך', list: protoLines(pr.actions) });
       return { tpl: 'legacy', heading: protoHeading(pr), blocks };
     }
-    const subject = [proj && proj.name, pr.template === 'supervision' ? 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '') : pr.title].filter(Boolean).join('\n');
+    const subject = [proj && proj.name, pr.template === 'supervision' ? 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '')
+      : pr.template === 'meeting' && protoNo(pr) ? (pr.title ? pr.title + ' - ' : '') + 'סיכום מס\' ' + protoNo(pr) : pr.title].filter(Boolean).join('\n');
     const date = fmtDate(pr.date).replace(/\/\d{2}(\d{2})$/, '/$1'); // 15/11/26, as on the documents sent so far
     let meta;
     if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', date], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
@@ -2250,7 +2259,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const t = protoTpl(pr);
     const d = new Date((pr.date || todayStr()) + 'T00:00:00');
     const canTasks = t ? protoTaskRows(pr).length : protoLines(pr.actions).length;
-    const sub = [t ? t.label + (pr.template === 'supervision' && pr.reportNo ? ' ' + pr.reportNo : '') : pr.type, p && !o.hideProject ? p.name : '', (pr.participants || '').split('\n')[0]].filter(Boolean);
+    const sub = [t ? t.label + (protoNo(pr) ? ' ' + protoNo(pr) : '') : pr.type, p && !o.hideProject ? p.name : '', (pr.participants || '').split('\n')[0]].filter(Boolean);
     return `<div class="card proto ${ui.openProto === pr.id ? 'open' : ''}" data-id="${pr.id}">
       <div class="proto-head">
         <div class="proto-date">${d.getDate()}<small>${d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' })}</small></div>
@@ -2535,14 +2544,60 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // ---------- Protocol form ----------
   const protoPrev = (tpl, projectId, exceptId) => db.protocols.filter((x) => x.template === tpl && x.projectId === projectId && x.id !== exceptId && projectId)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
-  const nextReportNo = (projectId) => String(db.protocols.filter((x) => x.template === 'supervision' && x.projectId === projectId && projectId).length + 1).padStart(2, '0');
+  // The next number of a supervision report / meeting summary in a project: after the highest number among the
+  // reports written here and the documents in the project's Drive folder ("דוח פיקוח 09", "סיכום פגישה מס' 4"),
+  // plus the unnumbered ones dated after it. With no numbers at all, after the count of earlier documents.
+  const PROTO_NO_RE = {
+    supervision: /(?:דוח|ד"ח|דו"ח)[^\d]{0,20}?(\d{1,3})(?![\d./-])/,
+    meeting: /(?:סיכום|פרוטוקול|פגישה)[^\d]{0,25}?(?:מס['׳"]?\.?|מספר|#)\s*(\d{1,3})(?![\d./-])/,
+  };
+  function nextReportNo(projectId, tpl, exceptId) {
+    tpl = tpl || 'supervision';
+    if (!projectId || !PROTO_NO_RE[tpl]) return '';
+    const kind = tpl === 'supervision' ? 'report' : 'meeting';
+    const docs = db.protocols.filter((x) => x.projectId === projectId && x.id !== exceptId && x.template !== 'tour' && protoKind(x) === kind)
+      .map((x) => ({ date: x.date || '', n: parseInt(x.reportNo, 10) || 0 }))
+      .concat(dprot.items.filter((it) => it.kind === kind && (dpProject(it) || {}).id === projectId)
+        .map((it) => { const m = (it.title || '').match(PROTO_NO_RE[tpl]); return { date: it.date || '', n: m ? parseInt(m[1], 10) : 0 }; }));
+    const numbered = docs.filter((d) => d.n > 0);
+    let n = docs.length;
+    if (numbered.length) {
+      const top = numbered.reduce((a, b) => (b.n > a.n ? b : a));
+      n = top.n + docs.filter((d) => !d.n && d.date > top.date).length;
+    }
+    return String(n + 1).padStart(2, '0');
+  }
+  const protoHasContent = (tpl, it) => PROTO_TPL[tpl].cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
+  // "Copy from the previous report?": the topics of the previous report / summary of the same project are listed,
+  // and each one asks whether to copy its content or skip it. Topics not answered are left out of the document.
+  let protoAsk = null; // { prev, tpl, map: topic#n -> previous item, done: Set }
+  const protoTopicKeys = (items) => { const seen = {}; return items.map((it) => { const t = (it.topic || '').trim(); seen[t] = (seen[t] || 0) + 1; return t + '#' + seen[t]; }); };
+  function protoAskSetup(tpl, prev, items) {
+    protoAsk = null;
+    if (!prev || tpl === 'tour' || !PROTO_TPL[tpl]) return items;
+    const pitems = (prev.items || []).filter((i) => (i.topic || '').trim() || protoHasContent(tpl, i));
+    const map = new Map();
+    protoTopicKeys(pitems).forEach((k, n) => { if (protoHasContent(tpl, pitems[n])) map.set(k, pitems[n]); });
+    protoAsk = { prev, tpl, map, done: new Set() };
+    const cur = items.map((i) => Object.assign({}, i));
+    const fromPrev = pitems.map((i) => (protoHasContent(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
+    const want = protoTopicKeys(fromPrev);
+    if (!cur.some((i) => protoHasContent(tpl, i))) {
+      // Nothing typed yet: the previous report's topics in its order, then the standard topics it did not have.
+      const have = new Set(want.map((k) => k.replace(/#\d+$/, '')));
+      return fromPrev.concat(cur.filter((i) => !have.has((i.topic || '').trim())));
+    }
+    const have = new Set(protoTopicKeys(cur));
+    return cur.concat(fromPrev.filter((i, n) => !have.has(want[n])));
+  }
   const defaultItems = (tpl) => (PROTO_TPL[tpl].rows ? PROTO_TPL[tpl].rows.map((r) => ({ topic: r[0], details: r[1] })) : PROTO_TPL[tpl].topics.map((topic) => ({ topic })));
   // A follow-up meeting / the next supervision visit: same project, participants and topics; the date is today.
   function protoFollowUp(pr) {
     const keep = ['template', 'projectId', 'title', 'location', 'participants', 'copies', 'status'];
     const n = {}; keep.forEach((k) => { if (pr[k]) n[k] = pr[k]; });
-    n.items = (pr.items || []).map((i) => Object.assign({}, i));
-    if (pr.template === 'supervision') { n.reportNo = nextReportNo(pr.projectId); n.doneWork = pr.nextWork || ''; delete n.title; }
+    // The topics and the texts are offered one by one ("copy from the previous report?"), from this protocol.
+    n.prevId = pr.id;
+    if (pr.template === 'supervision') delete n.title;
     return n;
   }
   // Form fields -> a protocol object (the items without content left out), for saving and for the preview.
@@ -2554,14 +2609,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       return filled || (i.topic && !defaults.includes(i.topic));
     });
     data.type = t.label;
-    if (data.template !== 'supervision') data.reportNo = '';
+    data.items = data.items.filter((i) => !i._fromPrev || protoHasContent(data.template, i)).map((i) => { const c = Object.assign({}, i); delete c._fromPrev; return c; });
+    if (data.template === 'tour') data.reportNo = '';
     return data;
   }
   function openProtocolForm(proto, defaults) {
     if (proto && !protoTpl(proto)) { openLegacyProtocolForm(proto); return; }
     const p = proto ? Object.assign({}, proto) : Object.assign({ date: todayStr(), template: 'meeting', title: '', projectId: ui.protoProject && ui.protoProject !== '_none' ? ui.protoProject : '', location: '', participants: '', copies: '', status: '', reportNo: '' }, defaults || {});
+    const prevFor = (tpl, pid) => (proto ? null : (p.prevId && byId(db.protocols, p.prevId) && byId(db.protocols, p.prevId).template === tpl && byId(db.protocols, p.prevId).projectId === pid
+      ? byId(db.protocols, p.prevId) : protoPrev(tpl, pid)));
+    let prev = prevFor(p.template, p.projectId);
+    delete p.prevId;
+    protoAsk = null;
     if (!proto && !p.items) p.items = defaultItems(p.template);
-    if (!proto && p.template === 'supervision' && !p.reportNo) p.reportNo = nextReportNo(p.projectId);
+    if (!proto) p.items = protoAskSetup(p.template, prev, p.items);
+    if (!proto && prev) ['participants', 'location', 'status'].forEach((k) => { if (!p[k] && prev[k]) p[k] = prev[k]; });
+    if (!proto && prev && prev.copies && !p.copies) p.copies = prev.copies;
+    let autoNo = '';
+    if (!proto && !p.reportNo) p.reportNo = autoNo = nextReportNo(p.projectId, p.template);
     if (!proto && p.template === 'tour' && !p.participants) p.participants = TOUR_PARTICIPANTS;
     if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     const vis = (tpls) => `data-tpls="${tpls}" style="${tpls.split(' ').includes(p.template) ? '' : 'display:none'}"`;
@@ -2571,17 +2636,18 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field"><label>תבנית</label><select class="input" name="template">${PROTO_TPL_KEYS.map((k) => `<option value="${k}" ${k === p.template ? 'selected' : ''}>${esc(PROTO_TPL[k].label)}</option>`).join('')}</select></div>
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
-      <div class="field" ${vis('supervision')}><label>מספר דוח</label><input class="input" name="reportNo" value="${esc(p.reportNo)}" placeholder="01"></div>
+      <div class="field" ${vis('supervision meeting')}><label data-lbl-no>${p.template === 'meeting' ? 'מספר סיכום' : 'מספר דוח'}</label><input class="input" name="reportNo" value="${esc(p.reportNo)}" placeholder="01"><span class="hint" data-no-hint>${autoNo ? 'נקבע אוטומטית לפי המסמכים הקודמים בפרויקט' : ''}</span></div>
       <div class="field" ${vis('meeting tour')}><label data-lbl-title>${p.template === 'tour' ? 'תיאור העבודה (בכותרת)' : 'הנדון'}</label><input class="input" name="title" value="${esc(p.title)}" placeholder="${p.template === 'tour' ? 'למשל: בניית מרפאה / פירוקים והריסות' : 'למשל: סיכום פגישת תיאום תכנון'}"></div>
       <div class="field" ${vis('supervision')}><label>סטטוס פרויקט</label><input class="input" name="status" value="${esc(p.status)}" placeholder="ביצוע" list="protoStatusList"><datalist id="protoStatusList"><option>תכנון</option><option>מכרז</option><option>ביצוע</option><option>מסירה</option></datalist></div>
       <div class="field"><label>מיקום</label><input class="input" name="location" value="${esc(p.location)}" placeholder="משרד / זום / שטח הפרויקט"></div>
       <div class="field full"><label>משתתפים</label><textarea class="input" name="participants" rows="3" style="min-height:60px" placeholder="גורם: שם, שורה לכל גורם. למשל: ניהול פרויקט: מוטי דיקמן">${esc(p.participants)}</textarea></div>
       <div class="field full"><label>העתקים</label><input class="input" name="copies" value="${esc(p.copies)}"></div>
-      <div class="field full" ${vis('supervision')}><label>סטטוס כללי: עבודות שבוצעו</label><textarea class="input" name="doneWork" style="min-height:56px">${esc(p.doneWork)}</textarea></div>
-      <div class="field" ${vis('supervision')}><label>הספקים לשבוע הקרוב</label><textarea class="input" name="nextWork" style="min-height:56px">${esc(p.nextWork)}</textarea></div>
-      <div class="field" ${vis('supervision')}><label>עבודות בהספק האחרון שלא בוצעו</label><textarea class="input" name="notDone" style="min-height:56px">${esc(p.notDone)}</textarea></div>
+      <div class="field full" ${vis('supervision')}><label>סטטוס כללי: עבודות שבוצעו</label><textarea class="input" name="doneWork" style="min-height:56px">${esc(p.doneWork)}</textarea><div data-fask="doneWork"></div></div>
+      <div class="field" ${vis('supervision')}><label>הספקים לשבוע הקרוב</label><textarea class="input" name="nextWork" style="min-height:56px">${esc(p.nextWork)}</textarea><div data-fask="nextWork"></div></div>
+      <div class="field" ${vis('supervision')}><label>עבודות בהספק האחרון שלא בוצעו</label><textarea class="input" name="notDone" style="min-height:56px">${esc(p.notDone)}</textarea><div data-fask="notDone"></div></div>
       <div class="field full"><div class="pi-head"><label data-lbl-items>${p.template === 'tour' ? 'סיכום החלטות, הבהרות והנחיות' : 'נושאים'}</label>
         <span class="spacer"></span><button type="button" class="btn sm" data-prev>העתקת נושאים מהפרוטוקול הקודם</button></div>
+        <div id="protoAskBar"></div>
         <div id="protoItems"></div>
         <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
         <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא מהרשימה הקבועה בלי תוכן לא יופיע במסמך. נושא חדש בלי תוכן יופיע כשורת כותרת אפורה לרוחב הטבלה (למשל שם רחוב או מבנה). מלאו "באחריות" כדי ליצור משימה.'}</span></div>
@@ -2598,7 +2664,29 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const tplSel = $('[name="template"]', body);
     const projSel = $('[name="projectId"]', body);
     let curTpl = p.template;
+    // The number follows the project and the template, unless it was typed by hand.
+    const renumber = () => {
+      if (proto) return;
+      const rn = $('[name="reportNo"]', body);
+      if (rn.value && rn.value !== autoNo) return;
+      rn.value = autoNo = nextReportNo(projSel.value, tplSel.value);
+      $('[data-no-hint]', body).textContent = autoNo ? 'נקבע אוטומטית לפי המסמכים הקודמים בפרויקט' : '';
+    };
+    // The general status of a supervision report asks the same "copy from the previous report?".
+    const fieldDone = new Set();
+    const drawFieldAsks = () => {
+      $$('[data-fask]', body).forEach((box) => {
+        const k = box.dataset.fask; const f = $(`[name="${k}"]`, body);
+        const v = prev && prev.template === 'supervision' && !fieldDone.has(k) && !f.value.trim() ? (prev[k] || '').trim() : '';
+        box.innerHTML = v ? protoAskHtml(v, 'supervision') : '';
+        if (!v) return;
+        $('[data-copy]', box).addEventListener('click', () => { f.value = prev[k]; fieldDone.add(k); drawFieldAsks(); schedulePreview(); });
+        $('[data-skip]', box).addEventListener('click', () => { fieldDone.add(k); drawFieldAsks(); });
+      });
+    };
     drawProtoItems(curTpl, p.items || []);
+    drawFieldAsks();
+    ['doneWork', 'nextWork', 'notDone'].forEach((k) => $(`[name="${k}"]`, body).addEventListener('input', () => { if (!fieldDone.has(k)) { fieldDone.add(k); drawFieldAsks(); } }));
     // Live preview, always open: on the left beside the form (on top of it on narrow screens).
     const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
     let pvTimer = null;
@@ -2621,18 +2709,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     body.addEventListener('change', schedulePreview);
     body.addEventListener('click', (e) => { if (e.target.closest('button') && !e.target.closest('[data-preview]')) schedulePreview(); });
     tplSel.addEventListener('change', () => {
-      const old = readProtoItems();
+      const old = readProtoItems().filter((i) => !i._fromPrev);
       const newTpl = tplSel.value;
       const oldDefaults = defaultItems(curTpl);
-      const untouched = old.every((i, n) => oldDefaults[n] && i.topic === oldDefaults[n].topic && (i.details || '') === (oldDefaults[n].details || '') && !i.instructions && !i.owner && !i.due) && old.length === oldDefaults.length;
+      const untouched = (old.every((i, n) => oldDefaults[n] && i.topic === oldDefaults[n].topic && (i.details || '') === (oldDefaults[n].details || '') && !i.instructions && !i.owner && !i.due) && old.length === oldDefaults.length)
+        || (curTpl !== 'tour' && !old.some((i) => protoHasContent(curTpl, i)));
       curTpl = newTpl;
       drawProtoItems(newTpl, untouched || !old.length ? defaultItems(newTpl) : old);
       $$('[data-tpls]', body).forEach((f) => { f.style.display = f.dataset.tpls.split(' ').includes(newTpl) ? '' : 'none'; });
       $('[data-lbl-title]', body).textContent = newTpl === 'tour' ? 'תיאור העבודה (בכותרת)' : 'הנדון';
       $('[data-lbl-items]', body).textContent = newTpl === 'tour' ? 'סיכום החלטות, הבהרות והנחיות' : 'נושאים';
       $('#modalTitle').textContent = (proto ? 'עריכת ' : 'פרוטוקול חדש: ') + PROTO_TPL[newTpl].label;
-      const rn = $('[name="reportNo"]', body);
-      if (newTpl === 'supervision' && !rn.value) rn.value = nextReportNo(projSel.value);
+      $('[data-lbl-no]', body).textContent = newTpl === 'meeting' ? 'מספר סיכום' : 'מספר דוח';
+      renumber();
+      if (!proto) { prev = prevFor(newTpl, projSel.value); drawProtoItems(newTpl, protoAskSetup(newTpl, prev, readProtoItems().filter((i) => !i._fromPrev))); drawFieldAsks(); }
       const part = $('[name="participants"]', body);
       if (newTpl === 'tour' && !part.value.trim()) part.value = TOUR_PARTICIPANTS;
       else if (newTpl !== 'tour' && part.value.trim() === TOUR_PARTICIPANTS.trim()) part.value = '';
@@ -2640,23 +2730,70 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!proto && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט', ''].includes(cp.value.trim())) cp.value = newTpl === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     });
     projSel.addEventListener('change', () => {
-      if (!proto && tplSel.value === 'supervision') $('[name="reportNo"]', body).value = nextReportNo(projSel.value);
+      renumber();
+      if (proto) return;
+      prev = prevFor(curTpl, projSel.value);
+      drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
+      if (prev) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
+      drawFieldAsks();
     });
     $('[data-additem]', body).addEventListener('click', () => { const cur = readProtoItems(); cur.push({}); drawProtoItems(curTpl, cur); const last = $$('.pi-row', body).pop(); if (last) $('[data-k="topic"]', last).focus(); });
     $('[data-prev]', body).addEventListener('click', () => {
+      if (protoAsk && protoAskPending().length) { protoAskAll(true); return; }
       const prev = protoPrev(curTpl, projSel.value, proto && proto.id);
       if (!prev) { toast(projSel.value ? 'אין פרוטוקול קודם מאותו סוג בפרויקט הזה' : 'בחרו קודם פרויקט'); return; }
       if (!confirm('להחליף את הנושאים בנושאים מהפרוטוקול מ-' + fmtDate(prev.date) + '?')) return;
+      protoAsk = null;
       drawProtoItems(curTpl, (prev.items || []).map((i) => Object.assign({}, i)));
       ['participants', 'location', 'copies', 'status'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && !f.value.trim() && prev[k]) f.value = prev[k]; });
       toast('הנושאים הועתקו מהפרוטוקול הקודם');
     });
   }
+  // The "copy from the previous report?" strip: the previous text, copy / skip.
+  const protoAskHtml = (text, tpl) => `<div class="pi-ask"><span class="pi-ask-q">📋 להעתיק ${tpl === 'meeting' ? 'מהסיכום הקודם' : 'מהדוח הקודם'}?</span>
+    <span class="pi-ask-txt" title="${esc(text)}">${esc(text.length > 160 ? text.slice(0, 160) + '…' : text)}</span>
+    <span class="pi-ask-btns"><button type="button" class="btn sm primary" data-copy>העתקה</button><button type="button" class="btn sm" data-skip>דילוג</button></span></div>`;
+  const protoPrevText = (tpl, it) => PROTO_TPL[tpl].cols.filter((c) => c[0] !== 'topic' && (it[c[0]] || '').trim()).map((c) => c[1] + ': ' + it[c[0]].trim().replace(/\s*\n\s*/g, ' / ')).join(' · ');
+  // Rows still waiting for an answer: [index, key, previous item].
+  function protoAskPending() {
+    if (!protoAsk || !$('#protoItems')) return [];
+    const cur = readProtoItems();
+    return protoTopicKeys(cur).map((k, n) => [n, k, protoAsk.map.get(k)])
+      .filter((x) => x[2] && !protoAsk.done.has(x[1]) && !protoHasContent(protoAsk.tpl, cur[x[0]]));
+  }
+  // Answer one row (n) or all the waiting rows: copy the previous content, or skip (a topic that came only from
+  // the previous report is then removed).
+  function protoAskAnswer(rows, copy) {
+    const cur = readProtoItems();
+    const drop = new Set();
+    rows.forEach(([n, k, prevIt]) => {
+      protoAsk.done.add(k);
+      if (copy) { cur[n] = Object.assign({}, prevIt); delete cur[n]._fromPrev; }
+      else if (cur[n]._fromPrev) { if ((PROTO_TPL[protoAsk.tpl].topics || []).includes((cur[n].topic || '').trim())) delete cur[n]._fromPrev; else drop.add(n); }
+    });
+    drawProtoItems(protoAsk.tpl, cur.filter((i, n) => !drop.has(n)));
+  }
+  const protoAskAll = (copy) => protoAskAnswer(protoAskPending(), copy);
   function drawProtoItems(tpl, items) {
     const t = PROTO_TPL[tpl];
     const box = $('#protoItems');
     const fields = t.cols.filter((c) => c[0] !== 'topic');
-    box.innerHTML = items.map((it, n) => `<div class="pi-row">
+    const asking = protoAsk && protoAsk.tpl === tpl ? protoAsk : null;
+    const keys = protoTopicKeys(items);
+    const askOf = (it, n) => { const pi = asking && asking.map.get(keys[n]); return pi && !asking.done.has(keys[n]) && !protoHasContent(tpl, it) ? pi : null; };
+    const bar = $('#protoAskBar');
+    if (bar) {
+      const waiting = items.filter((it, n) => askOf(it, n)).length;
+      bar.innerHTML = waiting ? `<div class="pi-askbar">📋 ${esc(asking.prev.template === 'supervision' ? 'דוח פיקוח' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : '') : 'הסיכום' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : ''))} מ-${esc(fmtDate(asking.prev.date))}:
+        ${waiting} נושאים ממתינים לתשובה. נושא שלא נענה לא ייכנס למסמך.
+        <span class="pi-ask-btns"><button type="button" class="btn sm primary" data-copyall>העתקת הכול</button><button type="button" class="btn sm" data-skipall>דילוג על הכול</button></span></div>` : '';
+      if (waiting) {
+        $('[data-copyall]', bar).addEventListener('click', () => protoAskAll(true));
+        $('[data-skipall]', bar).addEventListener('click', () => protoAskAll(false));
+      }
+    }
+    box.innerHTML = items.map((it, n) => `<div class="pi-row${askOf(it, n) ? ' asking' : ''}">
+      ${askOf(it, n) ? protoAskHtml(protoPrevText(tpl, askOf(it, n)), tpl) : ''}
       <div class="pi-top"><span class="pi-num">${n + 1}</span><input class="input" data-k="topic" value="${esc(it.topic)}" placeholder="נושא">
         <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm" data-del title="מחיקת נושא">✕</button></div>
       <div class="pi-fields pi-${tpl}">${fields.map((c) => (c[0] === 'details' || c[0] === 'instructions'
@@ -2669,6 +2806,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('[data-up]', row).addEventListener('click', () => move(-1));
       $('[data-down]', row).addEventListener('click', () => move(1));
       $('[data-del]', row).addEventListener('click', () => { const cur = readProtoItems(); cur.splice(n, 1); drawProtoItems(tpl, cur); });
+      const ask = askOf(items[n], n);
+      if (ask) {
+        $('.pi-ask [data-copy]', row).addEventListener('click', () => protoAskAnswer([[n, keys[n], ask]], true));
+        $('.pi-ask [data-skip]', row).addEventListener('click', () => protoAskAnswer([[n, keys[n], ask]], false));
+      }
     });
   }
   function readProtoItems() {
