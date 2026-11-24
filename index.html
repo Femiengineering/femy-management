@@ -367,6 +367,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pi-f { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
 .pi-f textarea { min-height: 54px; resize: vertical; }
 .pi-row.asking { border-color: #93c5fd; }
+.pf-mail { border-top: 1px dashed var(--border); padding-top: 10px; }
+.pf-mail-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pf-mail-row .input { flex: 1 1 260px; }
+.pi-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.pi-ph { position: relative; }
+.pi-ph img { width: 84px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: var(--surface-2); }
+.pi-ph button { position: absolute; top: -6px; inset-inline-end: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: #ef4444; color: #fff; font-size: 11px; cursor: pointer; line-height: 20px; padding: 0; }
+.pi-phadd { cursor: pointer; }
 .pi-ask, .pi-askbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; color: #1e3a8a; }
 .pi-askbar { margin: 8px 0 0; }
 .pi-ask-q { font-weight: 700; white-space: nowrap; }
@@ -2177,6 +2185,62 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const protoSearchText = (p) => [p.title, p.participants, p.summary, p.decisions, p.actions, p.location, p.doneWork, p.nextWork, p.notDone,
     protoProjName(p), (protoTpl(p) || {}).label, ...(p.items || []).map((i) => [i.topic, i.details, i.instructions, i.due, i.owner].join(' '))].join(' ').toLowerCase();
 
+  // ---------- Photos in protocol topics ----------
+  // A protocol keeps only the ids of its photos ("ph...-WxH", in the topic's "photos"). The photos themselves are
+  // kept in this browser (IndexedDB) and, in cloud mode, also in the shared database, one document per photo.
+  const photoCache = new Map();
+  let photoDbP = null;
+  const photoDb = () => photoDbP || (photoDbP = new Promise((res, rej) => {
+    const r = indexedDB.open('femy-photos', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('p');
+    r.onsuccess = () => res(r.result); r.onerror = () => { photoDbP = null; rej(r.error); };
+  }));
+  const idbDo = (mode, fn) => photoDb().then((d) => new Promise((res, rej) => {
+    const tx = d.transaction('p', mode); const r = fn(tx.objectStore('p'));
+    tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error);
+  }));
+  async function photoPut(id, data) {
+    photoCache.set(id, data);
+    await idbDo('readwrite', (st) => st.put(data, id)).catch(() => {});
+    if (CLOUD && cloud && cloud.putPhoto) await cloud.putPhoto(id, data);
+  }
+  async function photoGet(id) {
+    if (photoCache.has(id)) return photoCache.get(id);
+    let v = await idbDo('readonly', (st) => st.get(id)).catch(() => null);
+    if (!v && CLOUD && cloud && cloud.getPhoto) {
+      v = await cloud.getPhoto(id).catch(() => null);
+      if (v) idbDo('readwrite', (st) => st.put(v, id)).catch(() => {});
+    }
+    if (v) photoCache.set(id, v);
+    return v || '';
+  }
+  const photoIds = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const protoPhotoIds = (pr) => [].concat(...((pr && pr.items) || []).map((i) => photoIds(i.photos)));
+  const ensurePhotos = (pr) => Promise.all(protoPhotoIds(pr).map((id) => photoGet(id).catch(() => '')));
+  const photoSize = (id) => { const m = /-(\d+)x(\d+)$/.exec(id); return m ? [+m[1], +m[2]] : [4, 3]; };
+  // A photo from the camera or the gallery, made smaller (up to 1400 px, JPEG) so a report with many photos stays light.
+  async function makePhoto(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const k = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+      let data = c.toDataURL('image/jpeg', 0.72);
+      if (data.length > 900000) data = c.toDataURL('image/jpeg', 0.5);
+      const id = 'ph' + uid() + '-' + w + 'x' + h;
+      await photoPut(id, data);
+      return id;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  // Photos drawn before they were loaded get their picture when it arrives.
+  function fillPhotos(root) {
+    $$('img[data-photo]', root).forEach((im) => { if (!im.getAttribute('src')) photoGet(im.dataset.photo).then((v) => { if (v) im.src = v; }); });
+  }
+  const photoImg = (id, cls) => { const v = photoCache.get(id); return `<img class="${cls}" data-photo="${esc(id)}" ${v ? `src="${v}"` : ''} alt="">`; };
+  const photoLines = (it) => photoIds(it.photos).map((id) => ({ img: id, t: '(תמונה)' }));
+
   // The document model every output (card, PDF, Word, email) is drawn from.
   // A cell is a list of lines: [{ t: text, b: bold }].
   const cellOf = (s, bold, flags) => (s || '').split('\n').map((x) => x.replace(/\s+$/, '')).filter((x, i, a) => x || (i && i < a.length - 1)).map((t) => Object.assign({ t, b: !!bold }, flags));
@@ -2203,10 +2267,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     blocks.push({ kind: 'kv', head: true, rows: meta.filter((m) => m[1]).map((m) => [m[0],
       cellOf(m[1], m[0] === 'הנדון' || m[0] === 'שם הפרויקט', m[0] === 'שם הפרויקט' ? { u: true } : null),
       m[0] === 'תאריך' ? 'date' : m[0] === 'הנדון' ? 'subj' : '']) });
-    const items = (pr.items || []).filter((i) => t.cols.some((c) => (i[c[0]] || '').trim()));
+    const items = (pr.items || []).filter((i) => t.cols.some((c) => (i[c[0]] || '').trim()) || photoIds(i.photos).length);
     if (pr.template === 'tour') {
       if (items.length) blocks.push({ kind: 'table', title: 'סיכום החלטות, הבהרות והנחיות', cols: [['מס"ד', 800, 'num'], ['תיאור', 7500, 'details']],
-        rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', u: true }] : []), ...cellOf(it.details)]]) });
+        rows: items.map((it, n) => [cellOf(String(n + 1) + '.'), [...(it.topic ? [{ t: it.topic + ':', u: true }] : []), ...cellOf(it.details), ...photoLines(it)]]) });
     } else {
       // Supervision: "סטטוס כללי" is the first row of the table, the works not done in red.
       let status = null;
@@ -2215,7 +2279,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         if (st.length) status = [].concat(...st.map((x) => [{ t: x[0], b: true, r: !!x[2] }].concat(cellOf(x[1], false, x[2] ? { r: true } : null))));
       }
       // A topic with nothing else filled in is a section row across the table (a building, a street).
-      const isSection = (it) => !t.cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
+      const isSection = (it) => !t.cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim()) && !photoIds(it.photos).length;
       if (items.length || status) {
         const cols = (t.numbered ? [['', 500, 'num']] : []).concat(t.cols
           .filter((c) => c[0] !== 'due' || items.some((it) => (it.due || '').trim()))
@@ -2227,7 +2291,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           if (isSection(it)) { rows.push({ section: it.topic }); return; }
           n++;
           rows.push(cols.map((c) => (c[2] === 'num' ? cellOf(n + '.')
-            : cellOf(it[c[2]], (c[2] === 'topic' && pr.template === 'meeting') || c[2] === 'instructions', c[2] === 'instructions' ? { r: true } : null))));
+            : cellOf(it[c[2]], (c[2] === 'topic' && pr.template === 'meeting') || c[2] === 'instructions', c[2] === 'instructions' ? { r: true } : null)
+              .concat(c[2] === 'details' ? photoLines(it) : []))));
         });
         blocks.push({ kind: 'table', cols, rows });
       }
@@ -2271,6 +2336,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     .fdoc .pd-main td.c-instructions { font-size: .88em; }
     .fdoc .pd-main tr.pd-sec td { background: #d9d9d9; color: #1f4e79; font-size: 1.55em; text-align: center; padding: 1px 6px 3px; }
     .fdoc .red { color: #ff0000; }
+    .fdoc img.pd-img { display: block; max-width: 100%; max-height: 240px; margin: 4px auto; object-fit: contain; }
     .fdoc .pd-title { font-weight: bold; margin: 14px 0 6px; break-after: avoid; }
     .fdoc .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
     .fdoc p { margin: 0 0 6px; white-space: pre-wrap; } .fdoc ol { margin: 0; padding-inline-start: 22px; } .fdoc li { margin-bottom: 3px; }`;
@@ -2278,6 +2344,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
   // HTML for the card and for the PDF print view.
   const cellHtml = (cell) => cell.map((l) => {
+    if (l.img) return photoImg(l.img, 'pd-img');
     let h = esc(l.t);
     if (l.u) h = `<u>${h}</u>`;
     if (l.b) h = `<b>${h}</b>`;
@@ -2362,6 +2429,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   function bindProtoCards(root) {
     if (!root) return;
+    fillPhotos(root);
     $$('.proto', root).forEach((c) => {
       const pr = byId(db.protocols, c.dataset.id);
       $('.proto-head', c).addEventListener('click', () => { ui.openProto = ui.openProto === pr.id ? null : pr.id; c.classList.toggle('open'); });
@@ -2637,7 +2705,119 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     }
     return String(n + 1).padStart(2, '0');
   }
-  const protoHasContent = (tpl, it) => PROTO_TPL[tpl].cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
+  const protoHasText = (tpl, it) => PROTO_TPL[tpl].cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
+  const protoHasContent = (tpl, it) => protoHasText(tpl, it) || !!(it.photos || '').trim();
+
+  // ---------- The latest report in Drive (a Google Doc or a Word file) ----------
+  // The office keeps the latest report / summary of each project as a Google Doc in the project's folder.
+  // Its header and topics table are read so the new report can offer them for copying, like a report written here.
+  const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const driveDocCache = new Map(); // file id @ modified -> parsed protocol, or null
+  function driveLatestDoc(tpl, projectId) {
+    if (!projectId || !PROTO_NO_RE[tpl]) return null;
+    const kind = tpl === 'supervision' ? 'report' : 'meeting';
+    const list = dprot.items.filter((it) => it.kind === kind && (dpProject(it) || {}).id === projectId && (it.files || []).some((f) => f.ext === 'gdoc' || f.ext === 'docx'))
+      .sort((a, b) => (b.modified || b.date || '').localeCompare(a.modified || a.date || ''));
+    const it = list[0]; if (!it) return null;
+    return { item: it, file: it.files.find((f) => f.ext === 'gdoc') || it.files.find((f) => f.ext === 'docx'), at: it.modified || it.date || '' };
+  }
+  async function fetchDriveDocx(f) {
+    if (GOOGLE && G.valid()) {
+      try { return f.ext === 'gdoc' ? await G.drive.exportFile(f.id, DOCX_MIME) : await G.drive.readBuffer(f.id); }
+      catch (e) { if (!SYNC) throw e; }
+    }
+    if (SYNC) {
+      const r = await fetch(SYNC + '/data/doc?id=' + encodeURIComponent(f.id), { cache: 'no-store' });
+      if (r.ok) return r.arrayBuffer();
+      throw new Error('HTTP ' + r.status);
+    }
+    throw new Error('no_google');
+  }
+  // A Word document (as exported from Google Docs) -> { date, reportNo, status, participants, ..., items }.
+  async function parseProtoDocx(buf, tpl) {
+    const JSZip = await loadJSZip();
+    const zip = await JSZip.loadAsync(buf);
+    const xml = new DOMParser().parseFromString(await zip.file('word/document.xml').async('string'), 'application/xml');
+    const kids = (el, name) => Array.from(el.childNodes).filter((n) => n.nodeName === name);
+    const paraText = (pEl) => {
+      let out = '';
+      Array.from(pEl.getElementsByTagName('*')).forEach((n) => {
+        if (n.nodeName === 'w:t') out += n.textContent;
+        else if (n.nodeName === 'w:tab') out += ' ';
+        else if (n.nodeName === 'w:br' || n.nodeName === 'w:cr') out += '\n';
+      });
+      out = out.replace(/[ \u00a0]+/g, ' ').trim();
+      const list = pEl.getElementsByTagName('w:numPr').length;
+      return out && list && !/^[-•]/.test(out) ? '- ' + out : out;
+    };
+    const cellText = (tc) => kids(tc, 'w:p').map(paraText).join('\n').replace(/\n{2,}/g, '\n').trim();
+    const span = (tc) => { const g = tc.getElementsByTagName('w:gridSpan')[0]; return g ? parseInt(g.getAttribute('w:val'), 10) || 1 : 1; };
+    const rowsOf = (tbl) => kids(tbl, 'w:tr').map((tr) => { let pos = 0; return kids(tr, 'w:tc').map((tc) => { const c = { pos, span: span(tc), text: cellText(tc) }; pos += c.span; return c; }); });
+    const tables = Array.from(xml.getElementsByTagName('w:tbl')).filter((t) => !t.parentNode || t.parentNode.nodeName !== 'w:tc');
+    const out = { template: tpl, items: [] };
+    // The topics table: the first one with a "נושא" column.
+    const ti = tables.findIndex((t) => rowsOf(t).slice(0, 3).some((r) => r.some((c) => /^נושא/.test(c.text))));
+    // The header table before it: date, subject, status, location, participants, copies.
+    const headT = tables.slice(0, ti < 0 ? 1 : ti).find((t) => rowsOf(t).some((r) => r.length >= 2 && /תאריך|הנדון|משתתפים/.test(r[0].text)));
+    if (headT) rowsOf(headT).forEach((r) => {
+      if (r.length < 2) return;
+      const k = r[0].text.replace(/[:\s]+$/, '').trim(); const v = r[1].text;
+      if (/^תאריך/.test(k)) out.date = parseHeDate(v) || '';
+      else if (/^הנדון/.test(k)) { const m = v.match(PROTO_NO_RE[tpl] || /$^/); if (m) out.reportNo = m[1].padStart(2, '0'); }
+      else if (/^סטטוס/.test(k)) out.status = v;
+      else if (/^מיקום/.test(k)) out.location = v;
+      else if (/^משתתפים/.test(k)) out.participants = v;
+      else if (/^העתק/.test(k)) out.copies = v.replace(/\n/g, ', ');
+    });
+    if (ti < 0) return out;
+    const rows = rowsOf(tables[ti]);
+    const hi = rows.findIndex((r) => r.some((c) => /^נושא/.test(c.text)));
+    const keyOf = (h) => (/^נושא/.test(h) ? 'topic' : /פירוט|סיכום|החלטות|תיאור/.test(h) ? 'details' : /הנחיות/.test(h) ? 'instructions'
+      : /לוח זמנים|לו"ז|מועד/.test(h) ? 'due' : /באחריות|אחראי|מטפל/.test(h) ? 'owner' : '');
+    const cols = rows[hi].map((c) => ({ pos: c.pos, key: keyOf(c.text) }));
+    const width = rows[hi].reduce((a, c) => a + c.span, 0);
+    const numPos = cols.some((c) => !c.key && c.pos === 0) ? 0 : -1;
+    const keep = PROTO_TPL[tpl].cols.map((c) => c[0]);
+    rows.slice(hi + 1).forEach((r) => {
+      const filled = r.filter((c) => c.text);
+      if (!filled.length) return;
+      const all = r.map((c) => c.text).join('\n');
+      if (/עבודות שבוצעו|הספקים לשבוע/.test(all)) {
+        const labels = [['doneWork', /עבודות שבוצעו\s*:?/], ['nextWork', /הספקים לשבוע הקרוב\s*:?/], ['notDone', /עבודות בהספק[^:\n]*:?/]];
+        const at = labels.map(([k, re]) => { const m = all.match(re); return m ? { k, i: m.index, e: m.index + m[0].length } : null; }).filter(Boolean).sort((a, b) => a.i - b.i);
+        at.forEach((x, n) => { out[x.k] = all.slice(x.e, n + 1 < at.length ? at[n + 1].i : undefined).replace(/^סטטוס כללי\s*/, '').trim(); });
+        return;
+      }
+      // One cell across the table: a section row (a building, a street).
+      if (filled.length === 1 && filled[0].span >= width - 1) { out.items.push({ topic: filled[0].text }); return; }
+      const it = {};
+      r.forEach((c) => { const col = cols.filter((x) => x.pos <= c.pos).pop(); if (col && col.key && c.text) it[col.key] = it[col.key] ? it[col.key] + '\n' + c.text : c.text; });
+      const num = numPos === 0 && r[0] && r[0].pos === 0 ? r[0].text : '';
+      // A row without a number under a numbered one: a note that belongs to the topic above.
+      if (numPos === 0 && !num && out.items.length && out.items[out.items.length - 1].details !== undefined && Object.keys(it).length <= 2) {
+        const prevIt = out.items[out.items.length - 1];
+        prevIt.details = [prevIt.details, it.topic, it.details].filter(Boolean).join('\n');
+        return;
+      }
+      Object.keys(it).forEach((k) => { if (k !== 'topic' && !keep.includes(k)) { it.details = [it.details, it[k]].filter(Boolean).join('\n'); delete it[k]; } });
+      if (Object.keys(it).length) out.items.push(it);
+    });
+    return out;
+  }
+  // The latest report of a project in Drive, read and parsed once per version of the file.
+  async function driveDocPrev(tpl, projectId) {
+    const d = driveLatestDoc(tpl, projectId);
+    if (!d || !d.file) return null;
+    const key = d.file.id + '@' + d.at + '@' + tpl;
+    if (!driveDocCache.has(key)) {
+      const pr = parseProtoDocx(await fetchDriveDocx(d.file), tpl).then((x) => Object.assign(x, { projectId, _drive: { name: d.item.title || d.file.name, id: d.file.id, ext: d.file.ext } }));
+      driveDocCache.set(key, pr);
+      pr.catch(() => driveDocCache.delete(key));
+    }
+    const pr = await driveDocCache.get(key);
+    if (!pr.date) pr.date = (d.at || '').slice(0, 10);
+    return pr;
+  }
   // "Copy from the previous report?": the topics of the previous report / summary of the same project are listed,
   // and each one asks whether to copy its content or skip it. Topics not answered are left out of the document.
   let protoAsk = null; // { prev, tpl, map: topic#n -> previous item, done: Set }
@@ -2645,12 +2825,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function protoAskSetup(tpl, prev, items) {
     protoAsk = null;
     if (!prev || tpl === 'tour' || !PROTO_TPL[tpl]) return items;
-    const pitems = (prev.items || []).filter((i) => (i.topic || '').trim() || protoHasContent(tpl, i));
+    const pitems = (prev.items || []).filter((i) => (i.topic || '').trim() || protoHasText(tpl, i));
     const map = new Map();
-    protoTopicKeys(pitems).forEach((k, n) => { if (protoHasContent(tpl, pitems[n])) map.set(k, pitems[n]); });
+    protoTopicKeys(pitems).forEach((k, n) => { if (protoHasText(tpl, pitems[n])) map.set(k, pitems[n]); });
     protoAsk = { prev, tpl, map, done: new Set() };
     const cur = items.map((i) => Object.assign({}, i));
-    const fromPrev = pitems.map((i) => (protoHasContent(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
+    const fromPrev = pitems.map((i) => (protoHasText(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
     const want = protoTopicKeys(fromPrev);
     if (!cur.some((i) => protoHasContent(tpl, i))) {
       // Nothing typed yet: the previous report's topics in its order, then the standard topics it did not have.
@@ -2675,13 +2855,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const t = PROTO_TPL[data.template];
     const defaults = t.topics || [];
     data.items = readProtoItems().filter((i) => {
-      const filled = t.cols.some((c) => c[0] !== 'topic' && (i[c[0]] || '').trim());
+      const filled = protoHasContent(data.template, i);
       return filled || (i.topic && !defaults.includes(i.topic));
     });
     data.type = t.label;
     data.items = data.items.filter((i) => !i._fromPrev || protoHasContent(data.template, i)).map((i) => { const c = Object.assign({}, i); delete c._fromPrev; return c; });
     if (data.template === 'tour') data.reportNo = '';
     return data;
+  }
+  // The recipients of the last report / summary of the project (the same kind first), else the default in the settings.
+  function protoPrevEmails(projectId, tpl, exceptId) {
+    const kind = protoKind({ template: tpl });
+    const list = db.protocols.filter((x) => x.id !== exceptId && (x.emailTo || '').trim() && (projectId ? x.projectId === projectId : !x.projectId))
+      .sort((a, b) => (protoKind(b) === kind) - (protoKind(a) === kind) || (b.date || '').localeCompare(a.date || ''));
+    return list.length ? list[0].emailTo : (settings().emailTo || '');
   }
   function openProtocolForm(proto, defaults) {
     if (proto && !protoTpl(proto)) { openLegacyProtocolForm(proto); return; }
@@ -2696,6 +2883,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!proto && prev) ['participants', 'location', 'status'].forEach((k) => { if (!p[k] && prev[k]) p[k] = prev[k]; });
     if (!proto && prev && prev.copies && !p.copies) p.copies = prev.copies;
     let autoNo = '';
+    let autoMail = '';
+    if (!proto && !p.emailTo) p.emailTo = autoMail = protoPrevEmails(p.projectId, p.template);
+    let sendAfter = false;
     if (!proto && !p.reportNo) p.reportNo = autoNo = nextReportNo(p.projectId, p.template);
     if (!proto && p.template === 'tour' && !p.participants) p.participants = TOUR_PARTICIPANTS;
     if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
@@ -2722,10 +2912,17 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
         <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא מהרשימה הקבועה בלי תוכן לא יופיע במסמך. נושא חדש בלי תוכן יופיע כשורת כותרת אפורה לרוחב הטבלה (למשל שם רחוב או מבנה). מלאו "באחריות" כדי ליצור משימה.'}</span></div>
       <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>
+      <div class="field full pf-mail"><label>📧 שליחה במייל: נמענים</label>
+        <div class="pf-mail-row"><input class="input" name="emailTo" dir="ltr" value="${esc(p.emailTo)}" placeholder="name@example.com, ...">
+        <button type="button" class="btn primary" data-savemail>שמירה ושליחה במייל</button></div>
+        <span class="hint" data-mail-hint>${autoMail ? 'הנמענים מהפעם הקודמת בפרויקט. אפשר להוסיף או למחוק כתובות, מופרדות בפסיק.' : 'כתובות מייל מופרדות בפסיק. בפעם הבאה בפרויקט הן ימולאו מראש.'}</span></div>
       </div>`,
     (data) => {
       protoFormFinish(data);
-      if (proto) Object.assign(proto, data); else { const n = Object.assign({ id: uid() }, data); db.protocols.push(n); ui.openProto = n.id; }
+      data.emailTo = cleanEmails(data.emailTo).split(',').filter(Boolean).join(', ');
+      let saved = proto;
+      if (proto) Object.assign(proto, data); else { saved = Object.assign({ id: uid() }, data); db.protocols.push(saved); ui.openProto = saved.id; }
+      if (sendAfter) { sendAfter = false; save(); render(); emailProtocol(saved); return; }
       save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
     },
     proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
@@ -2744,6 +2941,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     };
     // The general status of a supervision report asks the same "copy from the previous report?".
     const fieldDone = new Set();
+    // The latest report in Drive (a Google Doc), when it is newer than the last one written here.
+    let driveTry = 0;
+    const tryDrivePrev = async () => {
+      if (proto) return;
+      const tpl = curTpl, pid = projSel.value, mine = ++driveTry;
+      const d = driveLatestDoc(tpl, pid);
+      if (!d || (prev && (prev.date || '') >= (d.at || '').slice(0, 10))) return;
+      const bar = $('#protoAskBar', body);
+      if (bar && !bar.innerHTML) bar.innerHTML = `<div class="pi-askbar">☁️ קורא את המסמך האחרון מה-Drive: ${esc(d.item.title || '')}...</div>`;
+      let dp = null;
+      try { dp = await driveDocPrev(tpl, pid); } catch (e) { dp = null; }
+      if (mine !== driveTry || !document.body.contains(body) || curTpl !== tpl || projSel.value !== pid) return;
+      if (!dp || !((dp.items || []).length || dp.nextWork || dp.doneWork) || (prev && (prev.date || '') > (dp.date || ''))) { drawProtoItems(curTpl, readProtoItems()); return; }
+      prev = dp;
+      drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
+      ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
+      drawFieldAsks(); schedulePreview();
+    };
     const drawFieldAsks = () => {
       $$('[data-fask]', body).forEach((box) => {
         const k = box.dataset.fask; const f = $(`[name="${k}"]`, body);
@@ -2755,7 +2970,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       });
     };
     drawProtoItems(curTpl, p.items || []);
+    if (protoPhotoIds(p).length) ensurePhotos(p).then(() => { if (document.body.contains(body)) { fillPhotos(body); schedulePreview(); } });
     drawFieldAsks();
+    setTimeout(tryDrivePrev, 0);
     ['doneWork', 'nextWork', 'notDone'].forEach((k) => $(`[name="${k}"]`, body).addEventListener('input', () => { if (!fieldDone.has(k)) { fieldDone.add(k); drawFieldAsks(); } }));
     // Live preview, always open: on the left beside the form (on top of it on narrow screens).
     const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
@@ -2792,18 +3009,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('#modalTitle').textContent = (proto ? 'עריכת ' : 'פרוטוקול חדש: ') + PROTO_TPL[newTpl].label;
       $('[data-lbl-no]', body).textContent = newTpl === 'meeting' ? 'מספר סיכום' : 'מספר דוח';
       renumber();
-      if (!proto) { prev = prevFor(newTpl, projSel.value); drawProtoItems(newTpl, protoAskSetup(newTpl, prev, readProtoItems().filter((i) => !i._fromPrev))); drawFieldAsks(); }
+      if (!proto) { prev = prevFor(newTpl, projSel.value); drawProtoItems(newTpl, protoAskSetup(newTpl, prev, readProtoItems().filter((i) => !i._fromPrev))); drawFieldAsks(); tryDrivePrev(); }
       const part = $('[name="participants"]', body);
       if (newTpl === 'tour' && !part.value.trim()) part.value = TOUR_PARTICIPANTS;
       else if (newTpl !== 'tour' && part.value.trim() === TOUR_PARTICIPANTS.trim()) part.value = '';
       const cp = $('[name="copies"]', body);
       if (!proto && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט', ''].includes(cp.value.trim())) cp.value = newTpl === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     });
+    $('[data-savemail]', body).addEventListener('click', () => {
+      if (!cleanEmails($('[name="emailTo"]', body).value)) { toast('הוסיפו לפחות כתובת מייל אחת'); $('[name="emailTo"]', body).focus(); return; }
+      sendAfter = true;
+      const f = $('#modalForm'); if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event('submit', { cancelable: true }));
+    });
     projSel.addEventListener('change', () => {
       renumber();
+      const mt = $('[name="emailTo"]', body);
+      if (!proto && (mt.value === autoMail || !mt.value.trim())) mt.value = autoMail = protoPrevEmails(projSel.value, curTpl);
       if (proto) return;
       prev = prevFor(curTpl, projSel.value);
       drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
+      tryDrivePrev();
       if (prev) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
       drawFieldAsks();
     });
@@ -2814,7 +3039,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!prev) { toast(projSel.value ? 'אין פרוטוקול קודם מאותו סוג בפרויקט הזה' : 'בחרו קודם פרויקט'); return; }
       if (!confirm('להחליף את הנושאים בנושאים מהפרוטוקול מ-' + fmtDate(prev.date) + '?')) return;
       protoAsk = null;
-      drawProtoItems(curTpl, (prev.items || []).map((i) => Object.assign({}, i)));
+      drawProtoItems(curTpl, (prev.items || []).map((i) => { const c = Object.assign({}, i); delete c.photos; return c; }));
       ['participants', 'location', 'copies', 'status'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && !f.value.trim() && prev[k]) f.value = prev[k]; });
       toast('הנושאים הועתקו מהפרוטוקול הקודם');
     });
@@ -2838,7 +3063,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const drop = new Set();
     rows.forEach(([n, k, prevIt]) => {
       protoAsk.done.add(k);
-      if (copy) { cur[n] = Object.assign({}, prevIt); delete cur[n]._fromPrev; }
+      if (copy) { cur[n] = Object.assign({}, prevIt, cur[n].photos ? { photos: cur[n].photos } : {}); if (!cur[n].photos || cur[n].photos === prevIt.photos) delete cur[n].photos; delete cur[n]._fromPrev; }
       else if (cur[n]._fromPrev) { if ((PROTO_TPL[protoAsk.tpl].topics || []).includes((cur[n].topic || '').trim())) delete cur[n]._fromPrev; else drop.add(n); }
     });
     drawProtoItems(protoAsk.tpl, cur.filter((i, n) => !drop.has(n)));
@@ -2854,7 +3079,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const bar = $('#protoAskBar');
     if (bar) {
       const waiting = items.filter((it, n) => askOf(it, n)).length;
-      bar.innerHTML = waiting ? `<div class="pi-askbar">📋 ${esc(asking.prev.template === 'supervision' ? 'דוח פיקוח' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : '') : 'הסיכום' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : ''))} מ-${esc(fmtDate(asking.prev.date))}:
+      bar.innerHTML = waiting ? `<div class="pi-askbar">📋 ${esc(asking.prev.template === 'supervision' ? 'דוח פיקוח' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : '') : 'הסיכום' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : ''))}${asking.prev.date ? ' מ-' + esc(fmtDate(asking.prev.date)) : ''}${asking.prev._drive ? ' (מה-Drive' + (asking.prev._drive.ext === 'gdoc' ? ', Google Docs' : '') + ')' : ''}:
         ${waiting} נושאים ממתינים לתשובה. נושא שלא נענה לא ייכנס למסמך.
         <span class="pi-ask-btns"><button type="button" class="btn sm primary" data-copyall>העתקת הכול</button><button type="button" class="btn sm" data-skipall>דילוג על הכול</button></span></div>` : '';
       if (waiting) {
@@ -2869,13 +3094,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="pi-fields pi-${tpl}">${fields.map((c) => (c[0] === 'details' || c[0] === 'instructions'
         ? `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><textarea class="input" data-k="${c[0]}" rows="${tpl === 'tour' ? 4 : 2}">${esc(it[c[0]])}</textarea></label>`
         : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
-      ${Object.keys(it).filter((k) => k !== 'topic' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
+      <div class="pi-photos">${photoIds(it.photos).map((id) => `<span class="pi-ph">${photoImg(id, '')}<button type="button" data-phdel="${esc(id)}" title="הסרת התמונה">✕</button></span>`).join('')}
+        <label class="btn sm pi-phadd" title="צילום או תמונה מהגלריה">📷 תמונה<input type="file" accept="image/*" multiple hidden data-phadd></label>
+        <input type="hidden" data-k="photos" value="${esc(it.photos || '')}"></div>
+      ${Object.keys(it).filter((k) => k !== 'topic' && k !== 'photos' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
     </div>`).join('') || '<div class="hint">אין נושאים. לחצו "+ נושא".</div>';
     $$('.pi-row', box).forEach((row, n) => {
       const move = (d) => { const cur = readProtoItems(); const j = n + d; if (j < 0 || j >= cur.length) return; [cur[n], cur[j]] = [cur[j], cur[n]]; drawProtoItems(tpl, cur); };
       $('[data-up]', row).addEventListener('click', () => move(-1));
       $('[data-down]', row).addEventListener('click', () => move(1));
       $('[data-del]', row).addEventListener('click', () => { const cur = readProtoItems(); cur.splice(n, 1); drawProtoItems(tpl, cur); });
+      const setPhotos = (fn) => { const cur = readProtoItems(); const ids = fn(photoIds(cur[n].photos)); if (ids.length) cur[n].photos = ids.join(','); else delete cur[n].photos; drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true })); };
+      $('[data-phadd]', row).addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []); if (!files.length) return;
+        toast(files.length > 1 ? 'מעבד ' + files.length + ' תמונות...' : 'מעבד תמונה...');
+        const ids = [];
+        for (const f of files) { try { ids.push(await makePhoto(f)); } catch (x) { toast('לא ניתן לקרוא את הקובץ ' + f.name); } }
+        if (ids.length) setPhotos((cur) => cur.concat(ids));
+      });
+      $$('[data-phdel]', row).forEach((b) => b.addEventListener('click', () => setPhotos((cur) => cur.filter((x) => x !== b.dataset.phdel))));
+      fillPhotos(row);
       const ask = askOf(items[n], n);
       if (ask) {
         $('.pi-ask [data-copy]', row).addEventListener('click', () => protoAskAnswer([[n, keys[n], ask]], true));
@@ -2912,7 +3150,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function exportProtocolPdf(pr) {
     const w = window.open('', '_blank');
     if (!w) { toast('הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב'); return; }
-    w.document.write(protoPrintHtml(pr)); w.document.close();
+    ensurePhotos(pr).then(() => { w.document.write(protoPrintHtml(pr)); w.document.close(); });
   }
   // The protocol on the company letterhead, as printed. preview: no print bar, scaled to fit the frame.
   function protoPrintHtml(pr, preview) {
@@ -2976,9 +3214,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   // Tables in the look of the documents sent so far: black borders, coloured header row, grey section rows.
   // A cell is a list of lines [{ t, b, u, r }]; o: fill, color, bold, size, center, vcenter, span.
+  // A photo in a cell, as wide as the cell allows and at most 6.4 cm high. The image files are added by buildProtocolDocx.
+  let wImgs = null;
+  function wImgPara(id, cellW) {
+    const data = photoCache.get(id);
+    if (!data || !wImgs) return '';
+    const n = wImgs.length + 1; const rid = 'rIdPhoto' + n;
+    wImgs.push({ rid, name: 'photo' + n + '.jpeg', data });
+    const [pw, ph] = photoSize(id);
+    const k = Math.min(Math.max(600, cellW - 220) * 635 / pw, 2300000 / ph);
+    const cx = Math.round(pw * k), cy = Math.round(ph * k);
+    return `<w:p><w:pPr><w:bidi/><w:spacing w:before="40" w:after="40"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${1000 + n}" name="Photo ${n}"/>`
+      + `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`
+      + `<pic:nvPicPr><pic:cNvPr id="${1000 + n}" name="photo${n}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
+      + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+  }
   function wCell(w, lines, o) {
     o = o || {};
-    const paras = (lines && lines.length ? lines : [{ t: '' }]).map((l) => wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
+    const paras = (lines && lines.length ? lines : [{ t: '' }]).map((l) => l.img ? wImgPara(l.img, w) : wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
     return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${o.span ? `<w:gridSpan w:val="${o.span}"/>` : ''}${o.blank ? '<w:tcBorders><w:top w:val="nil"/><w:start w:val="nil"/><w:bottom w:val="nil"/><w:end w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/></w:tcBorders>' : ''}${o.fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.fill}"/>` : ''}${o.vcenter ? '<w:vAlign w:val="center"/>' : ''}</w:tcPr>${paras}</w:tc>`;
   }
   const wRow = (cells) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells}</w:tr>`;
@@ -2994,6 +3247,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const [JSZip, tpl] = await Promise.all([loadJSZip(), fetch('docs/blank-template.docx').then((r) => { if (!r.ok) throw new Error('template'); return r.arrayBuffer(); })]);
       const zip = await JSZip.loadAsync(tpl);
       const docXml = await zip.file('word/document.xml').async('string');
+      await ensurePhotos(pr);
+      wImgs = [];
       const doc = protoDoc(pr);
       const tour = doc.tpl === 'tour';
       const head = { meeting: ['6666EF', 'FFFFFF'], supervision: ['3C78D8', 'FFFFFF'] }[doc.tpl] || ['D9D9D9', ''];
@@ -3034,6 +3289,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const i2 = docXml.indexOf('<w:sectPr');
       if (i1 < 8 || i2 < 0) throw new Error('template structure');
       zip.file('word/document.xml', docXml.slice(0, i1) + body + docXml.slice(i2));
+      if (wImgs.length) {
+        const relsPath = 'word/_rels/document.xml.rels';
+        const rels = await zip.file(relsPath).async('string');
+        wImgs.forEach((im) => zip.file('word/media/' + im.name, im.data.split(',')[1], { base64: true }));
+        zip.file(relsPath, rels.replace('</Relationships>', wImgs.map((im) => `<Relationship Id="${im.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.name}"/>`).join('') + '</Relationships>'));
+      }
+      wImgs = null;
       return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   }
   async function exportProtocolWord(pr) {
@@ -3047,10 +3309,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const cleanEmails = (s) => (s || '').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).join(',');
   function emailProtocol(pr) {
     const st = settings();
-    const subject = 'פרוטוקול: ' + (pr.title || '') + ' - ' + fmtDate(pr.date);
+    const subject = protoTpl(pr) ? [protoProjName(pr), protoHeading(pr), fmtDate(pr.date)].filter(Boolean).join(' - ') : 'פרוטוקול: ' + (pr.title || '') + ' - ' + fmtDate(pr.date);
     let body = protocolText(pr);
     if (body.length > 6000) body = body.slice(0, 6000) + '\n...\n(הפרוטוקול קוצר. את הגרסה המלאה אפשר לצרף כקובץ Word או PDF מהמערכת)';
-    const to = cleanEmails(st.emailTo), cc = cleanEmails(st.emailCc);
+    const to = cleanEmails(pr.emailTo || st.emailTo), cc = cleanEmails(st.emailCc);
     let url;
     if (GOOGLE && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
     if (st.mailApp === 'mailto') {
@@ -3063,7 +3325,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (to) params.set('to', to);
     if (cc) params.set('cc', cc);
     url = 'https://mail.google.com/mail/?' + params.toString();
-    const w = window.open(url, '_blank', 'noopener');
+    const w = window.open(url, '_blank'); // with 'noopener' the result is always null, and the site itself left for Gmail
+    if (w) w.opener = null;
     if (!w) location.href = url;
   }
 

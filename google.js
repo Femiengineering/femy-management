@@ -369,12 +369,13 @@
   async function folderName(id) { return (await json(`${DAPI}/${encodeURIComponent(id)}?fields=name&supportsAllDrives=true`)).name || ''; }
   // Downloads a Google file converted to another format (for example a Sheet as .xlsx).
   async function exportFile(id, mime) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`)).arrayBuffer(); }
+  async function readBuffer(id) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`)).arrayBuffer(); }
   async function readFile(id) { return (await api(await token(), `${DAPI}/${id}?alt=media`)).text(); }
 
   window.FemyGoogle = {
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, send, link: mailLink, findThread, searchLink },
-    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile },
+    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile, readBuffer },
   };
 })();

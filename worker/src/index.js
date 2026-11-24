@@ -74,6 +74,11 @@ export default {
       }
       if (req.method === 'GET' && path === '/api/sync-data') return reply(...(await syncData(env)));
       if (req.method === 'GET' && path === '/data/folder') return reply(...(await listFolder(env, new URL(req.url).searchParams.get('id') || '')));
+      if (req.method === 'GET' && path === '/data/doc') {
+        const [st, out] = await readDoc(env, new URL(req.url).searchParams.get('id') || '');
+        if (st !== 200) return reply(st, out);
+        return new Response(out, { headers: Object.assign({ 'Content-Type': DOCX, 'Cache-Control': 'no-store' }, cors) });
+      }
       if (req.method === 'GET' && path === '/data/status') return reply(200, JSON.parse((await env.TOKENS.get('sync:status')) || '{}'));
       if (req.method === 'POST' && path === '/data/refresh') return reply(...(await refresh(env)));
     } catch (e) {
@@ -289,6 +294,24 @@ async function listFolder(env, id) {
   files.forEach((f) => { f.folder = f.mimeType === FOLDER_MIME; });
   const name = id === root ? '' : tree.folders[id][1];
   return [200, { id, name, root, at: Date.now(), files }];
+}
+// One report / meeting summary from the projects folder as a Word file (a Google Doc is exported), so the site can
+// offer the topics of the latest report for copying. Only documents inside the projects folder tree.
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const GDOC = 'application/vnd.google-apps.document';
+async function readDoc(env, id) {
+  if (!/^[\w-]{10,80}$/.test(id)) return [400, { error: 'bad_id' }];
+  const tree = await env.TOKENS.get('sync:tree', 'json');
+  const root = env.PROJECTS_FOLDER_ID;
+  if (!root || !tree) return [404, { error: 'no_data' }];
+  const tok = await syncToken(env);
+  const meta = await (await gfetch(tok, `${DRIVE}/${id}?fields=id,mimeType,parents,size&supportsAllDrives=true`)).json();
+  const parent = (meta.parents || [])[0] || '';
+  if (parent !== root && !(tree.folders && tree.folders[parent])) return [404, { error: 'not_found' }];
+  if (meta.mimeType !== GDOC && meta.mimeType !== DOCX) return [415, { error: 'not_a_document' }];
+  if (Number(meta.size) > 20 * 1024 * 1024) return [413, { error: 'too_large' }];
+  const url = meta.mimeType === GDOC ? `${DRIVE}/${id}/export?mimeType=${encodeURIComponent(DOCX)}` : `${DRIVE}/${id}?alt=media&supportsAllDrives=true`;
+  return [200, await (await gfetch(tok, url)).arrayBuffer()];
 }
 // The sync account's access token, kept (sealed) in KV for 50 minutes so browsing a folder costs one Drive call.
 async function syncToken(env) {
