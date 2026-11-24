@@ -305,6 +305,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 7px; margin-inline-end: 7px; vertical-align: 1px; background: var(--primary-soft); color: var(--primary); }
 .tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
+.pv-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pv-pane { position: sticky; top: -18px; z-index: 3; background: var(--surface); padding-bottom: 6px; }
+.pv-pane iframe { width: 100%; height: min(520px, 55vh); border: 1px solid var(--border); border-radius: 8px; background: #9aa1a8; display: block; }
 .proto-kinds { display: flex; width: 100%; margin-bottom: 12px; }
 .proto-kinds button { flex: 1; padding: 10px 12px; font-size: 15px; }
 .proto-kinds .n { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text); font-size: 12px; margin-inline-start: 4px; }
@@ -1975,6 +1978,18 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (pr.template === 'supervision') { n.reportNo = nextReportNo(pr.projectId); n.doneWork = pr.nextWork || ''; delete n.title; }
     return n;
   }
+  // Form fields -> a protocol object (the items without content left out), for saving and for the preview.
+  function protoFormFinish(data) {
+    const t = PROTO_TPL[data.template];
+    const defaults = t.topics || [];
+    data.items = readProtoItems().filter((i) => {
+      const filled = t.cols.some((c) => c[0] !== 'topic' && (i[c[0]] || '').trim());
+      return filled || (i.topic && !defaults.includes(i.topic));
+    });
+    data.type = t.label;
+    if (data.template !== 'supervision') data.reportNo = '';
+    return data;
+  }
   function openProtocolForm(proto, defaults) {
     if (proto && !protoTpl(proto)) { openLegacyProtocolForm(proto); return; }
     const p = proto ? Object.assign({}, proto) : Object.assign({ date: todayStr(), template: 'meeting', title: '', projectId: ui.protoProject && ui.protoProject !== '_none' ? ui.protoProject : '', location: '', participants: '', copies: '', status: '', reportNo: '' }, defaults || {});
@@ -1984,6 +1999,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     const vis = (tpls) => `data-tpls="${tpls}" style="${tpls.split(' ').includes(p.template) ? '' : 'display:none'}"`;
     openModal(proto ? 'עריכת ' + PROTO_TPL[p.template].label : 'פרוטוקול חדש', `
+      <div class="field full pv-bar"><button type="button" class="btn sm" data-preview>👁️ תצוגה מקדימה</button><span class="hint" data-pvhint>רואים את המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span></div>
+      <div class="field full pv-pane" style="display:none"><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
       <div class="field"><label>תבנית</label><select class="input" name="template">${PROTO_TPL_KEYS.map((k) => `<option value="${k}" ${k === p.template ? 'selected' : ''}>${esc(PROTO_TPL[k].label)}</option>`).join('')}</select></div>
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
@@ -2003,15 +2020,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא בלי תוכן לא יופיע במסמך. מלאו "באחריות" כדי ליצור ממנו משימה.'}</span></div>
       <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>`,
     (data) => {
-      const items = readProtoItems();
-      const t = PROTO_TPL[data.template];
-      const defaults = t.topics || [];
-      data.items = items.filter((i) => {
-        const filled = t.cols.some((c) => c[0] !== 'topic' && (i[c[0]] || '').trim());
-        return filled || (i.topic && !defaults.includes(i.topic));
-      });
-      data.type = t.label;
-      if (data.template !== 'supervision') data.reportNo = '';
+      protoFormFinish(data);
       if (proto) Object.assign(proto, data); else { const n = Object.assign({ id: uid() }, data); db.protocols.push(n); ui.openProto = n.id; }
       save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
     },
@@ -2022,6 +2031,27 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const projSel = $('[name="projectId"]', body);
     let curTpl = p.template;
     drawProtoItems(curTpl, p.items || []);
+    // Live preview at the top of the form.
+    const pvPane = $('.pv-pane', body); const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
+    let pvTimer = null;
+    const drawPreview = () => {
+      if (pvPane.style.display === 'none') return;
+      const data = {}; new FormData($('#modalForm')).forEach((v, k) => { data[k] = v; });
+      const keep = pvFrame.contentWindow ? pvFrame.contentWindow.scrollY : 0;
+      pvFrame.onload = () => { try { pvFrame.contentWindow.scrollTo(0, keep); } catch (e) {} };
+      pvFrame.srcdoc = protoPrintHtml(protoFormFinish(Object.assign({}, p, data)), true);
+    };
+    const schedulePreview = () => { clearTimeout(pvTimer); pvTimer = setTimeout(drawPreview, 350); };
+    pvBtn.addEventListener('click', () => {
+      const show = pvPane.style.display === 'none';
+      pvPane.style.display = show ? '' : 'none';
+      pvBtn.textContent = show ? '✕ סגירת התצוגה המקדימה' : '👁️ תצוגה מקדימה';
+      pvBtn.classList.toggle('primary', show);
+      if (show) drawPreview();
+    });
+    body.addEventListener('input', schedulePreview);
+    body.addEventListener('change', schedulePreview);
+    body.addEventListener('click', (e) => { if (e.target.closest('button') && !e.target.closest('[data-preview]')) schedulePreview(); });
     tplSel.addEventListener('change', () => {
       const old = readProtoItems();
       const newTpl = tplSel.value;
@@ -2100,6 +2130,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // ---------- Protocol export (company letterhead) ----------
   // PDF: opens a print view on the letterhead; choose "Save as PDF" in the print dialog.
   function exportProtocolPdf(pr) {
+    const w = window.open('', '_blank');
+    if (!w) { toast('הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב'); return; }
+    w.document.write(protoPrintHtml(pr)); w.document.close();
+  }
+  // The protocol on the company letterhead, as printed. preview: no print bar, scaled to fit the frame.
+  function protoPrintHtml(pr, preview) {
     const doc = protoDoc(pr);
     const bg = new URL('docs/letterhead.jpg', location.href).href;
     const body = `<h1>${esc(doc.heading)}</h1>${protoDocHtml(doc)}`;
@@ -2129,17 +2165,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         .bar button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; background: #52bd76; color: #fff; font-weight: bold; cursor: pointer; }
         @media screen { body { background: #888; padding-top: 52px; } table.page { margin: 16px auto; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.3); position: relative; } .bg { position: absolute; } .sheet { position: relative; width: 210mm; margin: 0 auto; } }
         @media print { .bar { display: none; } }
-        @media screen and (max-width: 800px) { .sheet { zoom: .45; } }
+        ${preview ? 'body { padding-top: 0 !important; background: #9aa1a8 !important; } .sheet { margin: 10px auto; background: #fff; isolation: isolate; box-shadow: 0 2px 10px rgba(0,0,0,.3); } .bg { z-index: 0 !important; height: 100%; min-height: 297mm; } .bg img { object-fit: fill; height: 297mm !important; } table.page { margin: 0 !important; background: transparent !important; box-shadow: none !important; position: relative; z-index: 1; }' : '@media screen and (max-width: 800px) { .sheet { zoom: .45; } }'}
       </style></head><body>
-      <div class="bar"><button onclick="window.print()">שמירה כ-PDF / הדפסה</button><span>בחלון ההדפסה בחרו "שמירה כ-PDF"</span></div>
+      ${preview ? '' : '<div class="bar"><button onclick="window.print()">שמירה כ-PDF / הדפסה</button><span>בחלון ההדפסה בחרו "שמירה כ-PDF"</span></div>'}
       <div class="sheet"><div class="bg"><img src="${bg}" alt=""></div>
       <table class="page"><thead><tr><td class="pad"></td></tr></thead><tfoot><tr><td class="pad"></td></tr></tfoot>
       <tbody><tr><td class="content">${body}</td></tr></tbody></table></div>
-      <script>var i=document.querySelector('.bg img');function go(){setTimeout(function(){window.print()},300)}if(i.complete)go();else{i.onload=go;i.onerror=go}<\/script>
+      ${preview ? '<script>function fit(){var s=document.querySelector(".sheet");s.style.zoom=Math.min(1,(innerWidth-24)/s.offsetWidth)}fit();addEventListener("resize",fit)<\/script>'
+        : '<script>var i=document.querySelector(\'.bg img\');function go(){setTimeout(function(){window.print()},300)}if(i.complete)go();else{i.onload=go;i.onerror=go}<\/script>'}
       </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) { toast('הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב'); return; }
-    w.document.write(html); w.document.close();
+    return html;
   }
 
   // Word: fills the company letterhead template (docs/blank-template.docx).
