@@ -43,10 +43,14 @@ export default {
       if (path === '/token') return reply(...(await token(env, body)));
       if (path === '/revoke') return reply(...(await revoke(env, body)));
       if (path === '/forget') return reply(...(await forget(env, body)));
+      if (path === '/status') return reply(200, await status(env));
       return reply(404, { error: 'not_found' });
     } catch (e) {
+      const msg = String(e && e.message || e).slice(0, 300);
       console.error('femy-google ' + path + ': ' + (e && e.stack || e));
-      return reply(500, { error: 'server_error' });
+      // Keep the last failure (message only, never tokens) so it can be read from /status.
+      try { await env.TOKENS.put('diag:last', JSON.stringify({ at: new Date().toISOString(), path, msg })); } catch (e2) { /* ignore */ }
+      return reply(500, { error: 'server_error', detail: msg });
     }
   },
 };
@@ -112,6 +116,19 @@ async function revoke(env, { device }) {
 async function forget(env, { device }) {
   if (validDevice(device)) await env.TOKENS.delete('d:' + await hash(device));
   return [200, { ok: true }];
+}
+
+// Health check for setup problems: which settings are present (never their values) and the last failure.
+async function status(env) {
+  let last = null;
+  try { last = JSON.parse(await env.TOKENS.get('diag:last')); } catch (e) { /* none */ }
+  return {
+    client_id: env.GOOGLE_CLIENT_ID ? String(env.GOOGLE_CLIENT_ID).split('-')[0] : null,
+    client_secret: !!env.GOOGLE_CLIENT_SECRET,
+    enc_key_length: String(env.ENC_KEY || '').trim().length,
+    kv: !!env.TOKENS,
+    last_error: last,
+  };
 }
 
 const validDevice = (d) => typeof d === 'string' && d.length >= 40 && d.length <= 64;

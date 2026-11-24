@@ -86,7 +86,7 @@
     catch (e) { throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת החיבור ל-Google לא זמין'); }
     let j = {};
     try { j = await r.json(); } catch (e) { /* ignore */ }
-    if (!r.ok) throw Object.assign(new Error(j.error || 'HTTP ' + r.status), { status: r.status, code: j.error });
+    if (!r.ok) throw Object.assign(new Error((j.error || 'HTTP ' + r.status) + (j.detail ? ': ' + j.detail : '')), { status: r.status, code: j.error });
     return j;
   }
   function keep(j, extra) {
