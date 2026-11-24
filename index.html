@@ -179,6 +179,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tg-note { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .tg-title { min-width: 0; }
 .contact .tg-meta a { color: inherit; }
+.tlink { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--primary); text-decoration: none; background: var(--surface); white-space: nowrap; }
+.tlink:hover { background: var(--primary-soft); }
 .tg-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .tg-head .grow { flex: 1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .tg-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
@@ -840,6 +842,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}
       </div>
       ${p ? `<div class="t-meta" style="margin-top:4px">🏗 ${esc(p.name)}</div>` : ''}
+      <div class="t-meta" style="margin-top:6px">${taskLinks(t)}</div>
     </div>`;
   }
 
@@ -874,7 +877,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         return `<div class="tg-row" data-id="${t.id}">
           <input type="checkbox" data-done ${done ? 'checked' : ''} title="סימון כהושלם">
           <a href="#" data-edit class="tg-title" style="${done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(t.title)}${t.notes ? `<div class="hint tg-note">${esc(t.notes.split('\n')[0])}</div>` : ''}</a>
-          <span class="tg-meta">${mode !== 'projects' && pj ? `<span>🏗 ${esc(pj.name)}</span>` : ''}${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}${mode !== 'priority' ? pill(PRIORITY, t.priority) : ''}${pill(TASK_STATUS, t.status)}</span>
+          <span class="tg-meta">${taskLinks(t)}${mode !== 'projects' && pj ? `<span>🏗 ${esc(pj.name)}</span>` : ''}${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}${mode !== 'priority' ? pill(PRIORITY, t.priority) : ''}${pill(TASK_STATUS, t.status)}</span>
         </div>`;
       };
       area.innerHTML = shown.map((g) => {
@@ -909,7 +912,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         </div>`;
       }).join('')}</div>`;
       $$('.tcard', area).forEach((c) => {
-        c.addEventListener('click', () => openTaskForm(byId(db.tasks, c.dataset.id)));
+        c.addEventListener('click', (e) => { if (e.target.closest('a')) return; openTaskForm(byId(db.tasks, c.dataset.id)); });
         c.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); });
         c.addEventListener('dragend', () => c.classList.remove('dragging'));
       });
@@ -936,7 +939,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
             <td>${pill(PRIORITY, t.priority)}</td>
             <td>${pill(TASK_STATUS, t.status)}</td>
             <td class="${od ? 'overdue' : ''}">${fmtDate(t.due)}</td>
-            <td class="actions"><button class="icon-btn" data-edit title="עריכה">✏️</button></td></tr>`;
+            <td class="actions" style="white-space:nowrap">${taskLinks(t)} <button class="icon-btn" data-edit title="עריכה">✏️</button></td></tr>`;
         }).join('') || '<tr><td colspan="8" class="empty">לא נמצאו משימות</td></tr>'}</tbody></table></div>`;
       $$('tr[data-id]', area).forEach((tr) => {
         const t = byId(db.tasks, tr.dataset.id);
@@ -958,6 +961,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(t.projectId, 'ללא פרויקט')}</select></div>
       <div class="field"><label>אחראי</label><input class="input" name="assignee" list="assigneeList" value="${esc(t.assignee)}">
         <datalist id="assigneeList">${assignees().map((a) => `<option value="${esc(a)}">`).join('')}</datalist></div>
+      <div class="field"><label>איש קשר לטיפול</label><input class="input" name="contactName" list="contactList" value="${esc(t.contactName || '')}">
+        <datalist id="contactList">${(db.contacts || []).map((c) => `<option value="${esc(c.name)}">${esc(c.role || '')}</option>`).join('')}</datalist></div>
+      <div class="field"><label>טלפון איש הקשר</label><input class="input" name="contactPhone" type="tel" dir="ltr" value="${esc(t.contactPhone || '')}" placeholder="ימולא מאנשי הקשר אם ריק"></div>
       <div class="field"><label>עדיפות</label><select class="input" name="priority">${dictOptions(PRIORITY, t.priority)}</select></div>
       <div class="field"><label>סטטוס</label><select class="input" name="status">${dictOptions(TASK_STATUS, t.status)}</select></div>
       <div class="field"><label>תאריך יעד</label><input class="input" type="date" name="due" value="${esc(t.due)}"></div>
@@ -1018,7 +1024,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const old = {}; db.tasks.forEach((t) => { if (t.sheet) old[t.id] = t; });
     const fromSheet = res.tasks.map((t) => ({
       id: t.id, sheet: true, sheetClient: t.client, sheetNum: t.num, title: t.title, notes: t.notes,
-      projectId: t.group ? map[t.client + '|' + t.group] || '' : '', assignee: t.assignee, priority: t.priority, status: t.status, due: t.due,
+      projectId: t.group ? map[t.client + '|' + t.group] || '' : '', assignee: t.assignee, contactName: t.contactName, contactPhone: t.contactPhone, priority: t.priority, status: t.status, due: t.due,
       cal: old[t.id] && old[t.id].cal,
     }));
     // The tasks taken from the status reports (drv-t-) are replaced by the sheet, which is the real list.
@@ -1031,6 +1037,64 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const busy = (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || ($('#modalBg') && $('#modalBg').classList.contains('show'));
     if (!busy) render(); else { updateBadge(); showSheetStatus(); }
   }
+
+  // ---------- Per-task links: call whoever handles it, open its mail thread ----------
+  const normName = (x) => String(x || '').replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
+  function contactFor(name) {
+    const n = normName(name); if (!n) return null;
+    const list = db.contacts || [];
+    return list.find((c) => normName(c.name) === n) || list.find((c) => { const cn = normName(c.name); return cn && (cn.startsWith(n + ' ') || n.startsWith(cn + ' ')); }) || null;
+  }
+  // The person to call: the task's contact (from the sheet or the form), else a contact named like the assignee.
+  const myName = () => normName((me && me.name) || (localSession && localSession.name) || '');
+  function taskPerson(t) {
+    // Not yourself: when you are the assignee, only the task's outside contact counts.
+    const mine = (n) => { const a = normName(n), m = myName(); return !!(m && a && (a === m || a.startsWith(m + ' ') || a.includes(' ' + m) || a.startsWith(m + ' ו'))); };
+    const c = contactFor(t.contactName) || (!mine(t.assignee) ? contactFor(t.assignee) : null);
+    const name = t.contactName || (c && c.name) || '';
+    const phone = t.contactPhone || (c && c.phone) || '';
+    return { name, phone, email: (c && c.email) || '' };
+  }
+  const TITLE_STOP = ['עם', 'של', 'את', 'על', 'לפי', 'מול', 'בין', 'עבור', 'אל', 'או', 'גם', 'רק', 'כל', 'לא', 'יש', 'מוטי', 'מנדי'];
+  function taskMailQuery(t, withPerson) {
+    const words = String(t.title || '').replace(/\(.*?\)/g, ' ').replace(/[–\-–—,.:;'"׳״/!?]/g, ' ').split(/\s+/)
+      .filter((w) => w.length > 1 && !TITLE_STOP.includes(w)).slice(0, 4);
+    const who = taskPerson(t);
+    const parts = [];
+    if (withPerson && who.email) parts.push(`{from:${who.email} to:${who.email} cc:${who.email}}`);
+    if (words.length) parts.push(words.join(' '));
+    return parts.join(' ');
+  }
+  function taskLinks(t) {
+    const who = taskPerson(t);
+    const tel = who.phone.replace(/[^\d+]/g, '');
+    return `${tel ? `<a class="tlink" href="tel:${esc(tel)}" title="התקשרות ל${esc(who.name || 'מטפל')}" onclick="event.stopPropagation()">📞 ${esc(who.name || who.phone)}</a>` : ''}`
+      + `<a class="tlink" href="#" data-mail="${esc(t.id)}" title="פתיחת שרשור המייל בנושא">✉️ מייל</a>`;
+  }
+  // Opens the newest mail thread on the task: first by its contact and words from the title, then by the words
+  // alone, then by the contact alone. Without a Google connection, opens a Gmail search.
+  async function openTaskMail(t) {
+    const win = window.open('about:blank', '_blank'); // opened now, so the browser doesn't block it
+    const qs = [taskMailQuery(t, true), taskMailQuery(t, false)];
+    const who = taskPerson(t); if (who.email) qs.push(`{from:${who.email} to:${who.email}}`);
+    const queries = qs.filter((q, i) => q && qs.indexOf(q) === i);
+    const go = (url) => { if (win) win.location.href = url; else window.open(url, '_blank'); };
+    const fallback = 'https://mail.google.com/mail/u/0/#search/' + encodeURIComponent(queries[0] || t.title);
+    if (!GOOGLE || !G.valid()) { go(fallback); return; }
+    try {
+      for (const q of queries) {
+        const id = await G.gmail.findThread(q);
+        if (id) { go(G.gmail.link({ threadId: id })); return; }
+      }
+      toast('לא נמצא מייל בנושא, נפתח חיפוש ב-Gmail');
+      go(G.gmail.searchLink(queries[queries.length - 1] || t.title));
+    } catch (e) { go(fallback); }
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-mail]'); if (!a) return;
+    e.preventDefault(); e.stopPropagation();
+    const t = byId(db.tasks, a.dataset.mail); if (t) openTaskMail(t);
+  }, true);
 
   // ---------- Contacts (from the tasks sheet) ----------
   function renderContacts(el) {

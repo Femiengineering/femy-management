@@ -102,7 +102,7 @@
         tasks.push({
           id: 'sh-' + hash(client + '|' + group + '|' + (a || title)),
           num: a, client, group, title, notes,
-          assignee: clean(get('who')),
+          assignee: clean(get('who')), contactName: contact, contactPhone: phone,
           due: toDate(get('due')),
           priority: PRIORITY[clean(get('pri'))] || 'medium',
           status: STATUS[clean(get('status'))] || 'todo',
