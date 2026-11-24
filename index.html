@@ -305,9 +305,21 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 7px; margin-inline-end: 7px; vertical-align: 1px; background: var(--primary-soft); color: var(--primary); }
 .tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
-.pv-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.pv-pane { position: sticky; top: -18px; z-index: 3; background: var(--surface); padding-bottom: 6px; }
-.pv-pane iframe { width: 100%; height: min(520px, 55vh); border: 1px solid var(--border); border-radius: 8px; background: #9aa1a8; display: block; }
+.pv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 13px; }
+.pv-bar b { font-size: 14px; }
+/* Protocol form: the form on the right, a fixed live preview on the left (on top on narrow screens). */
+.modal.wide.with-pv { max-width: 1480px; }
+.modal.with-pv .modal-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 44%); grid-template-areas: "form pv"; gap: 18px; align-items: start; }
+.pv-form { grid-area: form; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; min-width: 0; }
+.pv-pane { grid-area: pv; position: sticky; top: -28px; z-index: 3; background: var(--surface); padding: 6px 0; min-width: 0; }
+.pv-pane iframe { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--border); border-radius: 8px; background: #9aa1a8; display: block; }
+.pv-pane [data-preview] { display: none; }
+@media (max-width: 1099px) {
+  .modal.with-pv .modal-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "pv" "form"; }
+  .pv-pane { top: -40px; }
+  .pv-pane iframe { height: min(440px, 42vh); }
+  .pv-pane [data-preview] { display: inline-flex; }
+}
 .proto-kinds { display: flex; width: 100%; margin-bottom: 12px; }
 .proto-kinds button { flex: 1; padding: 10px 12px; font-size: 15px; }
 .proto-kinds .n { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: var(--border); color: var(--text); font-size: 12px; margin-inline-start: 4px; }
@@ -346,6 +358,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pi-fields.pi-tour { grid-template-columns: 1fr; }
 .pi-f { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
 .pi-f textarea { min-height: 54px; resize: vertical; }
+@media (max-width: 700px) { .pv-form { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .pi-fields.pi-meeting, .pi-fields.pi-supervision { grid-template-columns: 1fr 1fr; } .pi-fields .pi-details, .pi-fields .pi-instructions { grid-column: 1 / -1; } }
 .proto.open .chev { transform: rotate(-90deg); }
 
@@ -2051,8 +2064,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     const vis = (tpls) => `data-tpls="${tpls}" style="${tpls.split(' ').includes(p.template) ? '' : 'display:none'}"`;
     openModal(proto ? 'עריכת ' + PROTO_TPL[p.template].label : 'פרוטוקול חדש', `
-      <div class="field full pv-bar"><button type="button" class="btn sm" data-preview>👁️ תצוגה מקדימה</button><span class="hint" data-pvhint>רואים את המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span></div>
-      <div class="field full pv-pane" style="display:none"><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
+      <div class="pv-pane"><div class="pv-bar"><b>👁️ תצוגה מקדימה</b><span class="hint">המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span><span class="spacer" style="flex:1"></span><button type="button" class="btn sm" data-preview>הסתרה</button></div><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
+      <div class="pv-form">
       <div class="field"><label>תבנית</label><select class="input" name="template">${PROTO_TPL_KEYS.map((k) => `<option value="${k}" ${k === p.template ? 'selected' : ''}>${esc(PROTO_TPL[k].label)}</option>`).join('')}</select></div>
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
@@ -2070,24 +2083,25 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <div id="protoItems"></div>
         <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
         <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא בלי תוכן לא יופיע במסמך. מלאו "באחריות" כדי ליצור ממנו משימה.'}</span></div>
-      <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>`,
+      <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>
+      </div>`,
     (data) => {
       protoFormFinish(data);
       if (proto) Object.assign(proto, data); else { const n = Object.assign({ id: uid() }, data); db.protocols.push(n); ui.openProto = n.id; }
       save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
     },
     proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
-    $('#modalForm').classList.add('wide');
+    $('#modalForm').classList.add('wide', 'with-pv');
     const body = $('#modalBody');
     const tplSel = $('[name="template"]', body);
     const projSel = $('[name="projectId"]', body);
     let curTpl = p.template;
     drawProtoItems(curTpl, p.items || []);
-    // Live preview at the top of the form.
-    const pvPane = $('.pv-pane', body); const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
+    // Live preview, always open: on the left beside the form (on top of it on narrow screens).
+    const pvFrame = $('[data-pvframe]', body); const pvBtn = $('[data-preview]', body);
     let pvTimer = null;
     const drawPreview = () => {
-      if (pvPane.style.display === 'none') return;
+      if (pvFrame.style.display === 'none') return;
       const data = {}; new FormData($('#modalForm')).forEach((v, k) => { data[k] = v; });
       const keep = pvFrame.contentWindow ? pvFrame.contentWindow.scrollY : 0;
       pvFrame.onload = () => { try { pvFrame.contentWindow.scrollTo(0, keep); } catch (e) {} };
@@ -2095,12 +2109,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     };
     const schedulePreview = () => { clearTimeout(pvTimer); pvTimer = setTimeout(drawPreview, 350); };
     pvBtn.addEventListener('click', () => {
-      const show = pvPane.style.display === 'none';
-      pvPane.style.display = show ? '' : 'none';
-      pvBtn.textContent = show ? '✕ סגירת התצוגה המקדימה' : '👁️ תצוגה מקדימה';
-      pvBtn.classList.toggle('primary', show);
+      const show = pvFrame.style.display === 'none';
+      pvFrame.style.display = show ? '' : 'none';
+      pvBtn.textContent = show ? 'הסתרה' : 'הצגה';
       if (show) drawPreview();
     });
+    drawPreview();
     body.addEventListener('input', schedulePreview);
     body.addEventListener('change', schedulePreview);
     body.addEventListener('click', (e) => { if (e.target.closest('button') && !e.target.closest('[data-preview]')) schedulePreview(); });
@@ -3061,7 +3075,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   let modalSubmit = null; let modalDelete = null;
   function openModal(title, bodyHtml, onSubmit, onDelete, deleteNote) {
     $('#modalTitle').textContent = title;
-    $('#modalForm').classList.remove('wide');
+    $('#modalForm').classList.remove('wide', 'with-pv');
     $('#modalBody').innerHTML = bodyHtml;
     modalSubmit = onSubmit; modalDelete = onDelete;
     const del = $('#modalDelete');
