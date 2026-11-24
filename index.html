@@ -199,6 +199,15 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
 /* Kanban */
 .tgroup { padding: 14px 16px; margin-bottom: 12px; }
+#taskViews { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+#taskViews button { white-space: nowrap; }
+#taskArea { touch-action: pan-y; }
+.sheet-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: -4px 0 12px; }
+.tg-note { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.tg-title { min-width: 0; }
+.contact .tg-meta a { color: inherit; }
+.tlink { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--primary); text-decoration: none; background: var(--surface); white-space: nowrap; }
+.tlink:hover { background: var(--primary-soft); }
 .tg-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .tg-head .grow { flex: 1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .tg-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
@@ -442,6 +451,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <a href="#google" data-view="google"><span class="ico">📅</span>יומן, מייל ו-Drive</a>
         <div class="nav-sep">עוד</div>
         <a href="#tasks" data-view="tasks" class="minor"><span class="ico">✅</span>כל המשימות<span class="badge" id="badgeTasks"></span></a>
+        <a href="#contacts" data-view="contacts" class="minor"><span class="ico">📇</span>אנשי קשר</a>
         <a href="#accounts" data-view="accounts" class="minor"><span class="ico">💰</span>חשבונות</a>
         <a href="#settings" data-view="settings" class="minor"><span class="ico">⚙️</span>הגדרות וגיבוי</a>
       </nav>
@@ -500,6 +510,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   <script src="firebase-config.js"></script>
   <script src="google-config.js"></script>
   <script src="google.js"></script>
+  <script src="sheet-sync.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
@@ -593,7 +604,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const isAdmin = () => !CLOUD || (me && me.role === 'admin');
   let db = CLOUD || !localSession ? emptyDb() : load();
 
-  function emptyDb() { return { projects: [], tasks: [], invoices: [], protocols: [], settings: {}, demo: false }; }
+  function emptyDb() { return { projects: [], tasks: [], invoices: [], protocols: [], contacts: [], settings: {}, demo: false }; }
   const settings = () => (db.settings = db.settings || {});
 
   function load() {
@@ -658,10 +669,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     project: { title: 'פרויקט', render: renderProjectPage },
     accounts: { title: 'חשבונות', render: renderAccounts },
     protocols: { title: 'פרוטוקולים', render: renderProtocols },
+    contacts: { title: 'אנשי קשר', render: renderContacts },
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'recent', protoProject: '', openProto: null, gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'recent', protoProject: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [] };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -796,6 +808,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   const assignees = () => Array.from(new Set(db.tasks.map((t) => t.assignee).filter(Boolean))).sort();
 
+  const GROUP_VIEWS = ['priority', 'projects', 'client'];
+  const TASK_VIEWS = [['priority', 'לפי דחיפות'], ['projects', 'לפי פרויקט'], ['client', 'לפי לקוח'], ['board', 'לוח'], ['list', 'רשימה']];
   function renderTasks(el) {
     const f = ui.taskFilter;
     el.innerHTML = `
@@ -805,15 +819,38 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <select class="input" id="ta"><option value="">כל האחראים</option>${assignees().map((a) => `<option ${a === f.assignee ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select>
         <select class="input" id="tpr">${dictOptions(PRIORITY, f.priority, 'כל העדיפויות')}</select>
         <span class="spacer"></span>
-        <div class="seg"><button data-v="projects" class="${ui.taskView === 'projects' ? 'on' : ''}">לפי פרויקט</button><button data-v="board" class="${ui.taskView === 'board' ? 'on' : ''}">לוח</button><button data-v="list" class="${ui.taskView === 'list' ? 'on' : ''}">רשימה</button></div>
+        <div class="seg" id="taskViews">${TASK_VIEWS.map(([k, l]) => `<button data-v="${k}" class="${ui.taskView === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       </div>
+      ${TASK_SHEET ? `<div class="sheet-bar"><span class="hint" id="sheetStatus">${sheetStatusText()}</span>
+        <a class="hint" href="https://docs.google.com/spreadsheets/d/${encodeURIComponent(TASK_SHEET)}/edit" target="_blank" rel="noopener">פתיחת הגיליון ↗</a>
+        <button class="btn sm" id="sheetSyncBtn">🔄 סנכרון עכשיו</button></div>` : ''}
       <div id="taskArea"></div>`;
+    const ssb = $('#sheetSyncBtn', el);
+    if (ssb) ssb.addEventListener('click', () => syncTaskSheet(true));
     const rerender = () => drawTasks($('#taskArea', el));
     $('#tq', el).addEventListener('input', (e) => { f.q = e.target.value; rerender(); });
     $('#tp', el).addEventListener('change', (e) => { f.project = e.target.value; rerender(); });
     $('#ta', el).addEventListener('change', (e) => { f.assignee = e.target.value; rerender(); });
     $('#tpr', el).addEventListener('change', (e) => { f.priority = e.target.value; rerender(); });
     $$('.seg button', el).forEach((b) => b.addEventListener('click', () => { ui.taskView = b.dataset.v; renderTasks(el); }));
+    // Swipe right or left on the tasks to move between the views, in the order of the buttons.
+    // The page is right to left, so the next view sits to the left: a swipe to the right brings it in.
+    const area = $('#taskArea', el);
+    let sx = null, sy = 0;
+    area.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1 || e.target.closest('.kanban, .table-wrap')) { sx = null; return; }
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    }, { passive: true });
+    area.addEventListener('touchend', (e) => {
+      if (sx == null) return;
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+      const keys = TASK_VIEWS.map(([k]) => k);
+      const i = keys.indexOf(ui.taskView) + (dx > 0 ? 1 : -1);
+      if (i < 0 || i >= keys.length) return;
+      ui.taskView = keys[i]; renderTasks(el);
+      const on = $('#taskViews .on', el); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, { passive: true });
     rerender();
   }
 
@@ -827,37 +864,52 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}
       </div>
       ${p ? `<div class="t-meta" style="margin-top:4px">🏗 ${esc(p.name)}</div>` : ''}
+      <div class="t-meta" style="margin-top:6px">${taskLinks(t)}</div>
     </div>`;
   }
 
   function drawTasks(area) {
     const list = filteredTasks().sort((a, b) => byId(PRIORITY, a.priority).rank - byId(PRIORITY, b.priority).rank || (a.due || '9999').localeCompare(b.due || '9999'));
-    if (ui.taskView === 'projects') {
-      // One section per project: its open tasks first, completed ones folded at the bottom.
-      const groups = db.projects.map((p) => ({ p, items: list.filter((t) => t.projectId === p.id) }));
-      groups.push({ p: null, items: list.filter((t) => !byId(db.projects, t.projectId)) });
+    if (GROUP_VIEWS.includes(ui.taskView)) {
+      // Grouped views: by urgency, by project or by client. Each group shows its open tasks,
+      // with the completed ones folded at the bottom.
+      const mode = ui.taskView;
+      const projOf = (t) => byId(db.projects, t.projectId);
+      let groups;
+      if (mode === 'priority') {
+        groups = PRIORITY.map((pr) => ({ key: 'pr-' + pr.id, title: pr.label, head: '', add: { priority: pr.id }, items: list.filter((t) => t.priority === pr.id) }));
+      } else if (mode === 'client') {
+        const clients = [];
+        db.projects.forEach((pj) => { const c = (pj.client || '').trim(); if (!clients.includes(c)) clients.push(c); });
+        groups = clients.map((c) => {
+          const ids = db.projects.filter((pj) => (pj.client || '').trim() === c).map((pj) => pj.id);
+          return { key: 'cl-' + c, title: c || 'ללא לקוח', head: `<span class="hint">${ids.length} פרויקטים</span>`, add: {}, items: list.filter((t) => ids.includes(t.projectId)) };
+        });
+        groups.push({ key: 'cl-_none', title: 'ללא פרויקט', head: '', add: {}, items: list.filter((t) => !projOf(t)) });
+      } else {
+        groups = db.projects.map((pj) => ({ key: pj.id, title: pj.name, head: `<span class="hint">${esc(pj.client || '')}</span> ${pill(PROJECT_STATUS, pj.status)}`, add: { projectId: pj.id }, pid: pj.id, items: list.filter((t) => t.projectId === pj.id) }));
+        groups.push({ key: '_none', title: 'ללא פרויקט', head: '', add: {}, items: list.filter((t) => !projOf(t)) });
+      }
       const filtering = ui.taskFilter.q || ui.taskFilter.assignee || ui.taskFilter.priority || ui.taskFilter.project;
-      const shown = groups.filter((g) => g.items.length && (!ui.taskFilter.project || (g.p && g.p.id === ui.taskFilter.project)))
-        .sort((a, b) => (b.items.some((t) => t.status !== 'done') - a.items.some((t) => t.status !== 'done'))
-          || (a.p ? 0 : 1) - (b.p ? 0 : 1));
+      const hasOpen = (g) => g.items.some((t) => t.status !== 'done');
+      let shown = groups.filter((g) => g.items.length && (mode !== 'projects' || !ui.taskFilter.project || g.pid === ui.taskFilter.project));
+      if (mode !== 'priority') shown = shown.sort((a, b) => hasOpen(b) - hasOpen(a));
       const row = (t) => {
-        const od = isOverdueTask(t); const done = t.status === 'done';
+        const od = isOverdueTask(t); const done = t.status === 'done'; const pj = projOf(t);
         return `<div class="tg-row" data-id="${t.id}">
           <input type="checkbox" data-done ${done ? 'checked' : ''} title="סימון כהושלם">
-          <a href="#" data-edit class="tg-title" style="${done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(t.title)}</a>
-          <span class="tg-meta">${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}${pill(PRIORITY, t.priority)}${pill(TASK_STATUS, t.status)}</span>
+          <a href="#" data-edit class="tg-title" style="${done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(t.title)}${t.notes ? `<div class="hint tg-note">${esc(t.notes.split('\n')[0])}</div>` : ''}</a>
+          <span class="tg-meta">${taskLinks(t)}${mode !== 'projects' && pj ? `<span>🏗 ${esc(pj.name)}</span>` : ''}${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}${t.due ? `<span class="${od ? 'overdue' : ''}">📅 ${fmtDate(t.due)}</span>` : ''}${mode !== 'priority' ? pill(PRIORITY, t.priority) : ''}${pill(TASK_STATUS, t.status)}</span>
         </div>`;
       };
       area.innerHTML = shown.map((g) => {
-        const key = g.p ? g.p.id : '_none';
         const open = g.items.filter((t) => t.status !== 'done'); const done = g.items.filter((t) => t.status === 'done');
         const odN = open.filter(isOverdueTask).length;
-        const showDone = ui.taskOpenDone[key];
-        return `<div class="card tgroup" data-key="${key}">
-          <div class="tg-head"><div class="grow"><b>${g.p ? esc(g.p.name) : 'ללא פרויקט'}</b>
-            ${g.p ? `<span class="hint">${esc(g.p.client || '')}</span> ${pill(PROJECT_STATUS, g.p.status)}` : ''}</div>
+        const showDone = ui.taskOpenDone[g.key];
+        return `<div class="card tgroup" data-key="${esc(g.key)}">
+          <div class="tg-head"><div class="grow"><b>${esc(g.title)}</b> ${g.head}</div>
             <span class="hint">${open.length} פתוחות${odN ? ` · <span class="overdue">${odN} באיחור</span>` : ''}</span>
-            <button class="btn sm" data-addp="${g.p ? g.p.id : ''}">+ משימה</button></div>
+            <button class="btn sm" data-addg="${esc(JSON.stringify(g.add))}">+ משימה</button></div>
           ${open.map(row).join('') || '<div class="hint" style="padding:8px 0">אין משימות פתוחות</div>'}
           ${done.length ? `<a href="#" class="hint" data-toggle-done style="display:inline-block;padding-top:8px">${showDone ? 'הסתרת' : 'הצגת'} ${done.length} משימות שהושלמו</a>${showDone ? done.map(row).join('') : ''}` : ''}
         </div>`;
@@ -870,7 +922,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $$('.tgroup', area).forEach((g) => {
         const tg = $('[data-toggle-done]', g);
         if (tg) tg.addEventListener('click', (e) => { e.preventDefault(); ui.taskOpenDone[g.dataset.key] = !ui.taskOpenDone[g.dataset.key]; drawTasks(area); });
-        $('[data-addp]', g).addEventListener('click', (e) => openTaskForm(null, { projectId: e.target.dataset.addp }));
+        $('[data-addg]', g).addEventListener('click', (e) => openTaskForm(null, JSON.parse(e.currentTarget.dataset.addg)));
       });
     } else if (ui.taskView === 'board') {
       area.innerHTML = `<div class="kanban">${TASK_STATUS.map((s) => {
@@ -882,7 +934,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         </div>`;
       }).join('')}</div>`;
       $$('.tcard', area).forEach((c) => {
-        c.addEventListener('click', () => openTaskForm(byId(db.tasks, c.dataset.id)));
+        c.addEventListener('click', (e) => { if (e.target.closest('a')) return; openTaskForm(byId(db.tasks, c.dataset.id)); });
         c.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); });
         c.addEventListener('dragend', () => c.classList.remove('dragging'));
       });
@@ -909,7 +961,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
             <td>${pill(PRIORITY, t.priority)}</td>
             <td>${pill(TASK_STATUS, t.status)}</td>
             <td class="${od ? 'overdue' : ''}">${fmtDate(t.due)}</td>
-            <td class="actions"><button class="icon-btn" data-edit title="עריכה">✏️</button></td></tr>`;
+            <td class="actions" style="white-space:nowrap">${taskLinks(t)} <button class="icon-btn" data-edit title="עריכה">✏️</button></td></tr>`;
         }).join('') || '<tr><td colspan="8" class="empty">לא נמצאו משימות</td></tr>'}</tbody></table></div>`;
       $$('tr[data-id]', area).forEach((tr) => {
         const t = byId(db.tasks, tr.dataset.id);
@@ -926,10 +978,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function openTaskForm(task, defaults) {
     const t = task || Object.assign({ title: '', projectId: ui.taskFilter.project || '', assignee: '', priority: 'medium', status: 'todo', due: '', notes: '' }, defaults || {});
     openModal(task ? 'עריכת משימה' : 'משימה חדשה', `
+      ${t.sheet ? `<div class="field full hint" style="background:var(--amber-soft);padding:8px 10px;border-radius:8px">המשימה מגיעה מהגיליון "משימות פמי" (${esc(t.sheetClient || '')}${t.sheetNum ? ', שורה ' + esc(t.sheetNum) : ''}). שינוי כאן יוחלף בסנכרון הבא, לכן עדכנו אותה בגיליון. <a href="https://docs.google.com/spreadsheets/d/${encodeURIComponent(TASK_SHEET)}/edit" target="_blank" rel="noopener">פתיחת הגיליון</a></div>` : ''}
       <div class="field full"><label>כותרת *</label><input class="input" name="title" required value="${esc(t.title)}"></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(t.projectId, 'ללא פרויקט')}</select></div>
       <div class="field"><label>אחראי</label><input class="input" name="assignee" list="assigneeList" value="${esc(t.assignee)}">
         <datalist id="assigneeList">${assignees().map((a) => `<option value="${esc(a)}">`).join('')}</datalist></div>
+      <div class="field"><label>איש קשר לטיפול</label><input class="input" name="contactName" list="contactList" value="${esc(t.contactName || '')}">
+        <datalist id="contactList">${(db.contacts || []).map((c) => `<option value="${esc(c.name)}">${esc(c.role || '')}</option>`).join('')}</datalist></div>
+      <div class="field"><label>טלפון איש הקשר</label><input class="input" name="contactPhone" type="tel" dir="ltr" value="${esc(t.contactPhone || '')}" placeholder="ימולא מאנשי הקשר אם ריק"></div>
       <div class="field"><label>עדיפות</label><select class="input" name="priority">${dictOptions(PRIORITY, t.priority)}</select></div>
       <div class="field"><label>סטטוס</label><select class="input" name="status">${dictOptions(TASK_STATUS, t.status)}</select></div>
       <div class="field"><label>תאריך יעד</label><input class="input" type="date" name="due" value="${esc(t.due)}"></div>
@@ -943,6 +999,144 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (toCal) taskToCalendar(saved);
     },
     task ? () => { db.tasks = db.tasks.filter((x) => x !== task); save(); render(); toast('המשימה נמחקה'); } : null);
+  }
+
+  // ---------- Sync from the tasks sheet ("משימות פמי" in Drive) ----------
+  // The sheet is the source of the tasks and contacts: every 10 minutes (and on demand) the site reads it,
+  // replaces the tasks that came from it, and keeps the tasks that were added on the site itself.
+  const TASK_SHEET = (window.FEMY_GOOGLE && window.FEMY_GOOGLE.tasksSheetId) || '';
+  const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  let sheetSyncing = false;
+  function sheetStatusText() {
+    const st = settings().sheetSync;
+    if (sheetSyncing) return '🔄 מסנכרן מהגיליון "משימות פמי"...';
+    if (!st) return GOOGLE && G.status().connected ? 'המשימות יסונכרנו מהגיליון "משימות פמי"' : 'כדי לסנכרן מהגיליון "משימות פמי", חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive)';
+    const min = Math.round((Date.now() - st.at) / 60000);
+    return `מסונכרן מהגיליון "משימות פמי": ${st.tasks} משימות, ${st.contacts} אנשי קשר · ${min < 1 ? 'עכשיו' : min < 60 ? `לפני ${min} דק׳` : new Date(st.at).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+  }
+  function showSheetStatus() { const e = $('#sheetStatus'); if (e) e.textContent = sheetStatusText(); }
+  async function syncTaskSheet(manual) {
+    if (!GOOGLE || !TASK_SHEET || !window.FemySheet || sheetSyncing || !isAdmin()) return;
+    if (!manual && !G.silent()) return;
+    sheetSyncing = true; showSheetStatus();
+    try {
+      if (manual) await G.token(); // may ask to connect, straight from the click
+      const [JSZip, buf] = await Promise.all([loadJSZip(), G.drive.exportFile(TASK_SHEET, XLSX)]);
+      const res = FemySheet.parse(await FemySheet.readXlsx(buf, JSZip));
+      if (!res.tasks.length) throw new Error('לא נמצאו משימות בגיליון');
+      applySheet(res);
+      if (manual) toast(`סונכרנו ${res.tasks.length} משימות ו-${res.contacts.length} אנשי קשר מהגיליון`);
+    } catch (e) {
+      if (manual) toast('הסנכרון מהגיליון נכשל: ' + gErr(e));
+    } finally { sheetSyncing = false; showSheetStatus(); }
+  }
+  function applySheet(res) {
+    const st = settings();
+    const map = st.sheetMap = st.sheetMap || {}; // "לקוח|פרויקט בגיליון" -> project id on the site
+    res.groups.forEach((g) => {
+      const key = g.client + '|' + g.name;
+      if (map[key] && byId(db.projects, map[key])) return;
+      let p = FemySheet.matchProject(g.name, g.client, db.projects);
+      if (!p) {
+        p = { id: 'sh-p-' + FemySheet.hash(key), name: g.name, client: g.client, location: '', manager: '', status: 'active', progress: 0, start: '', end: '', budget: '', notes: 'נוצר מהגיליון "משימות פמי".' };
+        if (!byId(db.projects, p.id)) db.projects.push(p);
+      }
+      map[key] = p.id;
+    });
+    const old = {}; db.tasks.forEach((t) => { if (t.sheet) old[t.id] = t; });
+    const fromSheet = res.tasks.map((t) => ({
+      id: t.id, sheet: true, sheetClient: t.client, sheetNum: t.num, title: t.title, notes: t.notes,
+      projectId: t.group ? map[t.client + '|' + t.group] || '' : '', assignee: t.assignee, contactName: t.contactName, contactPhone: t.contactPhone, priority: t.priority, status: t.status, due: t.due,
+      cal: old[t.id] && old[t.id].cal,
+    }));
+    // The tasks taken from the status reports (drv-t-) are replaced by the sheet, which is the real list.
+    db.tasks = db.tasks.filter((t) => !t.sheet && !/^drv-t-/.test(t.id)).concat(fromSheet);
+    db.contacts = res.contacts;
+    st.sheetSync = { at: Date.now(), tasks: fromSheet.length, contacts: res.contacts.length };
+    save();
+    // Don't redraw under someone who is typing or has a form open.
+    const a = document.activeElement;
+    const busy = (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || ($('#modalBg') && $('#modalBg').classList.contains('show'));
+    if (!busy) render(); else { updateBadge(); showSheetStatus(); }
+  }
+
+  // ---------- Per-task links: call whoever handles it, open its mail thread ----------
+  const normName = (x) => String(x || '').replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
+  function contactFor(name) {
+    const n = normName(name); if (!n) return null;
+    const list = db.contacts || [];
+    return list.find((c) => normName(c.name) === n) || list.find((c) => { const cn = normName(c.name); return cn && (cn.startsWith(n + ' ') || n.startsWith(cn + ' ')); }) || null;
+  }
+  // The person to call: the task's contact (from the sheet or the form), else a contact named like the assignee.
+  const myName = () => normName((me && me.name) || (localSession && localSession.name) || '');
+  function taskPerson(t) {
+    // Not yourself: when you are the assignee, only the task's outside contact counts.
+    const mine = (n) => { const a = normName(n), m = myName(); return !!(m && a && (a === m || a.startsWith(m + ' ') || a.includes(' ' + m) || a.startsWith(m + ' ו'))); };
+    const c = contactFor(t.contactName) || (!mine(t.assignee) ? contactFor(t.assignee) : null);
+    const name = t.contactName || (c && c.name) || '';
+    const phone = t.contactPhone || (c && c.phone) || '';
+    return { name, phone, email: (c && c.email) || '' };
+  }
+  const TITLE_STOP = ['עם', 'של', 'את', 'על', 'לפי', 'מול', 'בין', 'עבור', 'אל', 'או', 'גם', 'רק', 'כל', 'לא', 'יש', 'מוטי', 'מנדי'];
+  function taskMailQuery(t, withPerson) {
+    const words = String(t.title || '').replace(/\(.*?\)/g, ' ').replace(/[–\-–—,.:;'"׳״/!?]/g, ' ').split(/\s+/)
+      .filter((w) => w.length > 1 && !TITLE_STOP.includes(w)).slice(0, 4);
+    const who = taskPerson(t);
+    const parts = [];
+    if (withPerson && who.email) parts.push(`{from:${who.email} to:${who.email} cc:${who.email}}`);
+    if (words.length) parts.push(words.join(' '));
+    return parts.join(' ');
+  }
+  function taskLinks(t) {
+    const who = taskPerson(t);
+    const tel = who.phone.replace(/[^\d+]/g, '');
+    return `${tel ? `<a class="tlink" href="tel:${esc(tel)}" title="התקשרות ל${esc(who.name || 'מטפל')}" onclick="event.stopPropagation()">📞 ${esc(who.name || who.phone)}</a>` : ''}`
+      + `<a class="tlink" href="#" data-mail="${esc(t.id)}" title="פתיחת שרשור המייל בנושא">✉️ מייל</a>`;
+  }
+  // Opens the newest mail thread on the task: first by its contact and words from the title, then by the words
+  // alone, then by the contact alone. Without a Google connection, opens a Gmail search.
+  async function openTaskMail(t) {
+    const win = window.open('about:blank', '_blank'); // opened now, so the browser doesn't block it
+    const qs = [taskMailQuery(t, true), taskMailQuery(t, false)];
+    const who = taskPerson(t); if (who.email) qs.push(`{from:${who.email} to:${who.email}}`);
+    const queries = qs.filter((q, i) => q && qs.indexOf(q) === i);
+    const go = (url) => { if (win) win.location.href = url; else window.open(url, '_blank'); };
+    const fallback = 'https://mail.google.com/mail/u/0/#search/' + encodeURIComponent(queries[0] || t.title);
+    if (!GOOGLE || !G.valid()) { go(fallback); return; }
+    try {
+      for (const q of queries) {
+        const id = await G.gmail.findThread(q);
+        if (id) { go(G.gmail.link({ threadId: id })); return; }
+      }
+      toast('לא נמצא מייל בנושא, נפתח חיפוש ב-Gmail');
+      go(G.gmail.searchLink(queries[queries.length - 1] || t.title));
+    } catch (e) { go(fallback); }
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-mail]'); if (!a) return;
+    e.preventDefault(); e.stopPropagation();
+    const t = byId(db.tasks, a.dataset.mail); if (t) openTaskMail(t);
+  }, true);
+
+  // ---------- Contacts (from the tasks sheet) ----------
+  function renderContacts(el) {
+    const q = ui.contactQ.trim().toLowerCase();
+    const list = (db.contacts || []).filter((c) => !q || [c.name, c.category, c.role, c.projects, c.phone, c.email].join(' ').toLowerCase().includes(q));
+    const sections = [];
+    list.forEach((c) => { const k = c.category || c.section || ''; let s = sections.find((x) => x.k === k); if (!s) sections.push(s = { k, sub: c.section !== k ? c.section : '', items: [] }); s.items.push(c); });
+    const tel = (p) => p.replace(/[^\d+]/g, '');
+    el.innerHTML = `
+      <div class="toolbar"><input class="input search" id="cq" placeholder="חיפוש לפי שם, תחום, פרויקט או טלפון..." value="${esc(ui.contactQ)}">
+        <span class="spacer"></span>${TASK_SHEET ? `<span class="hint" id="sheetStatus">${sheetStatusText()}</span> <button class="btn sm" id="sheetSyncBtn">🔄 סנכרון</button>` : ''}</div>
+      ${sections.map((s) => `<div class="card tgroup"><div class="tg-head"><b>${esc(s.k || 'אנשי קשר')}</b><span class="hint">${s.sub ? esc(s.sub) + ' · ' : ''}${s.items.length}</span></div>
+        ${s.items.map((c) => `<div class="tg-row contact">
+          <div class="tg-title"><b>${esc(c.name)}</b>${c.role ? `<div class="hint">${esc(c.role)}</div>` : ''}</div>
+          <span class="tg-meta">${c.projects ? `<span>🏗 ${esc(c.projects)}</span>` : ''}
+            ${c.phone ? `<a href="tel:${esc(tel(c.phone))}" dir="ltr">📞 ${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}" dir="ltr">✉️ ${esc(c.email)}</a>` : ''}</span>
+        </div>`).join('')}</div>`).join('') || `<div class="card empty">${(db.contacts || []).length ? 'לא נמצאו אנשי קשר' : 'אנשי הקשר יופיעו כאן אחרי הסנכרון מהגיליון "משימות פמי"'}</div>`}`;
+    const inp = $('#cq', el);
+    inp.addEventListener('input', () => { ui.contactQ = inp.value; renderContacts(el); const n = $('#cq', el); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
+    const sb = $('#sheetSyncBtn', el); if (sb) sb.addEventListener('click', () => syncTaskSheet(true));
   }
 
   // ---------- Projects ----------
@@ -2326,7 +2520,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
       if (!localStorage.getItem(STORE_KEY)) save();
       render();
-      importDriveProjects(false);
+      importDriveProjects(false).then(() => syncTaskSheet(false));
+      setInterval(() => syncTaskSheet(false), 10 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => {
+        const st = settings().sheetSync;
+        if (document.visibilityState === 'visible' && (!st || Date.now() - st.at > 5 * 60 * 1000)) syncTaskSheet(false);
+      });
+      G.onChange(() => { if (G.silent() && !settings().sheetSync) syncTaskSheet(false); });
     }
 
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {

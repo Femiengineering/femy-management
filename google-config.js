@@ -9,5 +9,7 @@ window.FEMY_GOOGLE = {
   // תיקיית הפרויקטים ב-Drive: בלשונית Drive באתר מוצג רק מה שבתוכה.
   projectsFolderName: 'פרויקטים פמי',
   projectsFolderId: '1rb3m55bbrVh0rFku9uRB5GaCBsR-VLCV',
+  // גיליון המשימות ("משימות פמי"): המשימות ואנשי הקשר באתר מסונכרנים ממנו כל 10 דקות.
+  tasksSheetId: '1kwUxnrAQ6zAz2AkFjsR5rHEIKzQGbjo2_Qr0Sm8gSwQ',
   tokenServer: 'https://femy-google.femy-eng.workers.dev', // לדוגמה: 'https://femy-google.<שם-החשבון>.workers.dev'
 };
