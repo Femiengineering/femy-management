@@ -665,6 +665,25 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // The signed-in user's own Google account (calendar, Gmail, Drive), via google.js.
   const G = window.FemyGoogle || { enabled: false, status: () => ({}), valid: () => false, init() {}, forget() {}, onChange() {} };
   const GOOGLE = !!G.enabled;
+  // The background sync server (worker/): it reads the company's Drive with its own service account every
+  // 15 minutes, so the tasks sheet and the protocols stay up to date even with no Google account connected.
+  const SYNC = String((window.FEMY_GOOGLE && (window.FEMY_GOOGLE.syncServer || window.FEMY_GOOGLE.tokenServer)) || '').replace(/\/+$/, '');
+  let syncDown = false; // the server has no data for us (not set up yet), so stop asking it this session
+  async function syncFetch(path, opts) {
+    let r;
+    try { r = await fetch(SYNC + path, Object.assign({ cache: 'no-store' }, opts)); }
+    catch (e) { throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת הסנכרון לא זמין'); }
+    if (!r.ok) {
+      let j = {}; try { j = await r.json(); } catch (e) { /* ignore */ }
+      const down = r.status === 404 || r.status === 405 || r.status === 503;
+      if (down) syncDown = true;
+      throw Object.assign(new Error(down ? 'הסנכרון ברקע מה-Drive עדיין לא הוגדר בשרת' : j.error || 'HTTP ' + r.status), { status: r.status, code: j.error });
+    }
+    syncDown = false;
+    return r;
+  }
+  const syncRefresh = () => syncFetch('/data/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  const useSync = (manual) => !!SYNC && (manual || !syncDown);
   let me = null; // signed-in user { uid, email, name, photo, role }
   let profile = {}; // the user's private profile (Claude key)
   const isAdmin = () => !CLOUD || (me && me.role === 'admin');
@@ -1076,27 +1095,41 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function sheetStatusText() {
     const st = settings().sheetSync;
     if (sheetSyncing) return '🔄 מסנכרן מהגיליון "משימות פמי"...';
-    if (!st) return GOOGLE && G.status().connected ? 'המשימות יסונכרנו מהגיליון "משימות פמי"' : 'כדי לסנכרן מהגיליון "משימות פמי", חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive)';
+    if (!st) return SYNC || (GOOGLE && G.status().connected) ? 'המשימות יסונכרנו מהגיליון "משימות פמי"' : 'כדי לסנכרן מהגיליון "משימות פמי", חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive)';
     const min = Math.round((Date.now() - st.at) / 60000);
     return `מסונכרן מהגיליון "משימות פמי": ${st.tasks} משימות, ${st.contacts} אנשי קשר · ${min < 1 ? 'עכשיו' : min < 60 ? `לפני ${min} דק׳` : new Date(st.at).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   }
   function showSheetStatus() { const e = $('#sheetStatus'); if (e) e.textContent = sheetStatusText(); }
+  // With a Google account connected the site reads the sheet itself (always the latest); without one it
+  // takes the copy the sync server keeps (at most 15 minutes old).
   async function syncTaskSheet(manual) {
-    if (!GOOGLE || !TASK_SHEET || !window.FemySheet || sheetSyncing || !isAdmin()) return;
-    if (!manual && !G.silent()) return;
+    if (!TASK_SHEET || !window.FemySheet || sheetSyncing || !isAdmin()) return;
+    const direct = GOOGLE && (G.silent() || (manual && !SYNC));
+    if (!direct && !useSync(manual)) return;
     sheetSyncing = true; showSheetStatus();
     try {
-      if (manual) await G.token(); // may ask to connect, straight from the click
-      const [JSZip, buf] = await Promise.all([loadJSZip(), G.drive.exportFile(TASK_SHEET, XLSX)]);
+      let buf, at = Date.now();
+      if (direct) {
+        if (manual) await G.token(); // may ask to connect, straight from the click
+        buf = await G.drive.exportFile(TASK_SHEET, XLSX);
+      } else {
+        if (manual) await syncRefresh();
+        const r = await syncFetch('/data/sheet');
+        at = Number(r.headers.get('X-Synced-At')) || at;
+        const st = settings().sheetSync;
+        if (!manual && st && st.at >= at) return; // nothing new since the last sync
+        buf = await r.arrayBuffer();
+      }
+      const JSZip = await loadJSZip();
       const res = FemySheet.parse(await FemySheet.readXlsx(buf, JSZip));
       if (!res.tasks.length) throw new Error('לא נמצאו משימות בגיליון');
-      applySheet(res);
+      applySheet(res, at);
       if (manual) toast(`סונכרנו ${res.tasks.length} משימות ו-${res.contacts.length} אנשי קשר מהגיליון`);
     } catch (e) {
       if (manual) toast('הסנכרון מהגיליון נכשל: ' + gErr(e));
     } finally { sheetSyncing = false; showSheetStatus(); }
   }
-  function applySheet(res) {
+  function applySheet(res, at) {
     const st = settings();
     const map = st.sheetMap = st.sheetMap || {}; // "לקוח|פרויקט בגיליון" -> project id on the site
     res.groups.forEach((g) => {
@@ -1118,7 +1151,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     // The tasks taken from the status reports (drv-t-) are replaced by the sheet, which is the real list.
     db.tasks = db.tasks.filter((t) => !t.sheet && !/^drv-t-/.test(t.id)).concat(fromSheet);
     db.contacts = res.contacts;
-    st.sheetSync = { at: Date.now(), tasks: fromSheet.length, contacts: res.contacts.length };
+    st.sheetSync = { at: at || Date.now(), tasks: fromSheet.length, contacts: res.contacts.length };
     save();
     // Don't redraw under someone who is typing or has a form open.
     const a = document.activeElement;
@@ -1815,12 +1848,31 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   const dpProject = (it) => byId(db.projects, it.projectId) || (it.projectFolder ? db.projects.find((p) => p.driveFolder === it.projectFolder) : null) || null;
   const dpUrl = (f) => (DP ? DP.fileUrl(f) : '#');
+  // The sync server's copy comes first (no Google account needed); the user's own Google account is the
+  // fallback, while the server is not set up.
   async function syncDriveProtos(manual) {
-    if (!GOOGLE || !DP || dprot.syncing) return;
-    if (!manual && (!G.silent() || Date.now() - Math.max(dprot.at, dprot.tried) < 15 * 60 * 1000)) return;
+    if (!DP || dprot.syncing) return;
+    const server = useSync(manual);
+    const direct = GOOGLE && (G.silent() || (manual && !SYNC));
+    if (!server && !direct) return;
+    if (!manual && Date.now() - Math.max(dprot.at, dprot.tried) < (server ? 5 : 15) * 60 * 1000) return;
     dprot.syncing = true; dprot.tried = Date.now(); dprot.err = ''; showDriveProtoStatus();
     try {
-      if (manual) await G.token(); // may ask to connect, straight from the click
+      if (server) {
+        try {
+          if (manual) await syncRefresh();
+          const d = await (await syncFetch('/data/drive')).json();
+          if (!d || !Array.isArray(d.files)) throw new Error('no_data');
+          dprot.items = DP.buildItems(d.files, d.folders || {}, d.root, db.projects);
+          dprot.at = d.at || Date.now();
+          try { localStorage.setItem(DRIVE_PROTO_KEY, JSON.stringify({ at: dprot.at, items: dprot.items, folders: dprot.folders })); } catch (e) {}
+          if (manual) toast(`סונכרנו ${dprot.items.length} סיכומי פגישות ודוחות מה-Drive`);
+          return;
+        } catch (e) {
+          if (!(GOOGLE && G.silent())) throw e;
+        }
+      }
+      if (manual && !server) await G.token(); // may ask to connect, straight from the click
       const rootId = await G.drive.projectsRoot();
       const files = await G.drive.search(DP.driveQuery());
       const folders = Object.assign({}, (dprot.base && dprot.base.folders) || {}, dprot.folders);
@@ -1856,7 +1908,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const n = dprot.items.length;
     const when = dprot.syncing ? 'מסנכרן מה-Drive...' : dprot.at ? 'עודכן ' + agoText(dprot.at) : dprot.base ? 'לפי הרשימה מ-' + fmtDate(dprot.base.version) : '';
     return `☁️ ${n} מסמכים מתיקיית "פרויקטים פמי" · ${esc(when)}${dprot.err && !dprot.syncing ? ` · <span class="overdue">${esc(dprot.err)}</span>` : ''}
-      ${GOOGLE && !dprot.syncing ? ' · <a href="#" data-dpsync>🔄 סנכרון עכשיו</a>' : ''}`;
+      ${(GOOGLE || SYNC) && !dprot.syncing ? ' · <a href="#" data-dpsync>🔄 סנכרון עכשיו</a>' : ''}`;
   }
   function showDriveProtoStatus() {
     $$('.dp-status').forEach((b) => { b.innerHTML = driveProtoStatusHtml(); });
