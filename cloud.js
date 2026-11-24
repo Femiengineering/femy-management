@@ -174,6 +174,13 @@ export function push(db) {
 }
 
 // ---------- Members (admin) ----------
+// Photos of protocol topics: one document each (a JPEG data URL, under Firestore's 1 MB), read only when shown.
+export const putPhoto = (id, data) => (base ? F.setDoc(F.doc(fs, ...base, 'photos', id), { data, at: new Date().toISOString() }) : Promise.resolve());
+export async function getPhoto(id) {
+  if (!base) return '';
+  const snap = await F.getDoc(F.doc(fs, ...base, 'photos', id));
+  return snap.exists() ? snap.data().data || '' : '';
+}
 export function watchMembers(cb) {
   return F.onSnapshot(F.collection(fs, 'orgs', orgId, 'members'), (snap) => cb(snap.docs.map((d) => Object.assign({ email: d.id }, d.data()))), () => cb(null));
 }
