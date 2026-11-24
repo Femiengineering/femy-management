@@ -1693,7 +1693,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <p>החיבור ל-Google עוד לא הופעל באתר. ${isAdmin() ? 'כדי להפעיל אותו, יוצרים פעם אחת OAuth Client ID ב-Google Cloud ומדביקים אותו בקובץ google-config.js. ההוראות המלאות בקובץ docs/GOOGLE-SETUP.md במאגר.' : 'מנהל המערכת צריך להפעיל אותו.'}</p></div>`;
     return `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>חשבון Google שלי (יומן, Gmail, Drive)</h2>
-        <p>כל משתמש מחבר את חשבון ה-Google שלו, ורואה רק את היומן, המיילים והקבצים שלו. החיבור נשמר בדפדפן הזה בלבד, ומתחדש בלחיצה אחת כל שעה בערך.</p>
+        <p>כל משתמש מחבר את חשבון ה-Google שלו, ורואה רק את היומן, המיילים והקבצים שלו. ${s.persistent ? 'החיבור קבוע: מאשרים פעם אחת בכל מכשיר, והוא נשאר פעיל עד שלוחצים "ניתוק". ניתוק מבטל את הגישה בכל המכשירים.' : 'החיבור נשמר בדפדפן הזה בלבד, ומתחדש בלחיצה אחת כל שעה בערך.'}</p>
         <p>${s.connected ? `מחובר כ-<b dir="ltr">${esc(s.email)}</b>${s.valid ? '' : ' (צריך לחדש את החיבור)'}` : 'לא מחובר'}</p>
         <div class="row">${s.connected && s.valid ? '' : `<button class="btn primary" id="gConnectSet">${s.connected ? 'חידוש החיבור' : 'חיבור לחשבון Google'}</button>`}
           ${s.connected ? '<button class="btn" id="gDisconnectSet">ניתוק</button>' : ''}</div>
