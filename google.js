@@ -1,9 +1,11 @@
 // פמי הנדסה - חיבור לחשבון Google האישי של כל משתמש: יומן, Gmail ו-Google Drive.
 // Uses Google Identity Services (OAuth 2.0 token flow in the browser, no server).
-// Each signed-in user of the site connects their own Google account. The access
-// token is kept in this browser under that user's key only, so one user never
-// sees another user's calendar, mail or files. Tokens last about an hour; after
-// that one click renews it (no consent screen the second time).
+// Each signed-in user of the site connects their own Google account. What this
+// browser keeps is stored under that user's key only, so one user never sees
+// another user's calendar, mail or files.
+// With tokenServer set in google-config.js (the worker/ folder), the connection
+// is permanent: one approval per device, then silent renewal. Without it, tokens
+// last about an hour and one click renews them.
 (function () {
   'use strict';
   const cfg = window.FEMY_GOOGLE || {};
@@ -21,7 +23,7 @@
   let userKey = null; // the site user this browser is signed in as
   let hint = ''; // their email, suggested to Google as the account to pick
   let rec = null; // { token, exp, scope, email }
-  let client = null;
+  let client = null; // token client (hourly mode)
   let pending = null;
   const listeners = [];
 
@@ -52,70 +54,120 @@
   function init(key, email) {
     userKey = String(key || '').toLowerCase();
     hint = email || '';
-    client = null;
+    client = null; pending = null;
     read();
     if (enabled) loadGis().catch(() => {});
   }
-  const valid = () => !!(rec && rec.token && rec.exp > Date.now() + 60000);
+  // Always-on mode: with a token server (worker/), the browser keeps only a device key
+  // and gets fresh access tokens from the server, with no popup, for as long as the
+  // user stays connected. Without one, tokens last an hour and renewing needs a click.
+  const server = String(cfg.tokenServer || '').replace(/\/+$/, '');
+  const persistent = enabled && !!server;
+
+  const fresh = () => !!(rec && rec.token && rec.exp > Date.now() + 60000);
+  // "valid" = the site can call Google now without asking the user for anything.
+  const valid = () => fresh() || !!(persistent && rec && rec.device);
   function status() {
-    return { enabled, connected: !!(rec && rec.email), valid: valid(), email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
+    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
   }
   const onChange = (f) => listeners.push(f);
 
-  function makeClient() {
-    client = google.accounts.oauth2.initTokenClient({
-      client_id: cfg.clientId,
-      scope: SCOPES.join(' '),
-      include_granted_scopes: true,
-      callback: () => {},
-    });
+  const gisMissing = () => !(window.google && google.accounts && google.accounts.oauth2);
+  const notReady = () => { loadGis().catch(() => {}); return Promise.reject(new Error('ספריית Google עדיין נטענת. נסו שוב בעוד רגע')); };
+  const popupError = (e) => {
+    const t = e && e.type;
+    return Object.assign(new Error(t === 'popup_closed' ? 'החלון נסגר לפני שהחיבור הסתיים' : t === 'popup_failed_to_open' ? 'הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב' : 'החיבור נכשל'), { code: t });
+  };
+  const hintFor = () => (rec && rec.email) || hint || undefined;
+
+  async function post(path, body) {
+    let r;
+    try { r = await fetch(server + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+    catch (e) { throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת החיבור ל-Google לא זמין'); }
+    let j = {};
+    try { j = await r.json(); } catch (e) { /* ignore */ }
+    if (!r.ok) throw Object.assign(new Error(j.error || 'HTTP ' + r.status), { status: r.status, code: j.error });
+    return j;
+  }
+  function keep(j, extra) {
+    rec = Object.assign({}, rec, extra, { token: j.access_token, exp: Date.now() + (Number(j.expires_in) || 3600) * 1000, scope: j.scope, email: j.email || (rec && rec.email) || '' });
+    write();
+    return rec.token;
   }
 
-  // Returns a valid access token. When a new one is needed it opens Google's popup,
-  // so call it straight from a click, before any other await.
+  // Returns a valid access token. In always-on mode it renews silently from the server.
+  // When the user still has to approve (first time, or after a disconnect) it opens
+  // Google's popup, so call it straight from a click, before any other await.
   function token() {
     if (!enabled) return Promise.reject(Object.assign(new Error('החיבור ל-Google עדיין לא הוגדר באתר'), { code: 'not-configured' }));
     if (!userKey) return Promise.reject(new Error('לא מחובר למערכת'));
-    if (valid()) return Promise.resolve(rec.token);
+    if (fresh()) return Promise.resolve(rec.token);
     if (pending) return pending;
-    if (!(window.google && google.accounts && google.accounts.oauth2)) {
-      loadGis().catch(() => {});
-      return Promise.reject(new Error('ספריית Google עדיין נטענת. נסו שוב בעוד רגע'));
-    }
-    if (!client) makeClient();
-    pending = new Promise((resolve, reject) => {
-      client.callback = async (r) => {
+    if (persistent && rec && rec.device) {
+      const device = rec.device;
+      pending = post('/token', { device }).then((j) => { pending = null; return keep(j); }, (e) => {
         pending = null;
-        if (!r || r.error || !r.access_token) { reject(Object.assign(new Error(r && (r.error_description || r.error) || 'החיבור נכשל'), { code: r && r.error })); return; }
-        const missing = SCOPES.filter((s) => !google.accounts.oauth2.hasGrantedAllScopes(r, s));
-        const prevEmail = rec && rec.email;
-        rec = { token: r.access_token, exp: Date.now() + (Number(r.expires_in) || 3600) * 1000, scope: r.scope, email: prevEmail || '', missing };
+        if (e.status === 401) { rec = null; write(); e.message = 'החיבור ל-Google בוטל. לחצו "חיבור לחשבון Google" כדי להתחבר מחדש'; e.code = 'reconnect'; }
+        throw e;
+      });
+      return pending;
+    }
+    return connect();
+  }
+
+  // Opens Google's popup and asks the user to approve. Call straight from a click.
+  function connect() {
+    if (!enabled) return token();
+    if (gisMissing()) return notReady();
+    if (pending) return pending;
+    pending = new Promise((resolve, reject) => {
+      const fail = (e) => { pending = null; reject(e); };
+      if (persistent) {
+        // Authorization code flow: the server trades the code for a long-lived refresh token.
+        const cc = google.accounts.oauth2.initCodeClient({
+          client_id: cfg.clientId, scope: SCOPES.join(' '), ux_mode: 'popup', include_granted_scopes: true, login_hint: hintFor(),
+          callback: (r) => {
+            if (!r || r.error || !r.code) { fail(Object.assign(new Error(r && (r.error_description || r.error) || 'החיבור נכשל'), { code: r && r.error })); return; }
+            post('/exchange', { code: r.code }).then((j) => { pending = null; resolve(keep(j, { device: j.device })); }, (e) => {
+              if (e.code === 'no_refresh_token') { e.message = 'עוד שלב אחד: לחצו שוב על "חיבור לחשבון Google" ואשרו את כל ההרשאות'; e.code = 'retry'; }
+              fail(e);
+            });
+          },
+          error_callback: (e) => fail(popupError(e)),
+        });
+        cc.requestCode();
+        return;
+      }
+      if (!client) client = google.accounts.oauth2.initTokenClient({ client_id: cfg.clientId, scope: SCOPES.join(' '), include_granted_scopes: true, callback: () => {} });
+      client.callback = async (r) => {
+        if (!r || r.error || !r.access_token) { fail(Object.assign(new Error(r && (r.error_description || r.error) || 'החיבור נכשל'), { code: r && r.error })); return; }
+        pending = null;
+        keep(r);
         if (!rec.email) {
-          try { rec.email = (await (await api(null, 'https://gmail.googleapis.com/gmail/v1/users/me/profile')).json()).emailAddress || ''; } catch (e) { /* not fatal */ }
+          try { rec.email = (await (await api(null, 'https://gmail.googleapis.com/gmail/v1/users/me/profile')).json()).emailAddress || ''; write(); } catch (e) { /* not fatal */ }
         }
-        write();
         resolve(rec.token);
       };
-      client.error_callback = (e) => {
-        pending = null;
-        const t = e && e.type;
-        reject(Object.assign(new Error(t === 'popup_closed' ? 'החלון נסגר לפני שהחיבור הסתיים' : t === 'popup_failed_to_open' ? 'הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב' : 'החיבור נכשל'), { code: t }));
-      };
-      const opts = { prompt: '' };
-      if (rec && rec.email) opts.login_hint = rec.email; else if (hint) opts.login_hint = hint;
-      client.requestAccessToken(opts);
+      client.error_callback = (e) => fail(popupError(e));
+      client.requestAccessToken({ prompt: '', login_hint: hintFor() });
     });
     return pending;
   }
-  const connect = token;
 
+  // "ניתוק": removes access in Google itself (on all devices, in always-on mode).
   function disconnect() {
-    const t = rec && rec.token;
+    const t = rec && rec.token, device = rec && rec.device;
     rec = null; write();
-    if (t && window.google && google.accounts && google.accounts.oauth2) { try { google.accounts.oauth2.revoke(t, () => {}); } catch (e) { /* ignore */ } }
+    if (persistent && device) { post('/revoke', { device }).catch(() => {}); return; }
+    if (t && !gisMissing()) { try { google.accounts.oauth2.revoke(t, () => {}); } catch (e) { /* ignore */ } }
   }
-  // On sign-out from the site: forget this user's token in this browser (access stays granted in Google).
-  function forget() { rec = null; write(); }
+  // On sign-out from the site: forget this user's connection in this browser only.
+  // In always-on mode the next sign-in here takes one click, with no consent screen.
+  function forget() {
+    const device = rec && rec.device;
+    rec = null; write();
+    if (persistent && device) post('/forget', { device }).catch(() => {});
+  }
 
   async function api(tok, url, opts) {
     const t = tok || (rec && rec.token);

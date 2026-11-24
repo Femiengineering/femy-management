@@ -4,4 +4,7 @@
 // הערך הזה אינו סודי: Google מאשרת רק בקשות שמגיעות מכתובות האתר שהוגדרו לו.
 window.FEMY_GOOGLE = {
   clientId: '', // לדוגמה: '123456789-abc.apps.googleusercontent.com'
+  // חיבור קבוע (בלי התנתקות כל שעה): כתובת שרת החיבור מהתיקייה worker/, ראו docs/GOOGLE-SETUP.md שלב 7.
+  // כל עוד ריק, החיבור מתחדש בלחיצה כל שעה בערך.
+  tokenServer: '', // לדוגמה: 'https://femy-google.<שם-החשבון>.workers.dev'
 };

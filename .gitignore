@@ -19,3 +19,8 @@ desktop.ini
 *.key
 *.pem
 credentials*.json
+
+# Cloudflare Worker
+.wrangler/
+.dev.vars
+node_modules/

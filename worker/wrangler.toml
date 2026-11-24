@@ -1,0 +1,19 @@
+# שרת החיבור התמידי ל-Google. הוראות הקמה: docs/GOOGLE-SETUP.md, שלב 7.
+name = "femy-google"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# אותו Client ID כמו בקובץ google-config.js
+GOOGLE_CLIENT_ID = ""
+# כתובות האתר שמותר להן לפנות לשרת, מופרדות בפסיק
+ALLOWED_ORIGINS = "https://femiengineering.github.io,http://localhost:8000"
+
+# מזהה ה-KV מהפקודה: npx wrangler kv namespace create TOKENS
+[[kv_namespaces]]
+binding = "TOKENS"
+id = ""
+
+# GOOGLE_CLIENT_SECRET ו-ENC_KEY הם סודות. הם לא נכתבים בקובץ הזה, אלא עם:
+#   npx wrangler secret put GOOGLE_CLIENT_SECRET
+#   npx wrangler secret put ENC_KEY
