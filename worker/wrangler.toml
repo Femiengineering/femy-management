@@ -5,14 +5,14 @@ compatibility_date = "2025-06-01"
 
 [vars]
 # אותו Client ID כמו בקובץ google-config.js
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "380692332592-oq3d6q4vkbrnftmm03v4si5co6rptjqe.apps.googleusercontent.com"
 # כתובות האתר שמותר להן לפנות לשרת, מופרדות בפסיק
 ALLOWED_ORIGINS = "https://femiengineering.github.io,http://localhost:8000"
 
 # מזהה ה-KV מהפקודה: npx wrangler kv namespace create TOKENS
 [[kv_namespaces]]
 binding = "TOKENS"
-id = ""
+id = "d81ec9722bd445079855e960e2e363a2"
 
 # GOOGLE_CLIENT_SECRET ו-ENC_KEY הם סודות. הם לא נכתבים בקובץ הזה, אלא עם:
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET
