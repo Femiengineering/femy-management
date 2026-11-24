@@ -1,5 +1,5 @@
 // Service worker: lets the app open without a network connection.
-const CACHE = 'femy-v17';
+const CACHE = 'femy-v18';
 const ASSETS = [
   './',
   './index.html',
