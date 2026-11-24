@@ -365,6 +365,31 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .drive-files li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .drive-files li a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .drive-files small { color: var(--muted); }
+/* Google: calendar, mail, Drive */
+.g-conn { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.g-conn .grow { flex: 1; min-width: 200px; }
+.g-conn .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gray-soft); flex-shrink: 0; }
+.g-conn .dot.on { background: var(--green); }
+.g-conn .dot.warn { background: var(--amber); }
+.g-day { font-weight: 700; margin: 14px 0 4px; font-size: 14px; color: var(--muted); }
+.g-day:first-child { margin-top: 0; }
+.g-ev { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.g-ev .time { width: 92px; flex-shrink: 0; font-size: 13px; color: var(--muted); direction: ltr; text-align: right; }
+.g-ev .grow, .g-mail .grow { flex: 1; min-width: 0; }
+.g-ev a, .g-mail a { color: inherit; text-decoration: none; }
+.g-ev a:hover, .g-mail a:hover .title { text-decoration: underline; }
+.g-mail { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.g-mail .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-mail.unread .title { font-weight: 700; }
+.g-mail .from { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-mail .snip { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-mail .when { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.g-file { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.g-file img { width: 16px; height: 16px; flex-shrink: 0; }
+.g-file a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.g-file small { color: var(--muted); white-space: nowrap; }
+.g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
+.g-search .input { flex: 1; }
 </style>
 </head>
 <body>
@@ -380,6 +405,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <a href="#projects" data-view="projects"><span class="ico">🏗️</span>פרויקטים</a>
         <a href="#accounts" data-view="accounts"><span class="ico">💰</span>חשבונות</a>
         <a href="#protocols" data-view="protocols"><span class="ico">📝</span>פרוטוקולים</a>
+        <a href="#google" data-view="google"><span class="ico">📅</span>יומן, מייל ו-Drive</a>
         <a href="#settings" data-view="settings"><span class="ico">⚙️</span>הגדרות וגיבוי</a>
       </nav>
       <div class="sidebar-foot" id="sidebarFoot">הנתונים נשמרים במכשיר זה</div>
@@ -435,6 +461,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     <form class="ai-form" id="aiForm"><textarea class="input" id="aiInput" placeholder="שאלה או בקשה..."></textarea><button class="btn primary" type="submit">שליחה</button></form>
   </div>
   <script src="firebase-config.js"></script>
+  <script src="google-config.js"></script>
+  <script src="google.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
@@ -520,6 +548,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // ---------- Data ----------
   const CLOUD = !!(window.FEMY_FIREBASE && window.FEMY_FIREBASE.apiKey);
   let cloud = null; // the cloud.js module, once loaded
+  // The signed-in user's own Google account (calendar, Gmail, Drive), via google.js.
+  const G = window.FemyGoogle || { enabled: false, status: () => ({}), valid: () => false, init() {}, forget() {}, onChange() {} };
+  const GOOGLE = !!G.enabled;
   let me = null; // signed-in user { uid, email, name, photo, role }
   let profile = {}; // the user's private profile (Claude key)
   const isAdmin = () => !CLOUD || (me && me.role === 'admin');
@@ -589,9 +620,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     projects: { title: 'פרויקטים', render: renderProjects },
     accounts: { title: 'חשבונות', render: renderAccounts },
     protocols: { title: 'פרוטוקולים', render: renderProtocols },
+    google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'board', taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, projFilter: '', protoQ: '', openProto: null };
+  const ui = { taskView: 'board', taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, projFilter: '', protoQ: '', openProto: null, gTab: 'calendar', gMailQ: '', gDriveQ: '' };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -656,6 +688,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <div class="card kpi ${overdueInv.length ? 'warn' : ''}"><div class="label">חשבונות באיחור</div><div class="value">${overdueInv.length}</div><div class="sub">לתשלום לספקים: ${fmtMoney(payable)}</div></div>
       </div>
 
+      ${GOOGLE && G.valid() ? `<div class="card card-pad" style="margin-bottom:18px">
+        <div class="card-head"><h2>היומן שלי היום ומחר</h2><a href="#google">ליומן המלא</a></div>
+        <div id="dashCal"><div class="hint">טוען...</div></div></div>` : ''}
       <div class="grid-2">
         <div class="card card-pad">
           <div class="card-head"><h2>משימות קרובות</h2><a href="#tasks">לכל המשימות</a></div>
@@ -701,6 +736,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 
     $$('[data-task]', el).forEach((li) => li.addEventListener('click', () => openTaskForm(byId(db.tasks, li.dataset.task))));
     $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; location.hash = 'protocols'; }));
+    const dc = $('#dashCal', el);
+    if (dc) G.calendar.events(2).then((evs) => { if (document.body.contains(dc)) dc.innerHTML = eventsHtml(evs) || '<div class="empty">אין אירועים היום ומחר</div>'; })
+      .catch(() => { if (document.body.contains(dc)) dc.innerHTML = '<div class="hint">לא ניתן לטעון את היומן כרגע</div>'; });
     const cd = $('[data-act="clear-demo"]', el);
     if (cd) cd.addEventListener('click', () => {
       if (!confirm('למחוק את כל נתוני הדוגמה ולהתחיל מערכת ריקה?')) return;
@@ -824,10 +862,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field"><label>עדיפות</label><select class="input" name="priority">${dictOptions(PRIORITY, t.priority)}</select></div>
       <div class="field"><label>סטטוס</label><select class="input" name="status">${dictOptions(TASK_STATUS, t.status)}</select></div>
       <div class="field"><label>תאריך יעד</label><input class="input" type="date" name="due" value="${esc(t.due)}"></div>
-      <div class="field full"><label>הערות</label><textarea class="input" name="notes">${esc(t.notes)}</textarea></div>`,
+      <div class="field full"><label>הערות</label><textarea class="input" name="notes">${esc(t.notes)}</textarea></div>
+      ${GOOGLE ? `<div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:500;color:var(--text)"><input type="checkbox" name="toCal" ${taskCalId(t) ? 'checked' : ''}> ${taskCalId(t) ? 'לעדכן את האירוע ביומן Google שלי' : 'להוסיף ליומן Google שלי (ביום היעד)'}</label></div>` : ''}`,
     (data) => {
-      if (task) Object.assign(task, data); else db.tasks.push(Object.assign({ id: uid() }, data));
+      const toCal = data.toCal; delete data.toCal;
+      let saved = task;
+      if (task) Object.assign(task, data); else db.tasks.push(saved = Object.assign({ id: uid() }, data));
       save(); render(); toast(task ? 'המשימה עודכנה' : 'המשימה נוספה');
+      if (toCal) taskToCalendar(saved);
     },
     task ? () => { db.tasks = db.tasks.filter((x) => x !== task); save(); render(); toast('המשימה נמחקה'); } : null);
   }
@@ -1022,8 +1064,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
               <button class="btn sm" data-mail>✉️ שליחה במייל</button>
               <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
               <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
-              ${CLOUD ? '<button class="btn sm" data-drive>☁️ שמירה ב-Google Drive</button>' : ''}
-              ${CLOUD && pr.driveLink ? `<a class="btn sm" href="${esc(pr.driveLink)}" target="_blank" rel="noopener">פתיחה ב-Drive</a>` : ''}
+              ${GOOGLE ? '<button class="btn sm" data-drive>☁️ שמירה ב-Google Drive</button>' : ''}
+              ${GOOGLE ? '<button class="btn sm" data-cal>📅 הוספה ליומן</button>' : ''}
+              ${GOOGLE && pr.driveLink ? `<a class="btn sm" href="${esc(pr.driveLink)}" target="_blank" rel="noopener">פתיחה ב-Drive</a>` : ''}
             </div>
           </div></div>`;
       }).join('') || '<div class="card empty">אין פרוטוקולים. לחצו על "פרוטוקול חדש" כדי לתעד ישיבה.</div>'}</div>`;
@@ -1037,6 +1080,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('[data-mail]', c).addEventListener('click', () => emailProtocol(pr));
       const dv = $('[data-drive]', c);
       if (dv) dv.addEventListener('click', () => saveProtocolToDrive(pr));
+      const cl = $('[data-cal]', c);
+      if (cl) cl.addEventListener('click', () => openEventForm({ title: pr.title, date: pr.date, description: protocolText(pr) }));
       const mk = $('[data-mktasks]', c);
       if (mk) mk.addEventListener('click', () => {
         const items = lines(pr.actions);
@@ -1195,7 +1240,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (body.length > 6000) body = body.slice(0, 6000) + '\n...\n(הפרוטוקול קוצר. את הגרסה המלאה אפשר לצרף כקובץ Word או PDF מהמערכת)';
     const to = cleanEmails(st.emailTo), cc = cleanEmails(st.emailCc);
     let url;
-    if (CLOUD && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
+    if (GOOGLE && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
     if (st.mailApp === 'mailto') {
       const q = [cc && 'cc=' + encodeURIComponent(cc), 'subject=' + encodeURIComponent(subject), 'body=' + encodeURIComponent(body)].filter(Boolean).join('&');
       url = 'mailto:' + to + '?' + q;
@@ -1391,15 +1436,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (c === 'auth/popup-blocked') return 'הדפדפן חסם את החלון. אפשרו חלונות קופצים ונסו שוב';
     if (c === 'auth/user-mismatch') return 'יש לבחור את אותו חשבון Google שאיתו נכנסתם למערכת';
     if (c === 'auth/credential-already-in-use') return 'חשבון ה-Google הזה כבר מחובר למשתמש אחר במערכת';
-    if (e && e.status === 403) return 'אין הרשאה. ודאו שה-API מופעל בפרויקט ושאישרתם את הגישה';
+    if (e && e.status === 403) return 'אין הרשאה. ודאו שה-API מופעל בפרויקט ושאישרתם את הגישה בחלון של Google';
+    if (e && e.code === 'access_denied') return 'הגישה לא אושרה בחלון של Google';
     if (navigator.onLine === false) return 'אין חיבור לאינטרנט';
     return (e && e.message) || 'הפעולה נכשלה';
   };
   async function saveProtocolToDrive(pr) {
     try {
-      const token = await cloud.googleToken(cloud.SCOPE_DRIVE); // first, while the click still allows a popup
+      await G.token(); // first, while the click still allows a popup
       toast('שומר ב-Drive...');
-      const f = await cloud.driveSave(token, protoFileName(pr, 'docx'), await buildProtocolDocx(pr), pr.driveId);
+      const f = await G.drive.save(protoFileName(pr, 'docx'), await buildProtocolDocx(pr), pr.driveId);
       pr.driveId = f.id; pr.driveLink = f.webViewLink || '';
       save(); render(); toast('נשמר ב-Google Drive');
     } catch (e) { toast('השמירה ב-Drive נכשלה: ' + gErr(e)); }
@@ -1408,9 +1454,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!to) { toast('אין נמענים. הגדירו נמענים בעמוד ההגדרות'); location.hash = 'settings'; return; }
     if (!confirm('לשלוח את הפרוטוקול מה-Gmail שלך אל:\n' + to.split(',').join('\n') + (cc ? '\nהעתק: ' + cc.split(',').join(', ') : '') + '\n\nקובץ Word יצורף למייל.')) return;
     try {
-      const token = await cloud.googleToken(cloud.SCOPE_GMAIL);
+      await G.token();
       toast('שולח...');
-      await cloud.gmailSend(token, { to, cc, subject, text, attachment: { name: protoFileName(pr, 'docx'), blob: await buildProtocolDocx(pr) } });
+      await G.gmail.send({ to, cc, subject, text, attachment: { name: protoFileName(pr, 'docx'), blob: await buildProtocolDocx(pr) } });
       toast('המייל נשלח');
     } catch (e) { toast('השליחה נכשלה: ' + gErr(e)); }
   }
@@ -1427,6 +1473,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   async function signOut() {
     if (!confirm('לצאת מהמערכת במכשיר הזה?')) return;
+    G.forget();
     await cloud.signOut();
     location.reload();
   }
@@ -1558,6 +1605,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   function localSignOut() {
     if (!confirm('לצאת מהמערכת במכשיר הזה?')) return;
+    G.forget();
     try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
     location.reload();
   }
@@ -1573,6 +1621,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       onState: (s) => {
         if (s.state !== 'ready') { me = null; renderUserBox(); gate(s.state, s); return; }
         me = s.user; profile = s.profile || {};
+        G.init(me.email, me.email);
         renderUserBox(); aiClient = null; aiReset();
         gate('loading');
       },
@@ -1599,12 +1648,6 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           <select class="input" id="memberRole" style="width:auto"><option value="member">משתמש</option><option value="admin">מנהל</option></select>
           <button class="btn primary" type="submit">הוספה</button></form>
       </div>` : ''}
-      <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
-        <h2>Google Drive</h2>
-        <p>שמירת פרוטוקולים כקובצי Word, וגיבוי מלא של הנתונים, בתיקייה "פמי הנדסה - מערכת ניהול" ב-Drive האישי שלכם. המערכת רואה רק קבצים שהיא עצמה יצרה, ולא את שאר הקבצים שלכם.</p>
-        <div class="row"><button class="btn primary" id="driveBackup">גיבוי מלא ל-Drive</button><button class="btn" id="driveListBtn">הצגת הקבצים ב-Drive</button></div>
-        <ul class="drive-files" id="driveFiles"></ul>
-      </div>
       ${legacy && isAdmin() ? `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>העברת נתונים מהמכשיר הזה לענן</h2>
         <p>בדפדפן הזה שמורים נתונים מלפני המעבר לענן: ${(legacy.projects || []).length} פרויקטים, ${(legacy.tasks || []).length} משימות, ${(legacy.invoices || []).length} חשבונות, ${(legacy.protocols || []).length} פרוטוקולים. אפשר להוסיף אותם לנתונים המשותפים.</p>
@@ -1631,32 +1674,6 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         cloud.addMember(em, $('#memberRole', el).value).then(() => { $('#memberEmail', el).value = ''; toast(em + ' נוסף'); }).catch((x) => toast('ההוספה נכשלה: ' + gErr(x)));
       });
     }
-    const filesEl = $('#driveFiles', el);
-    const showFiles = (files) => {
-      filesEl.innerHTML = files.map((f) => `<li><a href="${esc(f.webViewLink)}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>
-        ${/\.json$/.test(f.name) && isAdmin() ? `<button class="btn sm" data-restore="${esc(f.id)}">שחזור</button>` : ''}</li>`).join('') || '<li>אין עדיין קבצים בתיקייה</li>';
-      $$('[data-restore]', filesEl).forEach((b) => b.addEventListener('click', async () => {
-        if (!confirm('השחזור יחליף את כל הנתונים המשותפים של החברה בנתונים מהגיבוי, אצל כל המשתמשים. להמשיך?')) return;
-        try {
-          const token = await cloud.googleToken(cloud.SCOPE_DRIVE);
-          const d = JSON.parse(await cloud.driveRead(token, b.dataset.restore));
-          if (!d || !Array.isArray(d.tasks) || !Array.isArray(d.projects)) throw new Error('הקובץ אינו קובץ גיבוי תקין');
-          db = Object.assign(emptyDb(), d, { demo: false }); save(); render(); toast('הגיבוי שוחזר');
-        } catch (e) { toast('השחזור נכשל: ' + gErr(e)); }
-      }));
-    };
-    $('#driveListBtn', el).addEventListener('click', async () => {
-      try { const token = await cloud.googleToken(cloud.SCOPE_DRIVE); filesEl.innerHTML = '<li>טוען...</li>'; showFiles(await cloud.driveList(token)); }
-      catch (e) { toast(gErr(e)); }
-    });
-    $('#driveBackup', el).addEventListener('click', async () => {
-      try {
-        const token = await cloud.googleToken(cloud.SCOPE_DRIVE);
-        toast('מגבה...');
-        await cloud.driveSave(token, 'femy-גיבוי-' + todayStr() + '.json', new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
-        toast('הגיבוי נשמר ב-Drive'); showFiles(await cloud.driveList(token));
-      } catch (e) { toast('הגיבוי נכשל: ' + gErr(e)); }
-    });
     const mg = $('#migrateBtn', el);
     if (mg) mg.addEventListener('click', () => {
       const d = localLegacy(); if (!d) return;
@@ -1669,10 +1686,193 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     });
   }
 
+  function googleSettingsHtml() {
+    const s = G.status();
+    if (!GOOGLE) return `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>חשבון Google (יומן, Gmail, Drive)</h2>
+        <p>החיבור ל-Google עוד לא הופעל באתר. ${isAdmin() ? 'כדי להפעיל אותו, יוצרים פעם אחת OAuth Client ID ב-Google Cloud ומדביקים אותו בקובץ google-config.js. ההוראות המלאות בקובץ docs/GOOGLE-SETUP.md במאגר.' : 'מנהל המערכת צריך להפעיל אותו.'}</p></div>`;
+    return `<div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>חשבון Google שלי (יומן, Gmail, Drive)</h2>
+        <p>כל משתמש מחבר את חשבון ה-Google שלו, ורואה רק את היומן, המיילים והקבצים שלו. החיבור נשמר בדפדפן הזה בלבד, ומתחדש בלחיצה אחת כל שעה בערך.</p>
+        <p>${s.connected ? `מחובר כ-<b dir="ltr">${esc(s.email)}</b>${s.valid ? '' : ' (צריך לחדש את החיבור)'}` : 'לא מחובר'}</p>
+        <div class="row">${s.connected && s.valid ? '' : `<button class="btn primary" id="gConnectSet">${s.connected ? 'חידוש החיבור' : 'חיבור לחשבון Google'}</button>`}
+          ${s.connected ? '<button class="btn" id="gDisconnectSet">ניתוק</button>' : ''}</div>
+      </div>
+      <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
+        <h2>גיבוי ל-Google Drive</h2>
+        <p>שמירת פרוטוקולים כקובצי Word, וגיבוי מלא של הנתונים, בתיקייה "פמי הנדסה - מערכת ניהול" ב-Drive האישי שלכם.</p>
+        <div class="row"><button class="btn primary" id="driveBackup">גיבוי מלא ל-Drive</button><button class="btn" id="driveListBtn">הצגת הקבצים בתיקייה</button></div>
+        <ul class="drive-files" id="driveFiles"></ul>
+      </div>`;
+  }
+  function bindGoogleSettings(el) {
+    if (!GOOGLE) return;
+    const gc = $('#gConnectSet', el);
+    if (gc) gc.addEventListener('click', () => G.connect().then(() => toast('החשבון חובר')).catch((e) => toast(gErr(e))));
+    const gd = $('#gDisconnectSet', el);
+    if (gd) gd.addEventListener('click', () => { if (confirm('לנתק את חשבון ה-Google מהמערכת בדפדפן הזה?')) { G.disconnect(); toast('החשבון נותק'); } });
+    const filesEl = $('#driveFiles', el);
+    const showFiles = (files) => {
+      filesEl.innerHTML = files.map((f) => `<li><a href="${esc(f.webViewLink)}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small>
+        ${/\.json$/.test(f.name) && isAdmin() ? `<button class="btn sm" data-restore="${esc(f.id)}">שחזור</button>` : ''}</li>`).join('') || '<li>אין עדיין קבצים בתיקייה</li>';
+      $$('[data-restore]', filesEl).forEach((b) => b.addEventListener('click', async () => {
+        if (!confirm(CLOUD ? 'השחזור יחליף את כל הנתונים המשותפים של החברה בנתונים מהגיבוי, אצל כל המשתמשים. להמשיך?' : 'השחזור יחליף את כל הנתונים שלך בנתונים מהגיבוי. להמשיך?')) return;
+        try {
+          await G.token();
+          const d = JSON.parse(await G.drive.read(b.dataset.restore));
+          if (!d || !Array.isArray(d.tasks) || !Array.isArray(d.projects)) throw new Error('הקובץ אינו קובץ גיבוי תקין');
+          db = Object.assign(emptyDb(), d, { demo: false }); save(); render(); toast('הגיבוי שוחזר');
+        } catch (e) { toast('השחזור נכשל: ' + gErr(e)); }
+      }));
+    };
+    $('#driveListBtn', el).addEventListener('click', async () => {
+      try { await G.token(); filesEl.innerHTML = '<li>טוען...</li>'; showFiles(await G.drive.appFiles()); }
+      catch (e) { toast(gErr(e)); }
+    });
+    $('#driveBackup', el).addEventListener('click', async () => {
+      try {
+        await G.token();
+        toast('מגבה...');
+        await G.drive.save('femy-גיבוי-' + todayStr() + '.json', new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+        toast('הגיבוי נשמר ב-Drive'); showFiles(await G.drive.appFiles());
+      } catch (e) { toast('הגיבוי נכשל: ' + gErr(e)); }
+    });
+  }
+
+  // ---------- Google: calendar, Gmail, Drive ----------
+  const userKey = () => (me && me.email) || (localSession && localSession.username) || '';
+  const taskCalId = (t) => (t && t.cal && t.cal[userKey()]) || '';
+  function taskToCalendar(t) {
+    if (!t.due) { toast('כדי להוסיף ליומן צריך תאריך יעד'); return; }
+    const p = byId(db.projects, t.projectId);
+    G.calendar.create({ title: '✅ ' + t.title, date: t.due, description: [p ? 'פרויקט: ' + p.name : '', t.assignee ? 'אחראי: ' + t.assignee : '', t.notes || ''].filter(Boolean).join('\n') }, taskCalId(t))
+      .then((ev) => { t.cal = Object.assign({}, t.cal, { [userKey()]: ev.id }); save(); toast('המשימה נוספה ליומן'); })
+      .catch((e) => toast('ההוספה ליומן נכשלה: ' + gErr(e)));
+  }
+  const timeOf = (d) => d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  function eventsHtml(evs) {
+    let day = '';
+    return evs.map((e) => {
+      const allDay = !!e.start.date;
+      const st = new Date(allDay ? e.start.date + 'T00:00:00' : e.start.dateTime);
+      const k = toISO(st);
+      const head = k !== day ? `<div class="g-day">${k === todayStr() ? 'היום' : k === addDays(1) ? 'מחר' : st.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })}</div>` : '';
+      day = k;
+      return head + `<div class="g-ev"><div class="time">${allDay ? 'כל היום' : timeOf(st) + (e.end && e.end.dateTime ? '–' + timeOf(new Date(e.end.dateTime)) : '')}</div>
+        <div class="grow"><a href="${esc(e.htmlLink || '#')}" target="_blank" rel="noopener"><b>${esc(e.summary || '(ללא כותרת)')}</b></a>
+        ${e.location ? `<div class="hint">📍 ${esc(e.location)}</div>` : ''}</div></div>`;
+    }).join('');
+  }
+  function openEventForm(ev) {
+    const e = Object.assign({ title: '', date: todayStr(), start: '09:00', end: '10:00', location: '', attendees: '', description: '' }, ev || {});
+    openModal('אירוע חדש ביומן', `
+      <div class="field full"><label>כותרת *</label><input class="input" name="title" required value="${esc(e.title)}"></div>
+      <div class="field"><label>תאריך *</label><input class="input" type="date" name="date" required value="${esc(e.date)}"></div>
+      <div class="field"><label>מיקום</label><input class="input" name="location" value="${esc(e.location)}"></div>
+      <div class="field"><label>שעת התחלה (ריק = כל היום)</label><input class="input" type="time" name="start" value="${esc(e.start)}"></div>
+      <div class="field"><label>שעת סיום</label><input class="input" type="time" name="end" value="${esc(e.end)}"></div>
+      <div class="field full"><label>מוזמנים (אימיילים, מופרדים בפסיק. יקבלו הזמנה)</label><input class="input" name="attendees" dir="ltr" value="${esc(e.attendees)}"></div>
+      <div class="field full"><label>תיאור</label><textarea class="input" name="description">${esc(e.description)}</textarea></div>`,
+    (data) => {
+      data.attendees = cleanEmails(data.attendees).split(',').filter(Boolean);
+      G.calendar.create(data).then(() => { toast('האירוע נוסף ליומן'); if (currentView() === 'google') render(); })
+        .catch((x) => toast('ההוספה ליומן נכשלה: ' + gErr(x)));
+    });
+  }
+  function openComposeForm(m) {
+    const d = Object.assign({ to: '', cc: '', subject: '', text: '' }, m || {});
+    openModal('מייל חדש מה-Gmail שלי', `
+      <div class="field full"><label>אל *</label><input class="input" name="to" dir="ltr" required value="${esc(d.to)}"></div>
+      <div class="field full"><label>העתק</label><input class="input" name="cc" dir="ltr" value="${esc(d.cc)}"></div>
+      <div class="field full"><label>נושא</label><input class="input" name="subject" value="${esc(d.subject)}"></div>
+      <div class="field full"><label>תוכן</label><textarea class="input" name="text" style="min-height:160px">${esc(d.text)}</textarea></div>`,
+    (data) => {
+      const to = cleanEmails(data.to), cc = cleanEmails(data.cc);
+      if (!to) { toast('אין כתובת נמען תקינה'); return; }
+      if (!confirm('לשלוח את המייל מה-Gmail שלך אל:\n' + to.split(',').join('\n') + (cc ? '\nהעתק: ' + cc.split(',').join(', ') : ''))) return;
+      G.gmail.send({ to, cc, subject: data.subject, text: data.text }).then(() => toast('המייל נשלח')).catch((x) => toast('השליחה נכשלה: ' + gErr(x)));
+    });
+  }
+  function mailWhen(ms) {
+    const d = new Date(ms);
+    return toISO(d) === todayStr() ? timeOf(d) : d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+  }
+  function renderGoogle(el) {
+    if (!GOOGLE) {
+      el.innerHTML = `<div class="card card-pad settings" style="max-width:720px"><h2>יומן, Gmail ו-Google Drive</h2>
+        <p>כאן כל משתמש יראה את היומן, המיילים והקבצים שלו ב-Google, ויוכל להוסיף משימות ופגישות ליומן, לשלוח מיילים ולשמור קבצים ב-Drive.</p>
+        <p>${isAdmin() ? 'החיבור עוד לא הופעל באתר. כדי להפעיל אותו, יוצרים פעם אחת OAuth Client ID ב-Google Cloud ומדביקים אותו בקובץ google-config.js. ההוראות המלאות בקובץ docs/GOOGLE-SETUP.md במאגר.' : 'החיבור עוד לא הופעל באתר. מנהל המערכת צריך להפעיל אותו.'}</p></div>`;
+      return;
+    }
+    const s = G.status();
+    const tab = ui.gTab;
+    const tabs = [['calendar', '📅 יומן'], ['gmail', '✉️ מיילים'], ['drive', '📁 Drive']];
+    el.innerHTML = `
+      <div class="card card-pad g-conn">
+        <span class="dot ${s.valid ? 'on' : s.connected ? 'warn' : ''}"></span>
+        <div class="grow">${s.connected ? `מחובר לחשבון <b dir="ltr">${esc(s.email)}</b>${s.valid ? '' : '. החיבור פג (זה קורה כל שעה בערך), לחצו לחידוש.'}` : 'עדיין לא חיברתם את חשבון ה-Google שלכם. אחרי החיבור תראו כאן את היומן, המיילים והקבצים שלכם, ורק אתם תראו אותם.'}</div>
+        ${s.valid ? '' : `<button class="btn primary g-btn" data-gconnect>${s.connected ? 'חידוש החיבור' : 'חיבור לחשבון Google'}</button>`}
+      </div>
+      <div class="toolbar">
+        <div class="seg">${tabs.map(([k, l]) => `<button data-gtab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        ${tab === 'gmail' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="חיפוש במיילים (כמו ב-Gmail)" value="${esc(ui.gMailQ)}"><button class="btn">חיפוש</button></form>` : ''}
+        ${tab === 'drive' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="חיפוש קובץ לפי שם" value="${esc(ui.gDriveQ)}"><button class="btn">חיפוש</button></form>` : ''}
+        <span class="spacer"></span>
+        ${tab === 'calendar' ? '<button class="btn primary" data-gnew>+ אירוע חדש</button>' : ''}
+        ${tab === 'gmail' ? '<button class="btn primary" data-gnew>+ מייל חדש</button>' : ''}
+        ${tab === 'drive' ? '<label class="btn primary">⬆ העלאת קובץ<input type="file" id="gUpload" hidden></label>' : ''}
+      </div>
+      <div class="card card-pad" id="gArea"></div>`;
+    const area = $('#gArea', el);
+    $$('[data-gtab]', el).forEach((b) => b.addEventListener('click', () => { ui.gTab = b.dataset.gtab; renderGoogle(el); }));
+    const gc = $('[data-gconnect]', el);
+    if (gc) gc.addEventListener('click', () => G.connect().catch((e) => toast(gErr(e))));
+    const nb = $('[data-gnew]', el);
+    if (nb) nb.addEventListener('click', () => (tab === 'calendar' ? openEventForm() : openComposeForm()));
+    const sf = $('#gSearch', el);
+    if (sf) sf.addEventListener('submit', (e) => { e.preventDefault(); if (tab === 'gmail') ui.gMailQ = $('#gq', el).value.trim(); else ui.gDriveQ = $('#gq', el).value.trim(); renderGoogle(el); });
+    const up = $('#gUpload', el);
+    if (up) up.addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try { await G.token(); toast('מעלה...'); await G.drive.save(f.name, f); toast('הקובץ הועלה לתיקייה "פמי הנדסה - מערכת ניהול"'); renderGoogle(el); }
+      catch (x) { toast('ההעלאה נכשלה: ' + gErr(x)); }
+    });
+    if (!s.valid) { area.innerHTML = '<div class="empty">כדי לראות את התוכן, חברו את חשבון ה-Google שלכם (הכפתור למעלה)</div>'; return; }
+    area.innerHTML = '<div class="hint">טוען...</div>';
+    const alive = () => document.body.contains(area);
+    const fail = (e) => { if (alive()) area.innerHTML = `<div class="empty">הטעינה נכשלה: ${esc(gErr(e))}</div>`; };
+    if (tab === 'calendar') {
+      G.calendar.events(14).then((evs) => {
+        if (!alive()) return;
+        area.innerHTML = eventsHtml(evs) || '<div class="empty">אין אירועים בשבועיים הקרובים</div>';
+      }).catch(fail);
+    } else if (tab === 'gmail') {
+      G.gmail.inbox(ui.gMailQ || 'in:inbox', 25).then((msgs) => {
+        if (!alive()) return;
+        area.innerHTML = msgs.map((m) => `<div class="g-mail ${m.unread ? 'unread' : ''}" data-mid="${esc(m.id)}">
+          <a class="grow" href="${esc(G.gmail.link(m))}" target="_blank" rel="noopener">
+            <div class="from">${esc(m.from.replace(/\s*<[^>]+>/, ''))}</div><div class="title">${esc(m.subject)}</div><div class="snip">${esc(m.snippet)}</div></a>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="when">${esc(mailWhen(m.date))}</span>
+          <button class="btn sm" data-mtask title="יצירת משימה מהמייל">+ משימה</button></div></div>`).join('') || '<div class="empty">לא נמצאו מיילים</div>';
+        $$('[data-mid]', area).forEach((row) => {
+          const m = msgs.find((x) => x.id === row.dataset.mid);
+          $('[data-mtask]', row).addEventListener('click', () => openTaskForm(null, { title: m.subject, notes: 'ממייל של ' + m.from + ':\n' + m.snippet + '\n' + G.gmail.link(m) }));
+        });
+      }).catch(fail);
+    } else {
+      G.drive.files(ui.gDriveQ).then((files) => {
+        if (!alive()) return;
+        area.innerHTML = files.map((f) => `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}
+          <a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a>
+          <small>${esc(new Date(f.modifiedTime).toLocaleDateString('he-IL'))}</small></div>`).join('') || '<div class="empty">לא נמצאו קבצים</div>';
+      }).catch(fail);
+    }
+  }
+
   // ---------- Settings ----------
   function renderSettings(el) {
     const st = settings();
-    el.innerHTML = cloudSettingsHtml() + `
+    el.innerHTML = cloudSettingsHtml() + googleSettingsHtml() + `
       <div class="card card-pad settings" style="max-width:720px;margin-bottom:16px">
         <h2>עוזר Claude</h2>
         <p>העוזר (הכפתור ✨ בפינה) עונה על שאלות על הנתונים במערכת, מסכם פרוטוקולים, ויכול ליצור ולעדכן משימות. הוא עובד עם מפתח API של Anthropic, וכל שיחה מחויבת בחשבון ה-API שלכם. ${CLOUD ? 'המפתח אישי: הוא נשמר בפרופיל הפרטי שלכם בענן, רק אתם יכולים לקרוא אותו, והוא זמין בכל המכשירים שבהם אתם מחוברים.' : 'המפתח נשמר רק בדפדפן הזה.'} הוא לא עולה לגיטהב ולא נכלל בקובץ הגיבוי. בכל שאלה נשלחים ל-Claude גם נתוני המערכת, כדי שיוכל לענות.</p>
@@ -1689,7 +1889,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           <div class="field full"><label>לפתוח את המייל ב</label><select class="input" id="setApp">
             <option value="gmail" ${!st.mailApp || st.mailApp === 'gmail' ? 'selected' : ''}>Gmail (פתיחת טיוטה)</option>
             <option value="mailto" ${st.mailApp === 'mailto' ? 'selected' : ''}>אפליקציית המייל של המכשיר (Outlook, Mail)</option>
-            ${CLOUD ? `<option value="gmailApi" ${st.mailApp === 'gmailApi' ? 'selected' : ''}>Gmail: שליחה ישירה עם Word מצורף</option>` : ''}</select></div>
+            ${GOOGLE ? `<option value="gmailApi" ${st.mailApp === 'gmailApi' ? 'selected' : ''}>Gmail: שליחה ישירה עם Word מצורף</option>` : ''}</select></div>
         </div>
         <div class="row"><button class="btn primary" id="saveMail">שמירה</button></div>
       </div>
@@ -1746,6 +1946,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const demo = $('#demoBtn', el);
     if (demo) demo.addEventListener('click', () => { if (confirm('נתוני הדוגמה יחליפו את הנתונים הנוכחיים. להמשיך?')) { db = demoData(); save(); render(); } });
     bindCloudSettings(el);
+    bindGoogleSettings(el);
     const ib = $('#installBtn', el);
     if (ib && deferredInstall) { ib.style.display = ''; ib.addEventListener('click', promptInstall); }
   }
@@ -1831,12 +2032,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       else openTaskForm();
     });
     window.addEventListener('hashchange', render);
+    G.onChange(() => { if (currentView() === 'google' || currentView() === 'settings') render(); });
     if (CLOUD) { render(); startCloud(); }
     else if (!localSession) { localGate(); }
     else {
       $('#logoutName').textContent = localSession.name || localSession.username;
       $('#logoutTop').style.display = '';
       $('#logoutTop').addEventListener('click', localSignOut);
+      G.init(localSession.username, /@/.test(localSession.username) ? localSession.username : '');
       window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { db = load(); render(); } });
       if (!localStorage.getItem(STORE_KEY)) save();
       render();

@@ -1,6 +1,5 @@
 // פמי הנדסה - חיבור לענן (Firebase).
-// Sign-in (Google or email + password), shared data in Firestore, and the
-// user's own Google Drive and Gmail. Loaded by index.html only when
+// Sign-in (Google or email + password) and shared data in Firestore. Loaded by index.html only when
 // firebase-config.js holds a config; otherwise the app stays local-only.
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
@@ -109,7 +108,6 @@ export async function signOut() {
   stopData();
   try { await A.signOut(auth); } catch (e) { /* ignore */ }
   try { await F.terminate(fs); await F.clearIndexedDbPersistence(fs); } catch (e) { /* ignore */ }
-  try { sessionStorage.removeItem('femy-gtok'); } catch (e) { /* ignore */ }
 }
 
 // ---------- Data ----------
@@ -188,104 +186,4 @@ export const isShared = shared;
 // users/{uid} can be read and written only by that user (see firestore.rules).
 export const setProfile = (partial) => F.setDoc(F.doc(fs, 'users', me.uid), partial, { merge: true });
 
-// ---------- Google access token (Drive, Gmail) ----------
-// Must be called straight from a click, before any other await, so the popup is allowed.
-export const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.file';
-export const SCOPE_GMAIL = 'https://www.googleapis.com/auth/gmail.send';
-let toks = {};
-try { toks = JSON.parse(sessionStorage.getItem('femy-gtok') || '{}'); } catch (e) { toks = {}; }
-export function hasToken(scope) { const t = toks[scope]; return !!(t && t.exp > Date.now() + 60000); }
-export async function googleToken(scope) {
-  if (hasToken(scope)) return toks[scope].token;
-  const user = auth.currentUser;
-  const p = new A.GoogleAuthProvider();
-  p.addScope(scope);
-  p.setCustomParameters({ login_hint: user.email });
-  const linked = user.providerData.some((x) => x.providerId === 'google.com');
-  const res = linked ? await A.reauthenticateWithPopup(user, p) : await A.linkWithPopup(user, p);
-  const cred = A.GoogleAuthProvider.credentialFromResult(res);
-  if (!cred || !cred.accessToken) throw new Error('no token');
-  toks[scope] = { token: cred.accessToken, exp: Date.now() + 55 * 60000 };
-  try { sessionStorage.setItem('femy-gtok', JSON.stringify(toks)); } catch (e) { /* ignore */ }
-  return cred.accessToken;
-}
-function dropToken(scope) { delete toks[scope]; try { sessionStorage.setItem('femy-gtok', JSON.stringify(toks)); } catch (e) { /* ignore */ } }
-
-async function gfetch(scope, token, url, opts) {
-  const r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + token }, (opts && opts.headers) || {}) }));
-  if (r.status === 401) dropToken(scope);
-  if (!r.ok) {
-    let msg = '';
-    try { msg = (await r.json()).error.message; } catch (e) { /* ignore */ }
-    throw Object.assign(new Error(msg || 'HTTP ' + r.status), { status: r.status });
-  }
-  return r;
-}
-
-// ---------- Google Drive ----------
-// drive.file: the app sees only files it created, in one folder of the user's Drive.
-const FOLDER = 'פמי הנדסה - מערכת ניהול';
-const DAPI = 'https://www.googleapis.com/drive/v3/files';
-let folderId = null;
-async function driveFolder(token) {
-  if (folderId) return folderId;
-  const q = encodeURIComponent(`name='${FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const found = await (await gfetch(SCOPE_DRIVE, token, `${DAPI}?q=${q}&fields=files(id)&spaces=drive`)).json();
-  if (found.files && found.files.length) return (folderId = found.files[0].id);
-  const made = await (await gfetch(SCOPE_DRIVE, token, `${DAPI}?fields=id`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }),
-  })).json();
-  return (folderId = made.id);
-}
-// Creates the file, or replaces it when fileId is given and still reachable.
-export async function driveSave(token, name, blob, fileId) {
-  const form = (meta) => {
-    const f = new FormData();
-    f.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-    f.append('file', blob);
-    return f;
-  };
-  const up = 'https://www.googleapis.com/upload/drive/v3/files';
-  if (fileId) {
-    try {
-      return await (await gfetch(SCOPE_DRIVE, token, `${up}/${fileId}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'PATCH', body: form({ name }) })).json();
-    } catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
-  }
-  const parent = await driveFolder(token);
-  return (await gfetch(SCOPE_DRIVE, token, `${up}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form({ name, parents: [parent] }) })).json();
-}
-export async function driveList(token) {
-  const parent = await driveFolder(token);
-  const q = encodeURIComponent(`'${parent}' in parents and trashed=false`);
-  const r = await (await gfetch(SCOPE_DRIVE, token, `${DAPI}?q=${q}&orderBy=modifiedTime desc&pageSize=50&fields=files(id,name,mimeType,webViewLink,modifiedTime)`)).json();
-  return r.files || [];
-}
-export async function driveRead(token, id) { return (await gfetch(SCOPE_DRIVE, token, `${DAPI}/${id}?alt=media`)).text(); }
-
-// ---------- Gmail ----------
-const b64utf8 = (s) => btoa(unescape(encodeURIComponent(s)));
-const wrap = (s) => s.replace(/.{1,76}/g, '$&\r\n');
-const encWord = (s) => '=?UTF-8?B?' + b64utf8(s) + '?=';
-async function blobB64(blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-export async function gmailSend(token, { to, cc, subject, text, attachment }) {
-  const bd = 'femy' + Math.random().toString(36).slice(2);
-  let m = `To: ${to}\r\n` + (cc ? `Cc: ${cc}\r\n` : '') + `Subject: ${encWord(subject)}\r\nMIME-Version: 1.0\r\n`
-    + `Content-Type: multipart/mixed; boundary="${bd}"\r\n\r\n`
-    + `--${bd}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(b64utf8(text))}`;
-  if (attachment) {
-    const fn = encWord(attachment.name);
-    m += `--${bd}\r\nContent-Type: ${attachment.blob.type || 'application/octet-stream'}; name="${fn}"\r\n`
-      + `Content-Disposition: attachment; filename="${fn}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(await blobB64(attachment.blob))}`;
-  }
-  m += `--${bd}--\r\n`;
-  const raw = btoa(m).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  await gfetch(SCOPE_GMAIL, token, 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }),
-  });
-}
+// Google Calendar, Gmail and Drive are handled by google.js (per user, also in local mode).
