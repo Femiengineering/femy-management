@@ -2460,7 +2460,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           <button class="btn sm" data-mail>✉️ שליחה במייל</button>
           <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
           <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
-          ${GOOGLE ? '<button class="btn sm" data-drive>☁️ שמירה ב-Google Drive</button>' : ''}
+          ${GOOGLE ? '<button class="btn sm" data-drive>📝 עדכון ה-Google Docs של הפרויקט</button>' : ''}
           ${pr.gdocLink ? `<a class="btn sm" href="${esc(pr.gdocLink)}" target="_blank" rel="noopener" title="העותק ב-Google Docs, מתעדכן עם כל שמירה">📝 Google Docs</a>` : ''}
           ${GOOGLE ? '<button class="btn sm" data-cal>📅 הוספה ליומן</button>' : ''}
           ${GOOGLE && pr.driveLink ? `<a class="btn sm" href="#" data-lapp="${esc(protoFileName(pr, 'docx'))}" title="מעתיק את נתיב הקובץ במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋 העתק נתיב</a>` : ''}
@@ -3037,6 +3037,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="hint">הנושאים של המסמך האחרון בפרויקט שנבחר מוצעים להעתקה, בלי המשתתפים והנמענים.</span></div>
       ${GOOGLE ? `<div class="field"><label>📝 מסמך ה-Google Docs הקבוע של הפרויקט</label><select class="input" name="gdocPick" data-gdocpick></select>
         <span class="hint" data-gdocst data-id="${esc(proto ? proto.id : '')}">${protoGdocHtml(proto)}</span>
+        <button type="button" class="btn sm" data-gdocnow style="justify-self:start">📝 עדכון ה-Google Docs עכשיו</button>
         <span class="hint">כל השמירות של כל הדוחות והסיכומים בפרויקט נכתבות לאותו קובץ. בחירת קובץ אחר משנה אותו לכל הפרויקט.</span></div>` : ''}
       <div class="field full pf-mail"><label>📧 שליחה במייל: נמענים</label>
         <div class="pf-mail-row"><input class="input" name="emailTo" dir="ltr" value="${esc(p.emailTo)}" placeholder="name@example.com, ...">
@@ -3165,6 +3166,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       gpSel.disabled = false;
     };
     drawGdocPick();
+    const gNow = $('[data-gdocnow]', body);
+    if (gNow) gNow.addEventListener('click', () => {
+      const isNew = !rec;
+      persist(modalData(), true);
+      document.querySelectorAll('#gdocState, [data-gdocst]').forEach((st) => { st.dataset.id = rec.id; });
+      if (isNew) render();
+      saveProtocolToDrive(rec, true);
+    });
     // Saved while typing: the other users see the document as it is being written, and the Google Docs copy follows.
     liveForm(() => {
       const isNew = !rec;
@@ -3779,15 +3788,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (navigator.onLine === false) return 'אין חיבור לאינטרנט';
     return (e && e.message) || 'הפעולה נכשלה';
   };
-  async function saveProtocolToDrive(pr) {
-    if (pr.projectId && !confirm('לשמור את המסמך הזה בקובץ ה-Google Docs הקבוע של הפרויקט? התוכן שבקובץ כעת יוחלף בו (אפשר לשחזר מהיסטוריית הגרסאות).')) return;
+  async function saveProtocolToDrive(pr, inForm) {
+    if (!inForm && pr.projectId && protoOlder(pr) && !confirm('בפרויקט יש מסמך חדש יותר. לכתוב את המסמך הזה במקומו בקובץ ה-Google Docs של הפרויקט? (אפשר לשחזר מהיסטוריית הגרסאות)')) return;
     try {
-      await G.token(); // first, while the click still allows a popup
-      toast('שומר ב-Google Docs של הפרויקט...');
-      await protoGdocPush(pr.id);
-      render();
-      if (gdocState[pr.id] && gdocState[pr.id].s === 'ok') toast('נשמר בקובץ הקבוע של הפרויקט ב-Drive');
-    } catch (e) { toast('השמירה ב-Drive נכשלה: ' + gErr(e)); }
+      // From the click: Google's window when not connected or the permission to edit Drive files is missing.
+      if (!G.silent() || G.status().driveWrite === false) await G.connect(); else await G.token();
+    } catch (e) { gdocReport(pr, 'החיבור ל-Google נכשל: ' + esc(gErr(e))); return; }
+    toast('מעדכן את ה-Google Docs של הפרויקט...');
+    clearTimeout(gdocTimers.get(pr.id));
+    await protoGdocPush(pr.id);
+    if (!inForm) render();
+    const st = gdocState[pr.id] || {}, cur = byId(db.protocols, pr.id) || pr;
+    if (st.s === 'ok') { toast('ה-Google Docs של הפרויקט עודכן'); if (!inForm) gdocReport(cur, '✓ הקובץ עודכן: <a href="' + esc(cur.gdocLink) + '" target="_blank" rel="noopener">פתיחת ה-Google Docs</a>'); }
+    else gdocReport(cur, '⚠️ ' + (st.m || 'העדכון לא הושלם'));
+  }
+  function gdocReport(pr, html) {
+    if ($('#gdocState')) { gdocShow(pr.id); return; } // the report's form is open: its status line says it
+    openModal('Google Docs', `<div class="field full">${html}</div>`, () => {});
+    $('#modalForm button[type=submit]').textContent = 'סגירה';
   }
   // The Google Docs copy of a report: kept in the project's folder in Drive (next to its latest report of the
   // same kind), and updated a few seconds after every change while it is written, and at once on "שמירה".
@@ -3797,10 +3815,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const st = pr && gdocState[pr.id];
     if (!G.silent()) return '📝 Google Docs: חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive) כדי שהמסמך יתעדכן גם שם';
     // Connected before the site could write into the office's documents: one more approval is needed.
-    if (G.status().driveWrite === false) return '📝 כדי לעדכן את מסמך ה-Google Docs של הפרויקט צריך לאשר הרשאה נוספת: <a href="#" data-gdocauth>אישור עכשיו</a>';
+    if (G.status().driveWrite === false && !(st && st.s === 'ok')) return '📝 כדי לעדכן את מסמך ה-Google Docs של הפרויקט צריך לאשר הרשאה נוספת: <a href="#" data-gdocauth>אישור עכשיו</a>';
     if (pr && protoOlder(pr) && !(st && st.s)) return '📝 בקובץ ה-Google Docs של הפרויקט נמצא מסמך חדש יותר, ולכן הוא לא מתעדכן מהמסמך הזה';
     if (st && st.s === 'busy') return '📝 מעדכן ב-Google Docs...';
-    if (st && st.s === 'err') return '⚠️ Google Docs: ' + esc(st.m);
+    if (st && st.s === 'err') return '⚠️ Google Docs: ' + st.m;
     if (st && st.s === 'ok' && pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 Google Docs ✓ עודכן ${new Date(st.at || Date.now()).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</a>`;
     if (pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 פתיחת ה-Google Docs</a> (יתעדכן בשמירה)`;
     return '📝 יישמר גם כ-Google Docs';
@@ -3818,7 +3836,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     }).catch((x) => toast('האישור נכשל: ' + gErr(x)));
   });
   function protoGdocSync(pr, now) {
-    if (!GOOGLE || !G.silent() || G.status().driveWrite === false || !pr || !protoTpl(pr)) return;
+    if (!GOOGLE || !G.silent() || !pr || !protoTpl(pr)) return;
     // The project's file holds its newest report: editing an older one must not overwrite it.
     if (protoOlder(pr)) return;
     clearTimeout(gdocTimers.get(pr.id));
@@ -3835,6 +3853,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const p = byId(db.projects, pr.projectId);
     return (p && p.driveFolder) || '';
   }
+  // The project's fixed document, checked once per session: it must be a Google Doc that is not in the trash
+  // and that the user can edit. Otherwise the next one of the project's documents (newest first).
+  const gdocOk = new Set();
+  async function protoGdocTarget(pj, kind) {
+    const g = pj.gdocs || {};
+    const ids = Array.from(new Set([pj.gdocId, g[kind], g.report, g.meeting].concat(projGdocs(pj.id).map((x) => x.id)).filter(Boolean)));
+    for (const id of ids) {
+      if (gdocOk.has(id)) { if (pj.gdocId !== id) { pj.gdocId = id; save(); } return id; }
+      try {
+        const m = await G.drive.meta(id, 'id,trashed,mimeType,capabilities(canEdit)');
+        if (m.trashed || m.mimeType !== 'application/vnd.google-apps.document' || (m.capabilities && m.capabilities.canEdit === false)) continue;
+        gdocOk.add(id);
+        if (pj.gdocId !== id) { pj.gdocId = id; save(); }
+        return id;
+      } catch (e) { if (e && e.status !== 404) throw e; }
+    }
+    return '';
+  }
   async function protoGdocPush(id) {
     if (gdocBusy[id]) { gdocBusy[id] = 'again'; return; }
     const pr = byId(db.protocols, id); if (!pr) return;
@@ -3842,7 +3878,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     try {
       // Always the same file: the project's fixed Google Doc (made by the first save when there is none).
       const pj = byId(db.projects, pr.projectId);
-      let target = pj ? projGdoc(pj, protoKind(pr)) : pr.gdocId || '';
+      let target = pj ? await protoGdocTarget(pj, protoKind(pr)) : pr.gdocId || '';
       // No document known for the project: the newest Google Doc in the folder of its latest report, if any.
       if (pj && !target) {
         try {
@@ -3872,9 +3908,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       }
       gdocState[id] = { s: 'ok', at: Date.now() };
     } catch (e) {
-      gdocState[id] = { s: 'err', m: e && (e.status === 403 || e.status === 404) ? 'אין הרשאת עריכה למסמך הקבוע של הפרויקט. בדקו שהוא משותף אליכם לעריכה' : gErr(e) };
+      const scope = e && (e.status === 403 || e.status === 401) && /scope|insufficient|permission/i.test(e.message || '');
+      gdocState[id] = { s: 'err', scope, m: scope ? 'חסרה הרשאה לעדכן קבצים ב-Drive. <a href="#" data-gdocauth>אישור עכשיו</a>'
+        : e && (e.status === 403 || e.status === 404) ? 'אין הרשאת עריכה למסמך הקבוע של הפרויקט. בדקו שהוא משותף אליכם לעריכה' : esc(gErr(e)) + (e && e.status ? ' (' + e.status + ')' : '') };
     }
-    if (gdocState[id].s === 'err') toast('Google Docs לא עודכן: ' + gdocState[id].m);
+    if (gdocState[id].s === 'err') toast('Google Docs לא עודכן: ' + gdocState[id].m.replace(/<[^>]+>/g, ''));
     gdocShow(id);
     const again = gdocBusy[id] === 'again'; delete gdocBusy[id];
     if (again) protoGdocPush(id);
