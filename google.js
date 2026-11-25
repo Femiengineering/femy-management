@@ -470,6 +470,53 @@
     const parent = await folder(tok);
     return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form(Object.assign({ name, parents: [parent] }, conv)) })).json();
   }
+  // ---------- Photo documentation: <project folder>/תיעוד/<YYYY-MM-DD>/ ----------
+  const DOC_NAME = 'תיעוד';
+  const childFolders = {};
+  // A folder by its name inside parentId; made when it is missing (unless create is false).
+  async function childFolder(parentId, name, create) {
+    const key = parentId + '/' + name;
+    if (childFolders[key]) return childFolders[key];
+    const q = `'${qs(parentId)}' in parents and name='${qs(name)}' and mimeType='${FOLDER_MIME}' and trashed=false`;
+    const p = new URLSearchParams({ q, fields: 'files(id)', pageSize: '5', includeItemsFromAllDrives: 'true', supportsAllDrives: 'true' });
+    const f = ((await json(DAPI + '?' + p)).files || [])[0];
+    if (f) return (childFolders[key] = f.id);
+    if (create === false) return '';
+    const made = await json(`${DAPI}?fields=id&supportsAllDrives=true`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+    });
+    return (childFolders[key] = made.id);
+  }
+  // The project's "תיעוד" folder (or '' when there is none yet and create is false).
+  const docRoot = (projectFolder, create) => childFolder(projectFolder, DOC_NAME, create);
+  // Uploads a photo into <project>/תיעוד/<date>/ (the folders are made when missing).
+  async function docUpload(projectFolder, date, name, blob) {
+    const day = await childFolder(await docRoot(projectFolder, true), date, true);
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify({ name, parents: [day] })], { type: 'application/json' }));
+    form.append('file', blob);
+    const f = await json(`${UP}?uploadType=multipart&fields=id,name,webViewLink,thumbnailLink&supportsAllDrives=true`, { method: 'POST', body: form });
+    return Object.assign(f, { day: date, folderId: day });
+  }
+  // The project's latest photos: from the newest date folders of "תיעוד" (and photos put there directly).
+  async function docPhotos(projectFolder, max) {
+    const root = await docRoot(projectFolder, false);
+    if (!root) return { root: '', files: [] };
+    const days = (await browse(root, { foldersOnly: true })).files.filter((f) => /^\d{4}-\d{2}-\d{2}/.test(f.name))
+      .sort((a, b) => b.name.localeCompare(a.name)).slice(0, 12);
+    const dayName = {}; days.forEach((d) => { dayName[d.id] = d.name.slice(0, 10); });
+    const parents = [root].concat(days.map((d) => d.id)).map((id) => `'${qs(id)}' in parents`).join(' or ');
+    const q = `(${parents}) and mimeType contains 'image/' and trashed=false`;
+    const p = new URLSearchParams({ q, orderBy: 'createdTime desc', pageSize: String(max || 60), fields: 'files(id,name,mimeType,thumbnailLink,webViewLink,createdTime,parents)', includeItemsFromAllDrives: 'true', supportsAllDrives: 'true' });
+    const files = ((await json(DAPI + '?' + p)).files || []);
+    files.forEach((f) => { f.day = dayName[(f.parents || [])[0]] || (f.createdTime || '').slice(0, 10); });
+    files.sort((a, b) => (b.day + b.createdTime).localeCompare(a.day + a.createdTime));
+    return { root, files };
+  }
+  // The file itself, as a Blob (to put a photo from Drive into a report).
+  async function readBlob(id) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`)).blob(); }
+
   // A search over every file the user can see (My Drive, shared with them and shared drives), page after page.
   async function search(q, fields, maxPages) {
     const out = []; let pageToken = '';
@@ -496,6 +543,6 @@
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, list, unreadCount, conversation, attachment, markRead, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
-    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer },
+    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer, readBlob, docRoot, docUpload, docPhotos, docName: DOC_NAME },
   };
 })();
