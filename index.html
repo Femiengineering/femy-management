@@ -3053,7 +3053,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (sendAfter) { sendAfter = false; emailProtocol(saved); return; }
       toast((proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר') + (inEdit && protoAsk && protoAsk.map.size ? '. ההעתקה מהדוח הקודם נשארת זמינה עד השליחה' : ''));
     },
-    proto ? () => { db.protocols = db.protocols.filter((x) => x.id !== proto.id); save(); render(); toast('הפרוטוקול נמחק'); } : null);
+    () => {});
     $('#modalForm').classList.add('wide', 'with-pv');
     const body = $('#modalBody');
     const tplSel = $('[name="template"]', body);
@@ -3188,10 +3188,18 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       document.querySelectorAll('#gdocState, [data-gdocst]').forEach((st) => { st.dataset.id = rec.id; st.innerHTML = protoGdocHtml(rec); });
       if (isNew) {
         render();
-        modalDelete = () => { db.protocols = db.protocols.filter((x) => x.id !== rec.id); save(); render(); toast('הפרוטוקול נמחק'); };
-        $('#modalDelete').style.display = '';
       }
     });
+    // Deleting the whole report / summary, always there while editing (also a new one that was just started).
+    const delKind = () => ({ supervision: 'הדוח', meeting: 'הסיכום' }[curTpl] || 'הפרוטוקול');
+    const delBtn = $('#modalDelete');
+    delBtn.style.display = ''; delBtn.textContent = '🗑 מחיקת ' + delKind();
+    delBtn.dataset.note = 'המסמך יימחק לכל המשתמשים. קובץ ה-Google Docs של הפרויקט לא נמחק.';
+    modalDelete = () => {
+      if (rec) db.protocols = db.protocols.filter((x) => x.id !== rec.id);
+      if (proto) db.protocols = db.protocols.filter((x) => x.id !== proto.id);
+      save(); render(); toast(delKind().replace(/^ה/, '') + ' נמחק');
+    };
     const drawFieldAsks = () => {
       $$('[data-fask]', body).forEach((box) => {
         const k = box.dataset.fask; const f = $(`[name="${k}"]`, body);
@@ -3244,6 +3252,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const untouched = (old.every((i, n) => oldDefaults[n] && i.topic === oldDefaults[n].topic && (i.details || '') === (oldDefaults[n].details || '') && !i.instructions && !i.owner && !i.due) && old.length === oldDefaults.length)
         || (curTpl !== 'tour' && !old.some((i) => protoHasContent(curTpl, i)));
       curTpl = newTpl;
+      $('#modalDelete').textContent = '🗑 מחיקת ' + ({ supervision: 'הדוח', meeting: 'הסיכום' }[newTpl] || 'הפרוטוקול');
       drawProtoItems(newTpl, untouched || !old.length ? defaultItems(newTpl) : old);
       $$('[data-tpls]', body).forEach((f) => { f.style.display = f.dataset.tpls.split(' ').includes(newTpl) ? '' : 'none'; });
       $('[data-lbl-title]', body).textContent = newTpl === 'tour' ? 'תיאור העבודה (בכותרת)' : newTpl === 'supervision' ? 'נושא / שם הביקור (לא חובה)' : 'שם הפגישה';
@@ -4611,7 +4620,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     modalSubmit = onSubmit; modalDelete = onDelete; modalOnClose = null; modalGen++;
     $('#modalForm button[type=submit]').textContent = 'שמירה';
     const del = $('#modalDelete');
-    del.style.display = onDelete ? '' : 'none';
+    del.style.display = onDelete ? '' : 'none'; del.textContent = 'מחיקה';
     const gf = $('#modalGdoc'); gf.style.display = 'none'; $('[data-gdocst]', gf).dataset.id = ''; $('[data-gdocst]', gf).innerHTML = ''; $('[data-gdocfoot]', gf).onclick = null;
     del.dataset.note = deleteNote || '';
     $('#modalBg').classList.add('show');
