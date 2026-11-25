@@ -85,8 +85,15 @@
 
   async function post(path, body) {
     let r;
-    try { r = await fetch(server + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
-    catch (e) { throw new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת החיבור ל-Google לא זמין'); }
+    // A phone that comes back from the camera (or from the background) often fails the first requests for a
+    // moment: a few more tries before giving up.
+    for (let i = 0; ; i++) {
+      try { r = await fetch(server + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); break; }
+      catch (e) {
+        if (i >= 3) throw Object.assign(new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת החיבור ל-Google לא זמין'), { network: true });
+        await new Promise((res) => setTimeout(res, 700 * (i + 1)));
+      }
+    }
     let j = {};
     try { j = await r.json(); } catch (e) { /* ignore */ }
     if (!r.ok) throw Object.assign(new Error(j.error || 'HTTP ' + r.status), { status: r.status, code: j.error });
@@ -177,7 +184,14 @@
 
   async function api(tok, url, opts) {
     const t = tok || (rec && rec.token);
-    const r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + t }, (opts && opts.headers) || {}) }));
+    let r;
+    for (let i = 0; ; i++) {
+      try { r = await fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + t }, (opts && opts.headers) || {}) })); break; }
+      catch (e) {
+        if (i >= 2) throw Object.assign(new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'אין חיבור ל-Google'), { network: true });
+        await new Promise((res) => setTimeout(res, 700 * (i + 1)));
+      }
+    }
     if (r.status === 401 && rec) { rec.exp = 0; write(); }
     if (!r.ok) {
       let msg = '';
