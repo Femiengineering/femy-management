@@ -3556,6 +3556,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const i2 = docXml.indexOf('<w:sectPr');
       if (i1 < 8 || i2 < 0) throw new Error('template structure');
       zip.file('word/document.xml', docXml.slice(0, i1) + body + docXml.slice(i2));
+      // The letterhead (a full-page picture in the header) goes behind the text: Google Docs puts a picture that is
+      // "in front of text" over the whole page, and the document looks empty.
+      const hdr = zip.file('word/header1.xml');
+      if (hdr) zip.file('word/header1.xml', (await hdr.async('string')).replace(/behindDoc="0"/g, 'behindDoc="1"'));
       if (wImgs === imgs) wImgs = null;
       if (imgs.length) {
         const relsPath = 'word/_rels/document.xml.rels';
