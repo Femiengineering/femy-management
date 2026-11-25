@@ -15,6 +15,7 @@
     'https://www.googleapis.com/auth/calendar.events', // read and add events in the user's calendars
     'https://www.googleapis.com/auth/gmail.readonly', // read the inbox
     'https://www.googleapis.com/auth/gmail.send', // send mail as the user
+    'https://www.googleapis.com/auth/gmail.compose', // a reply ready in the project's thread, to send from Gmail
     'https://www.googleapis.com/auth/drive.readonly', // browse the user's Drive files
     'https://www.googleapis.com/auth/drive.file', // create and update files the site made
     'https://www.googleapis.com/auth/drive', // write the reports into the Google Docs the office opened in the project folders
@@ -69,7 +70,7 @@
   // "valid" = the site can call Google now without asking the user for anything.
   const valid = () => fresh() || !!(persistent && rec && rec.device);
   function status() {
-    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
+    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), gmailCompose: rec && rec.scope ? /auth\/gmail\.compose( |$)/.test(rec.scope) : null, driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
   }
   const onChange = (f) => listeners.push(f);
 
@@ -261,17 +262,22 @@
   }
   const htmlText = (html) => new DOMParser().parseFromString(html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|tr)>/gi, '\n'), 'text/html').body.textContent || '';
   // A mail thread: its subject, what a reply needs (Message-ID, References), and the last mail the user sent in it.
+  const hasFile = (p) => !!p && (!!(p.filename && p.body && p.body.attachmentId) || (p.parts || []).some(hasFile));
+  // The reply goes to the previous report: the last mail the user sent in the thread with a file attached
+  // (else the last mail the user sent, else the last mail). to / cc / from: its recipients, for "reply to all".
   async function thread(id) {
     const t = await json(GM + '/threads/' + encodeURIComponent(id) + '?format=full');
     const msgs = t.messages || [];
     const last = msgs[msgs.length - 1];
-    const mine = msgs.filter((m) => (m.labelIds || []).includes('SENT')).pop();
+    const sent = msgs.filter((m) => (m.labelIds || []).includes('SENT'));
+    const target = sent.filter((m) => hasFile(m.payload)).pop() || sent.pop() || last;
+    const mine = (target.labelIds || []).includes('SENT') ? target : null;
     let text = mine ? partText(mine.payload, 'text/plain') : '';
     if (!text && mine) text = htmlText(partText(mine.payload, 'text/html'));
-    const mid = hdr(last, 'Message-ID') || hdr(last, 'Message-Id');
+    const mid = hdr(target, 'Message-ID') || hdr(target, 'Message-Id');
     return {
-      id, subject: hdr(msgs[0], 'Subject'), messageId: mid, references: [hdr(last, 'References'), mid].filter(Boolean).join(' '),
-      to: hdr(mine || last, 'To'), cc: hdr(mine || last, 'Cc'), text, count: msgs.length, date: Number(last && last.internalDate) || 0,
+      id, subject: hdr(target, 'Subject') || hdr(msgs[0], 'Subject'), messageId: mid, references: [hdr(target, 'References'), mid].filter(Boolean).join(' '),
+      from: hdr(target, 'From'), to: hdr(target, 'To'), cc: hdr(target, 'Cc'), mine: !!mine, text, count: msgs.length, date: Number(target.internalDate) || 0,
     };
   }
   const searchLink = (query) => 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent((rec && rec.email) || '') + '#search/' + encodeURIComponent(query);
@@ -288,8 +294,7 @@
     return btoa(bin);
   }
   // threadId / inReplyTo / references: sent as a reply in that thread.
-  async function send({ to, cc, subject, text, attachment, threadId, inReplyTo, references }) {
-    const tok = await token();
+  async function rawMail({ to, cc, subject, text, attachment, inReplyTo, references }) {
     const bd = 'femy' + Math.random().toString(36).slice(2);
     let m = `To: ${to}\r\n` + (cc ? `Cc: ${cc}\r\n` : '') + `Subject: ${encWord(subject || '')}\r\nMIME-Version: 1.0\r\n`
       + (inReplyTo ? `In-Reply-To: ${inReplyTo}\r\nReferences: ${references || inReplyTo}\r\n` : '')
@@ -301,8 +306,16 @@
         + `Content-Disposition: attachment; filename="${fn}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(await blobB64(attachment.blob))}`;
     }
     m += `--${bd}--\r\n`;
-    const raw = btoa(m).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return (await api(tok, GM + '/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(threadId ? { raw, threadId } : { raw }) })).json();
+    return btoa(m).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  async function send(o) {
+    const tok = await token(); const raw = await rawMail(o);
+    return (await api(tok, GM + '/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o.threadId ? { raw, threadId: o.threadId } : { raw }) })).json();
+  }
+  // The same mail as a draft (in the thread when threadId is given), to check and send from Gmail.
+  async function draft(o) {
+    const tok = await token(); const raw = await rawMail(o);
+    return (await api(tok, GM + '/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: o.threadId ? { raw, threadId: o.threadId } : { raw } }) })).json();
   }
 
   // ---------- Drive ----------
@@ -401,12 +414,13 @@
   // Downloads a Google file converted to another format (for example a Sheet as .xlsx).
   async function exportFile(id, mime) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`)).arrayBuffer(); }
   async function readBuffer(id) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`)).arrayBuffer(); }
+  async function remove(id) { await api(await token(), `${DAPI}/${encodeURIComponent(id)}?supportsAllDrives=true`, { method: 'DELETE' }); }
   async function readFile(id) { return (await api(await token(), `${DAPI}/${id}?alt=media`)).text(); }
 
   window.FemyGoogle = {
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
-    gmail: { inbox, send, link: mailLink, findThread, findSent, thread, searchLink },
-    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile, readBuffer },
+    gmail: { inbox, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
+    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, read: readFile, readBuffer },
   };
 })();

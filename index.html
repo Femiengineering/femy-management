@@ -3862,52 +3862,77 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const what = pr.template === 'supervision' ? 'דוח פיקוח' + (no ? ' מס\' ' + no : '') : pr.template === 'meeting' ? 'סיכום פגישה' + (no ? ' מס\' ' + no : '') + (pr.title ? ' - ' + pr.title : '') : 'פרוטוקול ' + (pr.title || '');
     return `שלום רב,\n\nמצורף ${what} מיום ${fmtDate(pr.date)}${pj ? ' בפרויקט ' + pj.name : ''}.\nנבקש לעבור על ההנחיות והמשימות שבאחריותכם.\n\nבברכה,\n${(me && me.name) || ''}\nפמי הנדסה בע"מ`;
   }
-  // The attachment: the PDF of the report's Google Doc (as the office sends), else the Word file.
+  // The attachment is always a PDF: from the report's Google Doc, else made through a temporary Google Doc
+  // (the Word file on the letterhead, converted by Drive and deleted right after).
   async function protoMailAttachment(pr) {
+    const pdf = (buf) => ({ name: protoFileName(pr, 'pdf'), blob: new Blob([buf], { type: 'application/pdf' }) });
     if (pr.gdocId && G.status().driveWrite !== false) {
       try {
         await protoGdocPush(pr.id);
         const cur = byId(db.protocols, pr.id) || pr;
-        if (cur.gdocId) return { name: protoFileName(pr, 'pdf'), blob: new Blob([await G.drive.exportFile(cur.gdocId, 'application/pdf')], { type: 'application/pdf' }) };
-      } catch (e) { /* the Word file instead */ }
+        if (cur.gdocId) return pdf(await G.drive.exportFile(cur.gdocId, 'application/pdf'));
+      } catch (e) { /* through a temporary document */ }
     }
-    return { name: protoFileName(pr, 'docx'), blob: await buildProtocolDocx(pr) };
+    const tmp = await G.drive.save('זמני - ' + protoFileName(pr, 'docx').replace(/\.docx$/, ''), await buildProtocolDocx(pr), '', '', { gdoc: true });
+    try { return pdf(await G.drive.exportFile(tmp.id, 'application/pdf')); } finally { G.drive.remove(tmp.id).catch(() => {}); }
   }
   async function openProtoMail(pr) {
     const pj = byId(db.projects, pr.projectId);
     toast('מחפש את שרשור המייל של הפרויקט...');
     let th = null;
     try { const id = await protoFindThread(pr, pj); if (id) th = await G.gmail.thread(id); } catch (e) { th = null; }
-    const to = cleanEmails(pr.emailTo) || cleanEmails(th && th.to) || cleanEmails(settings().emailTo);
-    const cc = cleanEmails([settings().emailCc, th && th.cc].filter(Boolean).join(','));
+    // Reply to all on the previous report: its recipients (and its sender, when it was not me); without a thread,
+    // the report's recipients.
+    const mine = ((me && me.email) || G.status().email || '').toLowerCase();
+    const uniq = (s, drop) => Array.from(new Set(cleanEmails(s).split(',').filter((x) => x && x.toLowerCase() !== mine && !(drop || []).includes(x.toLowerCase())))).join(',');
+    const to = th ? uniq([th.mine ? '' : th.from, th.to].join(',')) || uniq(pr.emailTo) : uniq(pr.emailTo) || uniq(settings().emailTo);
+    const cc = uniq([th ? th.cc : '', settings().emailCc].filter(Boolean).join(','), to.toLowerCase().split(','));
     const subject = th && th.subject ? (/^(re|השב|תשובה)\s*:/i.test(th.subject) ? th.subject : 'Re: ' + th.subject)
       : [protoProjName(pr), protoHeading(pr), fmtDate(pr.date)].filter(Boolean).join(' - ');
     openModal('שליחה במייל', `
       <div class="field full hint" style="background:var(--primary-soft);padding:8px 10px;border-radius:8px">${th
-        ? `📧 יישלח כתשובה בשרשור של הפרויקט: <b>${esc(th.subject || '')}</b> (${th.count} הודעות). <a href="${esc(G.gmail.link({ threadId: th.id }))}" target="_blank" rel="noopener">פתיחת השרשור</a>`
-        : '📧 לא נמצא שרשור קודם לפרויקט: יישלח מייל חדש, והדוחות הבאים יישלחו בשרשור שלו.'}</div>
+        ? `📧 תשובה לכולם על המסמך הקודם בשרשור של הפרויקט: <b>${esc(th.subject || '')}</b>${th.date ? ' מ-' + esc(new Date(th.date).toLocaleDateString('he-IL')) : ''} (${th.count} הודעות). <a href="${esc(G.gmail.link({ threadId: th.id }))}" target="_blank" rel="noopener">פתיחת השרשור</a>`
+        : '📧 לא נמצא שרשור קודם לפרויקט: ייפתח מייל חדש, והמסמכים הבאים יישלחו כתשובה עליו.'}
+        ${G.status().gmailCompose === false ? '<br>כדי להכין את התשובה בתוך Gmail צריך לאשר הרשאה נוספת: <a href="#" data-gdocauth>אישור עכשיו</a>' : ''}</div>
       <div class="field full"><label>אל</label><input class="input" name="to" dir="ltr" value="${esc(to.split(',').join(', '))}" required></div>
       <div class="field full"><label>העתק</label><input class="input" name="cc" dir="ltr" value="${esc(cc.split(',').filter(Boolean).join(', '))}"></div>
       <div class="field full"><label>נושא</label><input class="input" name="subject" value="${esc(subject)}"></div>
       <div class="field full"><label>תוכן ${th && th.text ? '(הטקסט הקבוע מהמייל הקודם, עם התאריך והמספר של המסמך הזה)' : ''}</label><textarea class="input" name="body" rows="9">${esc(protoMailBody(pr, th && th.text))}</textarea></div>
-      <div class="field full hint">📎 יצורף: ${esc(pr.gdocId ? protoFileName(pr, 'pdf') + ' (מה-Google Docs)' : protoFileName(pr, 'docx'))}</div>`,
+      <div class="field full hint">📎 יצורף: ${esc(protoFileName(pr, 'pdf'))}</div>
+      <div class="field full"><button type="button" class="btn" data-direct>📤 שליחה ישירה מכאן, בלי לעבור ל-Gmail</button></div>`,
     async (data) => {
       const toList = cleanEmails(data.to);
       if (!toList) { toast('הוסיפו לפחות כתובת מייל אחת'); return; }
+      // Default: the reply waits in the thread in Gmail (opened in a new tab, from the click), to send from there.
+      const inGmail = !direct;
+      const w = inGmail ? window.open('', '_blank') : null;
       try {
-        toast('שולח...');
+        toast(inGmail ? 'מכין את התשובה בשרשור ב-Gmail...' : 'שולח...');
         const att = await protoMailAttachment(pr);
-        const r = await G.gmail.send({ to: toList, cc: cleanEmails(data.cc), subject: data.subject, text: data.body, attachment: att,
-          threadId: th && th.id, inReplyTo: th && th.messageId, references: th && th.references });
-        const tid = (r && r.threadId) || (th && th.id);
+        const mail = { to: toList, cc: cleanEmails(data.cc), subject: data.subject, text: data.body, attachment: att,
+          threadId: th && th.id, inReplyTo: th && th.messageId, references: th && th.references };
+        const r = inGmail ? await G.gmail.draft(mail) : await G.gmail.send(mail);
+        const tid = (r && (r.threadId || (r.message && r.message.threadId))) || (th && th.id);
+        if (inGmail) {
+          const url = tid ? G.gmail.link({ threadId: tid }) : 'https://mail.google.com/mail/u/#drafts';
+          if (w) w.location.href = url; else location.href = url;
+        }
         if (pj && tid) { pj.mailThreads = Object.assign({}, pj.mailThreads, { [protoKind(pr)]: tid, any: (pj.mailThreads && pj.mailThreads.any) || tid }); }
         const cur = byId(db.protocols, pr.id) || pr;
         cur.emailTo = toList.split(',').join(', ');
         protoMarkSent(cur); save(); render();
-        toast(th ? 'המייל נשלח בשרשור של הפרויקט' : 'המייל נשלח');
-      } catch (e) { toast('השליחה נכשלה: ' + gErr(e)); }
+        toast(inGmail ? 'התשובה מוכנה בשרשור ב-Gmail, עם ה-PDF. בדקו ושלחו משם' : th ? 'המייל נשלח בשרשור של הפרויקט' : 'המייל נשלח');
+      } catch (e) {
+        if (w) w.close();
+        toast((inGmail ? 'הכנת התשובה ב-Gmail נכשלה: ' : 'השליחה נכשלה: ') + gErr(e));
+      }
     });
+    let direct = false;
     $('#modalForm').classList.add('wide');
+    $('[data-direct]', $('#modalBody')).addEventListener('click', () => {
+      direct = true; const f = $('#modalForm'); if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event('submit', { cancelable: true }));
+    });
+    $('#modalForm button[type=submit]').textContent = '✉️ פתיחה בשרשור ב-Gmail';
   }
   async function sendProtocolGmail(pr, to, cc, subject, text) {
     if (!to) { toast('אין נמענים. הגדירו נמענים בעמוד ההגדרות'); location.hash = 'settings'; return; }
@@ -4459,6 +4484,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $('#modalForm').classList.remove('wide', 'with-pv');
     $('#modalBody').innerHTML = bodyHtml;
     modalSubmit = onSubmit; modalDelete = onDelete; modalOnClose = null; modalGen++;
+    $('#modalForm button[type=submit]').textContent = 'שמירה';
     const del = $('#modalDelete');
     del.style.display = onDelete ? '' : 'none';
     del.dataset.note = deleteNote || '';
