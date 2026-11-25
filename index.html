@@ -1743,6 +1743,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field"><label>תקציב (₪, לפני מע״מ)</label><input class="input" type="number" min="0" name="budget" value="${esc(p.budget)}"></div>
       <div class="field"><label>התקדמות: <output id="progOut">${p.progress || 0}</output>%</label><input type="range" min="0" max="100" step="5" name="progress" value="${p.progress || 0}" oninput="document.getElementById('progOut').textContent=this.value"></div>
       <div class="field full"><label>קישור לתיקיית הפרויקט ב-Google Drive</label><input class="input" name="driveFolder" dir="ltr" placeholder="https://drive.google.com/drive/folders/..." value="${p.driveFolder ? esc(driveUrl(p)) : ''}"></div>
+      <div class="field full"><label>תבנית לדוחות פיקוח ולסיכומי פגישות: מפרויקט אחר</label><select class="input" name="templateFrom"><option value="">ללא (לפי המסמכים של הפרויקט עצמו)</option>${db.projects.filter((x) => x !== proj).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')).map((x) => `<option value="${esc(x.id)}" ${x.id === p.templateFrom ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+        <span class="hint">עד שיהיה לפרויקט דוח או סיכום משלו, המסמך החדש יציע להעתיק את הנושאים מהמסמך האחרון של הפרויקט שנבחר.</span></div>
       <div class="field full"><label>הערות / סיכום מצב</label><textarea class="input" name="notes">${esc(p.notes)}</textarea></div>`,
     (data) => {
       data.progress = Number(data.progress) || 0; data.budget = data.budget === '' ? '' : Number(data.budget);
@@ -2757,11 +2759,35 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   // What a draft keeps of the previous report, so the same options come back when it is opened again.
   const protoPrevSnap = (pv) => JSON.parse(JSON.stringify({
-    id: pv.id || '', template: pv.template, projectId: pv.projectId || '', reportNo: pv.reportNo || '', date: pv.date || '', _drive: pv._drive || null,
+    id: pv.id || '', template: pv.template, projectId: pv.projectId || '', reportNo: pv.reportNo || '', date: pv.date || '', _drive: pv._drive || null, _tpl: pv._tpl || '',
     participants: pv.participants || '', location: pv.location || '', status: pv.status || '', copies: pv.copies || '',
     doneWork: pv.doneWork || '', nextWork: pv.nextWork || '', notDone: pv.notDone || '',
     items: (pv.items || []).filter((i) => (i.topic || '').trim() || protoHasText(pv.template, i)),
   }));
+  // The projects that have a report / summary of this template (here or in Drive), to take it as a template.
+  function protoTplProjects(tpl, exceptPid) {
+    const kind = protoKind({ template: tpl });
+    const ids = new Set(db.protocols.filter((x) => x.template === tpl && x.projectId).map((x) => x.projectId));
+    dprot.items.forEach((it) => { if (it.kind === kind && (it.files || []).some((f) => f.ext === 'gdoc' || f.ext === 'docx')) { const pj = dpProject(it); if (pj) ids.add(pj.id); } });
+    return db.projects.filter((x) => ids.has(x.id) && x.id !== exceptPid).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'));
+  }
+  // The Google Docs files in a project's folders (the documents the office keeps open), the newest first.
+  function projGdocs(projectId) {
+    const seen = new Set(); const out = [];
+    dprot.items.filter((it) => projectId && (dpProject(it) || {}).id === projectId)
+      .sort((a, b) => (b.modified || b.date || '').localeCompare(a.modified || a.date || ''))
+      .forEach((it) => (it.files || []).forEach((f) => { if (f.ext === 'gdoc' && !seen.has(f.id)) { seen.add(f.id); out.push({ id: f.id, name: f.name || it.title, kind: it.kind, date: it.modified || it.date || '' }); } }));
+    return out;
+  }
+  // The Google Doc a report writes into: the one it already writes into, else the one chosen for the project,
+  // else the project's open document of the same kind. '' = a new document.
+  function protoGdocDefault(pr) {
+    if (pr.gdocId) return pr.gdocId;
+    const kind = protoKind(pr); const pj = byId(db.projects, pr.projectId);
+    if (pj && pj.gdocs && pj.gdocs[kind]) return pj.gdocs[kind];
+    const g = projGdocs(pr.projectId).find((x) => x.kind === kind);
+    return g ? g.id : '';
+  }
   // A Drive document that is the Google Docs copy of a protocol written here.
   const dpOwn = (it) => { const own = new Set(db.protocols.map((x) => x.gdocId).filter(Boolean)); return (it.files || []).some((f) => own.has(f.id)); };
 
@@ -2984,6 +3010,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <button type="button" class="btn sm" data-additem style="margin-top:8px">+ נושא</button>
         <span class="hint" data-items-hint>${p.template === 'tour' ? 'הסעיפים הקבועים מולאו מראש לפי הפרוטוקולים הקודמים. ערכו, מחקו או הוסיפו סעיפים.' : 'נושא מהרשימה הקבועה בלי תוכן לא יופיע במסמך. נושא חדש בלי תוכן יופיע כשורת כותרת אפורה לרוחב הטבלה (למשל שם רחוב או מבנה). מלאו "באחריות" כדי ליצור משימה.'}</span></div>
       <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>
+      <div class="field" ${vis('supervision meeting')}><label>📋 תבנית מפרויקט אחר</label><select class="input" name="tplFrom" data-tplfrom></select>
+        <span class="hint">הנושאים של המסמך האחרון בפרויקט שנבחר מוצעים להעתקה, בלי המשתתפים והנמענים.</span></div>
+      ${GOOGLE ? `<div class="field"><label>📝 מסמך Google Docs לסנכרון</label><select class="input" name="gdocPick" data-gdocpick></select>
+        <span class="hint">המסמך מתעדכן תוך כדי העריכה, עד השליחה.</span></div>` : ''}
       <div class="field full pf-mail"><label>📧 שליחה במייל: נמענים</label>
         <div class="pf-mail-row"><input class="input" name="emailTo" dir="ltr" value="${esc(p.emailTo)}" placeholder="name@example.com, ...">
         <button type="button" class="btn primary" data-savemail>שמירה ושליחה במייל</button></div>
@@ -3018,14 +3048,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (proto && (!inEdit || proto.prevSnap)) return;
       const tpl = curTpl, pid = projSel.value, mine = ++driveTry;
       const d = driveLatestDoc(tpl, pid, proto && proto.date);
-      if (!d || (prev && (prev.date || '') >= (d.at || '').slice(0, 10))) return;
+      const own = prev && !prev._tpl ? prev : null; // a template from another project gives way to the project's own
+      if (!d || (own && (own.date || '') >= (d.at || '').slice(0, 10))) return;
       const bar = $('#protoAskBar', body);
       if (bar && !bar.innerHTML) bar.innerHTML = `<div class="pi-askbar">☁️ קורא את המסמך האחרון מה-Drive: ${esc(d.item.title || '')}...</div>`;
       let dp = null;
       try { dp = await driveDocPrev(tpl, pid); } catch (e) { dp = null; }
       if (mine !== driveTry || !document.body.contains(body) || curTpl !== tpl || projSel.value !== pid) return;
-      if (!dp || !((dp.items || []).length || dp.nextWork || dp.doneWork) || (prev && (prev.date || '') > (dp.date || ''))) { drawProtoItems(curTpl, readProtoItems()); return; }
+      if (!dp || !((dp.items || []).length || dp.nextWork || dp.doneWork) || (own && (own.date || '') > (dp.date || ''))) { drawProtoItems(curTpl, readProtoItems()); return; }
       prev = dp;
+      const tf = $('[data-tplfrom]', body); if (tf) tf.value = '';
       drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev), askDone0));
       if (!proto) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
       drawFieldAsks(); schedulePreview();
@@ -3034,6 +3066,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     // what was answered, and the previous report, so the options are there again when it is reopened.
     const persist = (data, auto) => {
       const raw = readProtoItems();
+      const pick = gpTouched ? data.gdocPick : undefined; delete data.gdocPick; delete data.tplFrom;
       protoFormFinish(data);
       data.emailTo = cleanEmails(data.emailTo).split(',').filter(Boolean).join(', ');
       if (rec && !db.protocols.includes(rec)) rec = byId(db.protocols, rec.id) || null;
@@ -3046,11 +3079,72 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           rec.askDone = (protoAsk ? Array.from(protoAsk.done) : []).concat(Array.from(fieldDone).map((k) => 'f:' + k));
         } else ['prevSnap', 'draftRows', 'askDone'].forEach((k) => { delete rec[k]; });
       }
+      if (pick !== undefined && !protoSent(rec) && pick !== (rec.gdocId || '')) {
+        // The office's open document of the project (written into, keeping its name), or a new one.
+        if (pick) { rec.gdocId = pick; rec.gdocLink = 'https://docs.google.com/document/d/' + pick + '/edit'; rec.gdocShared = true; delete rec.gdocNew; }
+        else { delete rec.gdocId; delete rec.gdocLink; delete rec.gdocShared; rec.gdocNew = true; }
+        const pj = byId(db.projects, rec.projectId);
+        if (pj) { pj.gdocs = Object.assign({}, pj.gdocs); if (pick) pj.gdocs[protoKind(rec)] = pick; else delete pj.gdocs[protoKind(rec)]; }
+      }
       if (auto) rec.editing = { by: (me && me.name) || '', at: Date.now() }; else delete rec.editing;
       save();
       protoGdocSync(rec, !auto);
       return rec;
     };
+    // "Template from another project": that project's latest report / summary of this template (here or in Drive)
+    // is offered for copying, topic by topic, without its participants and recipients.
+    const tfSel = $('[data-tplfrom]', body);
+    let tplTry = 0;
+    const drawTplFrom = () => {
+      if (!tfSel) return;
+      const cur = prev && prev._tpl ? prev._tplId : '';
+      tfSel.innerHTML = '<option value="">ללא: לפי המסמכים של הפרויקט הזה</option>' + protoTplProjects(curTpl, projSel.value).map((x) => `<option value="${esc(x.id)}" ${x.id === cur ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+    };
+    const loadTplFrom = async (otherPid) => {
+      const tpl = curTpl, mine = ++tplTry, other = byId(db.projects, otherPid);
+      if (!other) return;
+      let src = protoPrev(tpl, otherPid);
+      const d = driveLatestDoc(tpl, otherPid);
+      if (d && (!src || (src.date || '') < (d.at || '').slice(0, 10))) {
+        try { const dp = await driveDocPrev(tpl, otherPid); if (dp && (dp.items || []).length) src = dp; } catch (e) {}
+      }
+      if (mine !== tplTry || !document.body.contains(body) || curTpl !== tpl || (tfSel && tfSel.value !== otherPid)) return;
+      if (!src) { toast('לא נמצא מסמך מהסוג הזה בפרויקט ' + other.name); return; }
+      prev = Object.assign({}, src, { _tpl: other.name, _tplId: other.id });
+      drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
+      drawFieldAsks(); schedulePreview();
+    };
+    // A project with no report of its own yet takes the template chosen in the project's settings.
+    const autoTplFrom = () => {
+      if (proto || !tfSel) return;
+      drawTplFrom();
+      const pj = byId(db.projects, projSel.value);
+      if (prev || !pj || !pj.templateFrom || pj.templateFrom === pj.id || driveLatestDoc(curTpl, pj.id)) return;
+      tfSel.value = pj.templateFrom;
+      if (tfSel.value === pj.templateFrom) loadTplFrom(pj.templateFrom);
+    };
+    if (tfSel) tfSel.addEventListener('change', () => {
+      if (tfSel.value) { loadTplFrom(tfSel.value); return; }
+      ++tplTry;
+      prev = prevFor(curTpl, projSel.value);
+      drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
+      drawFieldAsks(); tryDrivePrev();
+    });
+    // The Google Doc to write into: by default the project's open document of the same kind.
+    const gpSel = $('[data-gdocpick]', body);
+    let gpTouched = false; // only a choice made in this form changes the document written into
+    if (gpSel) gpSel.addEventListener('change', () => { gpTouched = true; });
+    const drawGdocPick = () => {
+      if (!gpSel) return;
+      const pid = projSel.value, kind = protoKind({ template: curTpl });
+      const cur = rec && rec.gdocId ? rec.gdocId : protoGdocDefault({ projectId: pid, template: curTpl });
+      const list = projGdocs(pid);
+      if (cur && !list.some((g) => g.id === cur)) list.unshift({ id: cur, name: 'המסמך שנבחר קודם', kind });
+      gpSel.innerHTML = list.map((g) => `<option value="${esc(g.id)}" ${g.id === cur ? 'selected' : ''}>${esc(g.name)}${g.date ? ' · ' + esc(fmtDate(g.date)) : ''}</option>`).join('')
+        + `<option value="" ${cur ? '' : 'selected'}>מסמך חדש בתיקיית הפרויקט</option>`;
+      gpSel.disabled = !!(rec && protoSent(rec));
+    };
+    drawGdocPick();
     // Saved while typing: the other users see the document as it is being written, and the Google Docs copy follows.
     liveForm(() => {
       const isNew = !rec;
@@ -3075,6 +3169,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     drawProtoItems(curTpl, p.items || []);
     if (protoPhotoIds(p).length) ensurePhotos(p).then(() => { if (document.body.contains(body)) { fillPhotos(body); schedulePreview(); } });
     drawFieldAsks();
+    autoTplFrom();
     setTimeout(tryDrivePrev, 0);
     ['doneWork', 'nextWork', 'notDone'].forEach((k) => $(`[name="${k}"]`, body).addEventListener('input', () => { if (!fieldDone.has(k)) { fieldDone.add(k); drawFieldAsks(); } }));
     // Live preview, always open: on the left beside the form (on top of it on narrow screens).
@@ -3112,7 +3207,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('#modalTitle').textContent = (proto ? 'עריכת ' : 'פרוטוקול חדש: ') + PROTO_TPL[newTpl].label;
       $('[data-lbl-no]', body).textContent = newTpl === 'meeting' ? 'מספר סיכום' : 'מספר דוח';
       renumber();
-      if (!proto) { prev = prevFor(newTpl, projSel.value); drawProtoItems(newTpl, protoAskSetup(newTpl, prev, readProtoItems().filter((i) => !i._fromPrev))); drawFieldAsks(); tryDrivePrev(); }
+      if (!proto) { prev = prevFor(newTpl, projSel.value); drawProtoItems(newTpl, protoAskSetup(newTpl, prev, readProtoItems().filter((i) => !i._fromPrev))); drawFieldAsks(); autoTplFrom(); tryDrivePrev(); }
+      drawGdocPick();
       const part = $('[name="participants"]', body);
       if (newTpl === 'tour' && !part.value.trim()) part.value = TOUR_PARTICIPANTS;
       else if (newTpl !== 'tour' && part.value.trim() === TOUR_PARTICIPANTS.trim()) part.value = '';
@@ -3128,11 +3224,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       renumber();
       const mt = $('[name="emailTo"]', body);
       if (!proto && (mt.value === autoMail || !mt.value.trim())) mt.value = autoMail = protoPrevEmails(projSel.value, curTpl);
+      drawGdocPick();
       if (proto) return;
       prev = prevFor(curTpl, projSel.value);
       drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
+      autoTplFrom();
       tryDrivePrev();
-      if (prev) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
+      if (prev && !prev._tpl) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
       drawFieldAsks();
     });
     $('[data-additem]', body).addEventListener('click', () => { const cur = readProtoItems(); cur.push({}); drawProtoItems(curTpl, cur); const last = $$('.pi-row', body).pop(); if (last) $('[data-k="topic"]', last).focus(); });
@@ -3182,7 +3280,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const bar = $('#protoAskBar');
     if (bar) {
       const waiting = items.filter((it, n) => askOf(it, n)).length;
-      bar.innerHTML = waiting ? `<div class="pi-askbar">📋 ${esc(asking.prev.template === 'supervision' ? 'דוח פיקוח' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : '') : 'הסיכום' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : ''))}${asking.prev.date ? ' מ-' + esc(fmtDate(asking.prev.date)) : ''}${asking.prev._drive ? ' (מה-Drive' + (asking.prev._drive.ext === 'gdoc' ? ', Google Docs' : '') + ')' : ''}:
+      bar.innerHTML = waiting ? `<div class="pi-askbar">📋 ${esc(asking.prev.template === 'supervision' ? 'דוח פיקוח' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : '') : 'הסיכום' + (asking.prev.reportNo ? ' ' + asking.prev.reportNo : ''))}${asking.prev.date ? ' מ-' + esc(fmtDate(asking.prev.date)) : ''}${asking.prev._drive ? ' (מה-Drive' + (asking.prev._drive.ext === 'gdoc' ? ', Google Docs' : '') + ')' : ''}${asking.prev._tpl ? ' · תבנית מהפרויקט ' + esc(asking.prev._tpl) : ''}:
         ${waiting} נושאים ממתינים לתשובה. נושא שלא נענה לא ייכנס למסמך.
         <span class="pi-ask-btns"><button type="button" class="btn sm primary" data-copyall>העתקת הכול</button><button type="button" class="btn sm" data-skipall>דילוג על הכול</button></span></div>` : '';
       if (waiting) {
@@ -3661,6 +3759,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   const gdocShow = (id) => { const el = $('#gdocState'); if (el && el.dataset.id === id) el.innerHTML = protoGdocHtml(byId(db.protocols, id)); };
   function protoGdocSync(pr, now) {
     if (!GOOGLE || !G.valid() || !pr || !protoTpl(pr)) return;
+    // The project's open document is written into only while the report is being written: editing an old,
+    // sent report must not overwrite the newer one in it.
+    if (pr.gdocShared && protoSent(pr)) return;
     clearTimeout(gdocTimers.get(pr.id));
     gdocTimers.set(pr.id, setTimeout(() => protoGdocPush(pr.id), now ? 0 : 8000));
   }
@@ -3677,12 +3778,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const pr = byId(db.protocols, id); if (!pr) return;
     gdocBusy[id] = true; gdocState[id] = { s: 'busy' }; gdocShow(id);
     try {
+      // A new report writes into the project's open document of its kind, when there is one.
+      if (!pr.gdocId && !pr.gdocNew && !protoSent(pr)) {
+        const g = protoGdocDefault(pr);
+        if (g) { pr.gdocId = g; pr.gdocShared = true; }
+      }
       const parent = pr.gdocId ? '' : pr.gdocFolder || await protoGdocFolder(pr);
       const name = protoFileName(pr, 'docx').replace(/\.docx$/, '');
-      const f = await G.drive.save(name, await buildProtocolDocx(pr), pr.gdocId, parent, { gdoc: true });
+      const f = await G.drive.save(name, await buildProtocolDocx(pr), pr.gdocId, parent, { gdoc: true, keepName: !!pr.gdocShared });
       const cur = byId(db.protocols, id);
       if (cur && (cur.gdocId !== f.id || cur.gdocLink !== (f.webViewLink || ''))) {
+        if (cur.gdocShared && cur.gdocId && cur.gdocId !== f.id) delete cur.gdocShared; // the open document could not be written: a new one was made
         cur.gdocId = f.id; cur.gdocLink = f.webViewLink || ''; if (parent && f.inFolder) cur.gdocFolder = parent;
+        if (cur.gdocShared) { const pj = byId(db.projects, cur.projectId); if (pj && !(pj.gdocs || {})[protoKind(cur)]) pj.gdocs = Object.assign({}, pj.gdocs, { [protoKind(cur)]: f.id }); }
         save();
       }
       gdocState[id] = { s: 'ok' };

@@ -332,7 +332,8 @@
     return (await (await api(tok, `${DAPI}?q=${q}&orderBy=modifiedTime desc&pageSize=50&fields=${FIELDS}`)).json()).files || [];
   }
   // Creates the file in the site's folder, or replaces it when fileId is given and still reachable.
-  // opts.gdoc: a Word file is kept as a Google Doc (Drive converts it on every upload).
+  // opts.gdoc: a Word file is kept as a Google Doc (Drive converts it on every upload). opts.keepName: the
+  // existing file keeps its own name (a document the office opened, that the site only writes into).
   async function save(name, blob, fileId, parentId, opts) {
     const tok = await token();
     const conv = opts && opts.gdoc ? { mimeType: 'application/vnd.google-apps.document' } : {};
@@ -343,7 +344,7 @@
       return f;
     };
     if (fileId) {
-      try { return await (await api(tok, `${UP}/${fileId}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'PATCH', body: form({ name }) })).json(); }
+      try { return await (await api(tok, `${UP}/${fileId}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'PATCH', body: form(opts && opts.keepName ? {} : { name }) })).json(); }
       catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
     }
     if (parentId) {
