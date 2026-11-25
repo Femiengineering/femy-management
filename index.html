@@ -2932,12 +2932,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function protoAskSetup(tpl, prev, items, done) {
     protoAsk = null;
     if (!prev || tpl === 'tour' || !PROTO_TPL[tpl]) return items;
-    const pitems = (prev.items || []).filter((i) => (i.topic || '').trim() || protoHasText(tpl, i));
+    // A template from another project brings its topics and texts, not its photos.
+    const pitems = (prev.items || []).map((i) => { if (!prev._tpl) return i; const c = Object.assign({}, i); delete c.photos; delete c.photoPos; delete c.photoScale; return c; })
+      .filter((i) => (i.topic || '').trim() || protoHasContent(tpl, i));
     const map = new Map();
-    protoTopicKeys(pitems).forEach((k, n) => { if (protoHasText(tpl, pitems[n])) map.set(k, pitems[n]); });
+    protoTopicKeys(pitems).forEach((k, n) => { if (protoHasContent(tpl, pitems[n])) map.set(k, pitems[n]); });
     protoAsk = { prev, tpl, map, done: new Set((done || []).filter((k) => !/^f:/.test(k))) };
     const cur = items.map((i) => Object.assign({}, i));
-    let fromPrev = pitems.map((i) => (protoHasText(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
+    let fromPrev = pitems.map((i) => (protoHasContent(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
     let want = protoTopicKeys(fromPrev);
     const keepRow = fromPrev.map((i, n) => !(i._fromPrev && protoAsk.done.has(want[n])));
     fromPrev = fromPrev.filter((i, n) => keepRow[n]); want = want.filter((k, n) => keepRow[n]);
@@ -3282,7 +3284,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!prev) { toast(projSel.value ? 'אין פרוטוקול קודם מאותו סוג בפרויקט הזה' : 'בחרו קודם פרויקט'); return; }
       if (!confirm('להחליף את הנושאים בנושאים מהפרוטוקול מ-' + fmtDate(prev.date) + '?')) return;
       protoAsk = null;
-      drawProtoItems(curTpl, (prev.items || []).map((i) => { const c = Object.assign({}, i); delete c.photos; delete c.photoPos; delete c.photoScale; return c; }));
+      drawProtoItems(curTpl, (prev.items || []).map((i) => Object.assign({}, i)));
       ['participants', 'location', 'copies', 'status'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && !f.value.trim() && prev[k]) f.value = prev[k]; });
       toast('הנושאים הועתקו מהפרוטוקול הקודם');
     });
@@ -3306,7 +3308,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const drop = new Set();
     rows.forEach(([n, k, prevIt]) => {
       protoAsk.done.add(k);
-      if (copy) { cur[n] = Object.assign({}, prevIt, cur[n].photos ? { photos: cur[n].photos } : {}); if (!cur[n].photos || cur[n].photos === prevIt.photos) delete cur[n].photos; delete cur[n]._fromPrev; }
+      if (copy) {
+        const ph = Array.from(new Set(photoIds(prevIt.photos).concat(photoIds(cur[n].photos))));
+        cur[n] = Object.assign({}, prevIt);
+        if (ph.length) cur[n].photos = ph.join(','); else { delete cur[n].photos; delete cur[n].photoPos; delete cur[n].photoScale; }
+        delete cur[n]._fromPrev;
+      }
       else if (cur[n]._fromPrev) { if ((PROTO_TPL[protoAsk.tpl].topics || []).includes((cur[n].topic || '').trim())) delete cur[n]._fromPrev; else drop.add(n); }
     });
     drawProtoItems(protoAsk.tpl, cur.filter((i, n) => !drop.has(n)));
@@ -3331,7 +3338,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       }
     }
     box.innerHTML = items.map((it, n) => `<div class="pi-row${askOf(it, n) ? ' asking' : ''}">
-      ${askOf(it, n) ? protoAskHtml(protoPrevText(tpl, askOf(it, n)), tpl) : ''}
+      ${askOf(it, n) ? protoAskHtml([protoPrevText(tpl, askOf(it, n)), photoIds(askOf(it, n).photos).length ? (photoIds(askOf(it, n).photos).length === 1 ? '📷 תמונה אחת' : '📷 ' + photoIds(askOf(it, n).photos).length + ' תמונות') : ''].filter(Boolean).join(' · '), tpl) : ''}
       <div class="pi-top"><span class="pi-num">${n + 1}</span><input class="input" data-k="topic" value="${esc(it.topic)}" placeholder="נושא">
         <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm pi-del" data-del title="מחיקת הסעיף כולו: הנושא, התוכן והתמונות">🗑<span class="pi-del-l"> מחיקת הסעיף</span></button></div>
       <div class="pi-fields pi-${tpl}">${fields.map((c) => (c[0] === 'details' || c[0] === 'instructions'
