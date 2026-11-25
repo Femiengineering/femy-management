@@ -564,6 +564,41 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .g-mail .from { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-mail .snip { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-mail .when { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.g-mail.click { cursor: pointer; border-radius: 8px; padding: 10px 8px; }
+.g-mail.click:hover { background: var(--surface-2); }
+.g-mail .mdot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex-shrink: 0; }
+.g-mail.unread .mdot { background: var(--primary); }
+.g-mail.unread .from { color: var(--text); font-weight: 600; }
+.g-mail .side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.g-mail-sum { padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.mr-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.mr-bar .spacer { flex: 1; }
+.mr-subj { margin: 4px 0 12px; font-size: 20px; }
+.mr-note { margin-bottom: 10px; }
+.mr-msg { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: var(--surface); }
+.mr-head { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer; }
+.mr-head .av { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.mr-head .grow { flex: 1; min-width: 0; }
+.mr-head .addr, .mr-to { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.mr-head .when { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.mr-snip { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mr-msg.open .mr-snip, .mr-msg:not(.open) .mr-to { display: none; }
+.mr-msg:not(.open) .mr-body, .mr-msg:not(.open) .mr-files, .mr-msg:not(.open) .mr-actions { display: none; }
+.mr-body { padding: 4px 12px 8px; }
+.mr-when-m { display: none; font-size: 12px; color: var(--muted); }
+@media (max-width: 600px) {
+  .mr-head .when, .mr-head .addr { display: none; }
+  .mr-when-m { display: block; }
+  .mr-body { padding: 4px 6px 8px; }
+  .g-mail .side .btn { display: none; }
+}
+.mr-frame { width: 100%; border: 0; display: block; min-height: 40px; background: #fff; border-radius: 6px; }
+.mr-files { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 10px; }
+.mr-file { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 13px; color: inherit; max-width: 100%; }
+.mr-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.mr-file small { color: var(--muted); }
+.mr-file:hover { border-color: var(--primary); }
+.mr-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 12px 12px; border-top: 1px dashed var(--border); }
 .g-file { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .g-file img { width: 16px; height: 16px; flex-shrink: 0; }
 .g-file a { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -596,6 +631,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <a href="#dashboard" data-view="dashboard"><span class="ico">🏠</span>דף הבית</a>
         <a href="#projects" data-view="projects"><span class="ico">🏗️</span>פרויקטים</a>
         <a href="#protocols" data-view="protocols"><span class="ico">📝</span>פרוטוקולים</a>
+        <a href="#mail" data-view="mail"><span class="ico">✉️</span>מיילים<span class="badge" id="badgeMail" style="display:none"></span></a>
         <a href="#google" data-view="google"><span class="ico">📅</span>יומן, מייל ו-Drive</a>
         <div class="nav-sep">עוד</div>
         <a href="#tasks" data-view="tasks" class="minor"><span class="ico">✅</span>כל המשימות<span class="badge" id="badgeTasks"></span></a>
@@ -841,9 +877,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     protocols: { title: 'פרוטוקולים', render: renderProtocols },
     contacts: { title: 'אנשי קשר', render: renderContacts },
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
+    mail: { title: 'מיילים', render: (el) => { ui.gTab = 'gmail'; renderGoogle(el); } },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -863,6 +900,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const openTasks = db.tasks.filter((t) => t.status !== 'done').length;
     $('#badgeTasks').textContent = openTasks || '';
     $('#badgeTasks').style.display = openTasks ? '' : 'none';
+    refreshMailBadge();
     const addBtn = $('#addBtn');
     const addMap = { tasks: 'משימה חדשה', projects: 'פרויקט חדש', project: 'משימה חדשה', accounts: 'חשבון חדש', protocols: 'פרוטוקול חדש', dashboard: 'משימה חדשה' };
     if (addMap[v]) { addBtn.style.display = ''; $('.lbl', addBtn).textContent = addMap[v]; }
@@ -4400,7 +4438,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   function openComposeForm(m) {
     const d = Object.assign({ to: '', cc: '', subject: '', text: '' }, m || {});
-    openModal('מייל חדש מה-Gmail שלי', `
+    openModal(d.title || 'מייל חדש מה-Gmail שלי', `
       <div class="field full"><label>אל *</label><input class="input" name="to" dir="ltr" required value="${esc(d.to)}"></div>
       <div class="field full"><label>העתק</label><input class="input" name="cc" dir="ltr" value="${esc(d.cc)}"></div>
       <div class="field full"><label>נושא</label><input class="input" name="subject" value="${esc(d.subject)}"></div>
@@ -4409,12 +4447,175 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const to = cleanEmails(data.to), cc = cleanEmails(data.cc);
       if (!to) { toast('אין כתובת נמען תקינה'); return; }
       if (!confirm('לשלוח את המייל מה-Gmail שלך אל:\n' + to.split(',').join('\n') + (cc ? '\nהעתק: ' + cc.split(',').join(', ') : ''))) return;
-      G.gmail.send({ to, cc, subject: data.subject, text: data.text }).then(() => toast('המייל נשלח')).catch((x) => toast('השליחה נכשלה: ' + gErr(x)));
+      G.gmail.send({ to, cc, subject: data.subject, text: data.text, threadId: d.threadId, inReplyTo: d.inReplyTo, references: d.references })
+        .then(() => { toast('המייל נשלח'); if (d.threadId && ui.gMailOpen === d.threadId) { ui.gMailConv = null; if (currentView() === 'mail' || currentView() === 'google') render(); } })
+        .catch((x) => toast('השליחה נכשלה: ' + gErr(x)));
     });
   }
   function mailWhen(ms) {
     const d = new Date(ms);
     return toISO(d) === todayStr() ? timeOf(d) : d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+  }
+
+  // ---------- Mail: reading Gmail on the site ----------
+  const MAIL_FILTERS = [['inbox', 'דואר נכנס', 'in:inbox'], ['unread', 'לא נקראו', 'in:inbox is:unread'], ['attach', 'עם קבצים', 'has:attachment -in:sent'], ['sent', 'נשלחו', 'in:sent'], ['all', 'כל הדואר', '']];
+  const mailQuery = () => [((MAIL_FILTERS.find((f) => f[0] === ui.gMailF) || MAIL_FILTERS[0])[2]), ui.gMailQ].filter(Boolean).join(' ');
+  const mailName = (s) => ((/^\s*"?([^"<]*?)"?\s*<[^>]+>\s*$/.exec(s || '') || [])[1] || s || '').trim();
+  const mailAddr = (s) => ((/<([^>]+)>/.exec(s || '') || [])[1] || s || '').trim();
+  const mailAddrs = (s) => (s || '').split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(mailAddr).filter((x) => /@/.test(x));
+  const fileSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+  function mailFullWhen(ms) {
+    const d = new Date(ms);
+    return d.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) + ', ' + timeOf(d);
+  }
+  // The number of unread mails in the inbox, next to "מיילים" in the menu.
+  let mailBadgeAt = 0;
+  function refreshMailBadge(force) {
+    const b = $('#badgeMail'); if (!b) return;
+    if (!GOOGLE || !G.silent()) { b.style.display = 'none'; return; }
+    if (!force && Date.now() - mailBadgeAt < 60000) return;
+    mailBadgeAt = Date.now();
+    G.gmail.unreadCount().then((n) => { b.textContent = n > 99 ? '99+' : n || ''; b.style.display = n ? '' : 'none'; }).catch(() => {});
+  }
+  function mailRowHtml(m) {
+    const who = m.sent ? 'אל: ' + mailName(m.to) : mailName(m.from);
+    return `<div class="g-mail click ${m.unread ? 'unread' : ''}" data-mid="${esc(m.id)}" tabindex="0">
+      <span class="mdot" title="${m.unread ? 'לא נקרא' : ''}"></span>
+      <div class="grow"><div class="from">${esc(who)}</div><div class="title">${esc(m.subject)}</div><div class="snip">${esc(m.snippet)}</div></div>
+      <div class="side"><span class="when">${esc(mailWhen(m.date))}</span>
+      <button class="btn sm" data-mtask title="יצירת משימה מהמייל">+ משימה</button></div></div>`;
+  }
+  function renderMailList(area, el) {
+    const key = mailQuery();
+    const alive = () => document.body.contains(area);
+    const draw = () => {
+      const L = ui.gMailList;
+      const unread = L.messages.filter((m) => m.unread).length;
+      area.innerHTML = (L.messages.length ? `<div class="g-mail-sum hint">${L.messages.length}${L.next ? '+' : ''} מיילים${unread ? ` · <b>${unread} לא נקראו</b>` : ''}${ui.gMailQ ? ` · חיפוש: "${esc(ui.gMailQ)}" <a href="#" data-mclear>ניקוי</a>` : ''}</div>` : '')
+        + (L.messages.map(mailRowHtml).join('') || `<div class="empty">${ui.gMailF === 'unread' && !ui.gMailQ ? 'אין מיילים שלא נקראו 🎉' : 'לא נמצאו מיילים'}${ui.gMailQ ? ' · <a href="#" data-mclear>ניקוי החיפוש</a>' : ''}</div>`)
+        + (L.next ? '<div style="text-align:center;padding-top:12px"><button class="btn" data-mmore>טעינת מיילים נוספים</button></div>' : '');
+      const clear = $$('[data-mclear]', area);
+      clear.forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); ui.gMailQ = ''; ui.gMailList = null; renderGoogle(el); }));
+      $$('[data-mid]', area).forEach((row) => {
+        const m = L.messages.find((x) => x.id === row.dataset.mid);
+        const open = () => { ui.gMailOpen = m.threadId; ui.gMailConv = null; ui.gMailScroll = window.scrollY; renderGoogle(el); window.scrollTo(0, 0); };
+        row.addEventListener('click', (e) => { if (!e.target.closest('[data-mtask]')) open(); });
+        row.addEventListener('keydown', (e) => { if (e.key === 'Enter') open(); });
+        $('[data-mtask]', row).addEventListener('click', () => openTaskForm(null, { title: m.subject, notes: 'ממייל של ' + m.from + ':\n' + m.snippet + '\n' + G.gmail.link(m) }));
+      });
+      const more = $('[data-mmore]', area);
+      if (more) more.addEventListener('click', () => {
+        more.disabled = true; more.textContent = 'טוען...';
+        G.gmail.list(key, 25, L.next).then((r) => { if (ui.gMailList !== L) return; L.messages = L.messages.concat(r.messages); L.next = r.next; if (alive()) draw(); })
+          .catch((e) => { more.disabled = false; more.textContent = 'טעינת מיילים נוספים'; toast('הטעינה נכשלה: ' + gErr(e)); });
+      });
+    };
+    if (ui.gMailList && ui.gMailList.key === key) { draw(); if (ui.gMailScroll) { window.scrollTo(0, ui.gMailScroll); ui.gMailScroll = 0; } return; }
+    G.gmail.list(key, 25).then((r) => {
+      ui.gMailList = { key, messages: r.messages, next: r.next };
+      if (alive()) draw();
+    }).catch((e) => { if (alive()) area.innerHTML = `<div class="empty">הטעינה נכשלה: ${esc(gErr(e))}</div>`; });
+    refreshMailBadge(true);
+  }
+
+  // The mail itself is shown in a closed frame: no scripts run in it, and its styles do not touch the site.
+  function mailFrame(box, m, cids) {
+    let html = m.html || `<div style="white-space:pre-wrap">${esc(m.text || '').replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')}</div>`;
+    if (cids) html = html.replace(/cid:([^"'\s)>]+)/gi, (x, id) => cids[id] || x);
+    const f = document.createElement('iframe');
+    f.className = 'mr-frame';
+    f.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+    f.setAttribute('referrerpolicy', 'no-referrer');
+    f.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'"><base target="_blank">
+      <style>html,body{margin:0;padding:0;background:#fff;color:#1c2533}body{display:flow-root;font:14px/1.55 Arial,'Segoe UI',sans-serif;overflow-wrap:anywhere;padding:2px}img{max-width:100%;height:auto}table{max-width:100%!important}pre{white-space:pre-wrap}blockquote{margin:6px 0;padding-inline-start:10px;border-inline-start:3px solid #d5dbe3;color:#55627a}</style></head><body dir="auto">${html}</body></html>`;
+    box.appendChild(f);
+    const fit = () => { try { const d = f.contentDocument; if (d && d.body) f.style.height = Math.max(40, Math.ceil(d.body.getBoundingClientRect().height) + 8) + 'px'; } catch (e) {} };
+    f.addEventListener('load', () => {
+      fit();
+      try { new ResizeObserver(fit).observe(f.contentDocument.body); } catch (e) {}
+      try { $$('img', f.contentDocument).forEach((i) => i.addEventListener('load', fit)); } catch (e) {}
+    });
+  }
+  // The pictures inside a mail (cid:), as local addresses the frame can show.
+  async function mailInline(m) {
+    const out = {};
+    for (const a of (m.inline || []).slice(0, 12)) {
+      try { if (a.cid) out[a.cid] = URL.createObjectURL(await G.gmail.attachment(m.id, a)); } catch (e) {}
+    }
+    return out;
+  }
+  function replyDraft(m, all, fwd) {
+    const me = (G.status().email || '').toLowerCase();
+    const subj = m.subject.replace(/^\s*((re|fwd?|הע|תגובה)\s*:\s*)+/i, '');
+    if (fwd) {
+      const body = m.text || (m.html ? new DOMParser().parseFromString(m.html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|tr)>/gi, '\n'), 'text/html').body.textContent : '');
+      return { title: 'העברת מייל', to: '', cc: '', subject: 'Fwd: ' + subj,
+        text: '\n\n---------- הודעה שהועברה ----------\nמאת: ' + m.from + '\nתאריך: ' + mailFullWhen(m.date) + '\nנושא: ' + m.subject + '\nאל: ' + m.to + '\n\n' + (body || '').trim() + (m.files.length ? '\n\n(קבצים מצורפים במקור: ' + m.files.map((f) => f.name).join(', ') + ')' : '') };
+    }
+    const sentByMe = m.labels.includes('SENT');
+    let to = sentByMe ? mailAddrs(m.to) : mailAddrs(m.replyTo || m.from);
+    let cc = [];
+    if (all) {
+      const seen = new Set(to.map((x) => x.toLowerCase()).concat([me]));
+      cc = mailAddrs(sentByMe ? m.cc : [m.to, m.cc].filter(Boolean).join(',')).filter((x) => { const k = x.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    }
+    return { title: all ? 'תשובה לכולם' : 'תשובה', to: to.join(', '), cc: cc.join(', '), subject: 'Re: ' + subj, text: '',
+      threadId: m.threadId, inReplyTo: m.messageId, references: [m.references, m.messageId].filter(Boolean).join(' ') };
+  }
+  function renderMailReader(area, el, threadId) {
+    const alive = () => document.body.contains(area);
+    const back = () => { ui.gMailOpen = ''; ui.gMailConv = null; renderGoogle(el); };
+    const draw = (msgs) => {
+      const last = msgs[msgs.length - 1];
+      const st = G.status();
+      area.innerHTML = `<div class="mr-bar"><button class="btn sm" data-mback>→ חזרה לרשימה</button><span class="spacer"></span>
+          <button class="btn sm" data-mtask>+ משימה</button><a class="btn sm" href="${esc(G.gmail.link({ threadId }))}" target="_blank" rel="noopener">פתיחה ב-Gmail ↗</a></div>
+        <h2 class="mr-subj">${esc(msgs[0].subject)}${msgs.length > 1 ? ` <span class="hint">(${msgs.length})</span>` : ''}</h2>
+        ${st.gmailModify === false ? '<div class="hint mr-note">המיילים שנקראים כאן עדיין לא מסומנים כנקראו ב-Gmail. לשם כך צריך לאשר הרשאה נוספת: <a href="#" data-gmodauth>אישור עכשיו</a></div>' : ''}
+        <div class="mr-list">${msgs.map((m, i) => `<div class="mr-msg ${i === msgs.length - 1 || m.unread ? 'open' : ''}" data-i="${i}">
+          <div class="mr-head" data-toggle>
+            <div class="av">${esc((mailName(m.from) || '?').trim().charAt(0).toUpperCase())}</div>
+            <div class="grow"><div><b>${esc(mailName(m.from))}</b> <span class="addr" dir="ltr">&lt;${esc(mailAddr(m.from))}&gt;</span></div>
+              <div class="mr-to">אל: <span dir="ltr">${esc(m.to)}</span>${m.cc ? ` · העתק: <span dir="ltr">${esc(m.cc)}</span>` : ''}</div>
+              <div class="mr-snip">${esc(m.snippet)}</div><div class="mr-when-m">${esc(mailFullWhen(m.date))}</div></div>
+            <span class="when">${esc(mailFullWhen(m.date))}</span></div>
+          <div class="mr-body"></div>
+          ${m.files.length ? `<div class="mr-files">${m.files.map((f, j) => `<button class="mr-file" data-file="${j}" title="הורדה">📎 <span>${esc(f.name)}</span> <small>${esc(fileSize(f.size))}</small></button>`).join('')}</div>` : ''}
+          <div class="mr-actions"><button class="btn sm" data-reply>↩ תשובה</button><button class="btn sm" data-replyall>↩ תשובה לכולם</button><button class="btn sm" data-fwd>↪ העברה</button></div>
+        </div>`).join('')}</div>`;
+      $('[data-mback]', area).addEventListener('click', back);
+      $('[data-mtask]', area).addEventListener('click', () => openTaskForm(null, { title: last.subject, notes: 'ממייל של ' + last.from + ':\n' + last.snippet + '\n' + G.gmail.link({ threadId }) }));
+      const ga = $('[data-gmodauth]', area);
+      if (ga) ga.addEventListener('click', (e) => { e.preventDefault(); G.connect().then(() => G.gmail.markRead(threadId)).catch((x) => toast(gErr(x))); });
+      $$('.mr-msg', area).forEach((box) => {
+        const m = msgs[Number(box.dataset.i)];
+        const body = $('.mr-body', box);
+        const show = () => { if (body.dataset.done) return; body.dataset.done = '1'; mailInline(m).then((cids) => mailFrame(body, m, cids)); };
+        if (box.classList.contains('open')) show();
+        $('[data-toggle]', box).addEventListener('click', () => { box.classList.toggle('open'); if (box.classList.contains('open')) show(); });
+        $$('[data-file]', box).forEach((b) => b.addEventListener('click', () => {
+          const f = m.files[Number(b.dataset.file)];
+          b.disabled = true;
+          G.gmail.attachment(m.id, f).then((blob) => downloadBlob(f.name, blob)).catch((x) => toast('ההורדה נכשלה: ' + gErr(x))).finally(() => { b.disabled = false; });
+        }));
+        $('[data-reply]', box).addEventListener('click', () => openComposeForm(replyDraft(m, false)));
+        $('[data-replyall]', box).addEventListener('click', () => openComposeForm(replyDraft(m, true)));
+        $('[data-fwd]', box).addEventListener('click', () => openComposeForm(replyDraft(m, false, true)));
+      });
+    };
+    if (ui.gMailConv && ui.gMailConv.id === threadId) { draw(ui.gMailConv.msgs); return; }
+    G.gmail.conversation(threadId).then((msgs) => {
+      if (!msgs.length) { back(); return; }
+      ui.gMailConv = { id: threadId, msgs };
+      if (alive()) draw(msgs);
+      if (msgs.some((m) => m.unread)) {
+        G.gmail.markRead(threadId).then((ok) => {
+          if (!ok) return;
+          if (ui.gMailList) ui.gMailList.messages.forEach((x) => { if (x.threadId === threadId) x.unread = false; });
+          refreshMailBadge(true);
+        }).catch(() => {});
+      }
+    }).catch((e) => { if (alive()) area.innerHTML = `<div class="mr-bar"><button class="btn sm" data-mback>→ חזרה לרשימה</button></div><div class="empty">פתיחת המייל נכשלה: ${esc(gErr(e))}</div>`; const b = $('[data-mback]', area); if (b) b.addEventListener('click', back); });
   }
   function renderGoogle(el) {
     if (!GOOGLE) {
@@ -4433,8 +4634,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ${s.valid ? '' : `<button class="btn primary g-btn" data-gconnect>${s.connected ? 'חידוש החיבור' : 'חיבור לחשבון Google'}</button>`}
       </div>
       <div class="toolbar">
-        <div class="seg">${tabs.map(([k, l]) => `<button data-gtab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-        ${tab === 'gmail' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="חיפוש במיילים (כמו ב-Gmail)" value="${esc(ui.gMailQ)}"><button class="btn">חיפוש</button></form>` : ''}
+        ${currentView() === 'mail' ? '' : `<div class="seg">${tabs.map(([k, l]) => `<button data-gtab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`}
+        ${tab === 'gmail' && !ui.gMailOpen ? `<div class="seg">${MAIL_FILTERS.map(([k, l]) => `<button data-mfilter="${k}" class="${ui.gMailF === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <form class="g-search" id="gSearch"><input class="input" id="gq" type="search" placeholder="חיפוש: שולח, נושא, מילים מהמייל" value="${esc(ui.gMailQ)}"><button class="btn">חיפוש</button></form>` : ''}
         ${tab === 'drive' ? `<form class="g-search" id="gSearch"><input class="input" id="gq" placeholder="${ui.gDrivePath.length ? 'חיפוש בתיקייה הזו' : 'חיפוש פרויקט'}" value="${esc(ui.gDriveQ)}"><button class="btn">חיפוש</button></form>` : ''}
         <span class="spacer"></span>
         ${tab === 'calendar' ? '<button class="btn primary" data-gnew>+ אירוע חדש</button>' : ''}
@@ -4445,12 +4647,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="card card-pad" id="gArea"></div>`;
     const area = $('#gArea', el);
     $$('[data-gtab]', el).forEach((b) => b.addEventListener('click', () => { ui.gTab = b.dataset.gtab; renderGoogle(el); }));
+    $$('[data-mfilter]', el).forEach((b) => b.addEventListener('click', () => { ui.gMailF = b.dataset.mfilter; ui.gMailList = null; renderGoogle(el); }));
     const gc = $('[data-gconnect]', el);
     if (gc) gc.addEventListener('click', () => G.connect().catch((e) => toast(gErr(e))));
     const nb = $('[data-gnew]', el);
     if (nb) nb.addEventListener('click', () => (tab === 'calendar' ? openEventForm() : openComposeForm()));
     const sf = $('#gSearch', el);
-    if (sf) sf.addEventListener('submit', (e) => { e.preventDefault(); if (tab === 'gmail') ui.gMailQ = $('#gq', el).value.trim(); else ui.gDriveQ = $('#gq', el).value.trim(); renderGoogle(el); });
+    if (sf) sf.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (tab === 'gmail') {
+        ui.gMailQ = $('#gq', el).value.trim(); ui.gMailList = null;
+        if (ui.gMailQ && ui.gMailF === 'inbox') ui.gMailF = 'all'; // a search looks in all the mail, as in Gmail
+      } else ui.gDriveQ = $('#gq', el).value.trim();
+      renderGoogle(el);
+    });
     const gl = $('#gLetter', el);
     if (gl) gl.addEventListener('change', () => { setLocalDrive({ letter: gl.value }); toast('אות הכונן נשמרה: ' + gl.value + ':'); });
     const up = $('#gUpload', el);
@@ -4475,18 +4685,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         area.innerHTML = eventsHtml(evs) || '<div class="empty">אין אירועים בשבועיים הקרובים</div>';
       }).catch(fail);
     } else if (tab === 'gmail') {
-      G.gmail.inbox(ui.gMailQ || 'in:inbox', 25).then((msgs) => {
-        if (!alive()) return;
-        area.innerHTML = msgs.map((m) => `<div class="g-mail ${m.unread ? 'unread' : ''}" data-mid="${esc(m.id)}">
-          <a class="grow" href="${esc(G.gmail.link(m))}" target="_blank" rel="noopener">
-            <div class="from">${esc(m.from.replace(/\s*<[^>]+>/, ''))}</div><div class="title">${esc(m.subject)}</div><div class="snip">${esc(m.snippet)}</div></a>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="when">${esc(mailWhen(m.date))}</span>
-          <button class="btn sm" data-mtask title="יצירת משימה מהמייל">+ משימה</button></div></div>`).join('') || '<div class="empty">לא נמצאו מיילים</div>';
-        $$('[data-mid]', area).forEach((row) => {
-          const m = msgs.find((x) => x.id === row.dataset.mid);
-          $('[data-mtask]', row).addEventListener('click', () => openTaskForm(null, { title: m.subject, notes: 'ממייל של ' + m.from + ':\n' + m.snippet + '\n' + G.gmail.link(m) }));
-        });
-      }).catch(fail);
+      if (ui.gMailOpen) renderMailReader(area, el, ui.gMailOpen); else renderMailList(area, el);
     } else {
       // Only the company's projects folder: at the top its project folders, inside a folder its contents.
       const path = ui.gDrivePath;
@@ -4718,7 +4917,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     });
     window.addEventListener('hashchange', render);
     loadDriveProtos();
-    G.onChange(() => { if (currentView() === 'google' || currentView() === 'settings') render(); });
+    G.onChange(() => { if (currentView() === 'google' || currentView() === 'mail' || currentView() === 'settings') render(); refreshMailBadge(); });
     if (CLOUD) { render(); startCloud(); }
     else if (!localSession) { localGate(); }
     else {
