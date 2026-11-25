@@ -631,6 +631,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="modal-foot">
         <button type="submit" class="btn primary">שמירה</button>
         <button type="button" class="btn" data-close>ביטול</button>
+        <span id="modalGdoc" style="display:none;align-items:center;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-gdocfoot>📝 עדכון קובץ ה-Google Docs</button><span class="hint" data-gdocst></span></span>
         <span class="spacer"></span>
         <button type="button" class="btn danger" id="modalDelete">מחיקה</button>
       </div>
@@ -3037,7 +3038,6 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="hint">הנושאים של המסמך האחרון בפרויקט שנבחר מוצעים להעתקה, בלי המשתתפים והנמענים.</span></div>
       ${GOOGLE ? `<div class="field"><label>📝 מסמך ה-Google Docs הקבוע של הפרויקט</label><select class="input" name="gdocPick" data-gdocpick></select>
         <span class="hint" data-gdocst data-id="${esc(proto ? proto.id : '')}">${protoGdocHtml(proto)}</span>
-        <button type="button" class="btn sm" data-gdocnow style="justify-self:start">📝 עדכון ה-Google Docs עכשיו</button>
         <span class="hint">כל השמירות של כל הדוחות והסיכומים בפרויקט נכתבות לאותו קובץ. בחירת קובץ אחר משנה אותו לכל הפרויקט.</span></div>` : ''}
       <div class="field full pf-mail"><label>📧 שליחה במייל: נמענים</label>
         <div class="pf-mail-row"><input class="input" name="emailTo" dir="ltr" value="${esc(p.emailTo)}" placeholder="name@example.com, ...">
@@ -3166,14 +3166,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       gpSel.disabled = false;
     };
     drawGdocPick();
-    const gNow = $('[data-gdocnow]', body);
-    if (gNow) gNow.addEventListener('click', () => {
+    // Always at the bottom of the window: update the project's Google Docs file now, with its status.
+    const gFoot = $('#modalGdoc');
+    if (GOOGLE) {
+      gFoot.style.display = 'inline-flex';
+      const fst = $('[data-gdocst]', gFoot); fst.dataset.id = proto ? proto.id : ''; fst.innerHTML = protoGdocHtml(proto);
+    }
+    $('[data-gdocfoot]', gFoot).onclick = () => {
       const isNew = !rec;
       persist(modalData(), true);
       document.querySelectorAll('#gdocState, [data-gdocst]').forEach((st) => { st.dataset.id = rec.id; });
       if (isNew) render();
       saveProtocolToDrive(rec, true);
-    });
+    };
     // Saved while typing: the other users see the document as it is being written, and the Google Docs copy follows.
     liveForm(() => {
       const isNew = !rec;
@@ -4600,6 +4605,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $('#modalForm button[type=submit]').textContent = 'שמירה';
     const del = $('#modalDelete');
     del.style.display = onDelete ? '' : 'none';
+    const gf = $('#modalGdoc'); gf.style.display = 'none'; $('[data-gdocst]', gf).dataset.id = ''; $('[data-gdocst]', gf).innerHTML = ''; $('[data-gdocfoot]', gf).onclick = null;
     del.dataset.note = deleteNote || '';
     $('#modalBg').classList.add('show');
     const first = $('#modalBody input, #modalBody select, #modalBody textarea');
