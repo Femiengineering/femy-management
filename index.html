@@ -3819,11 +3819,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     try {
       // Always the same file: the project's fixed Google Doc (made by the first save when there is none).
       const pj = byId(db.projects, pr.projectId);
-      const target = pj ? projGdoc(pj, protoKind(pr)) : pr.gdocId || '';
+      let target = pj ? projGdoc(pj, protoKind(pr)) : pr.gdocId || '';
+      // No document known for the project: the newest Google Doc in the folder of its latest report, if any.
+      if (pj && !target) {
+        try {
+          const folder = pr.gdocFolder || await protoGdocFolder(pr);
+          const docs = folder ? (await G.drive.browse(folder)).files.filter((x) => x.mimeType === 'application/vnd.google-apps.document' && !/^זמני/.test(x.name) && !db.protocols.some((q) => q.gdocId === x.id && !q.gdocShared)) : [];
+          docs.sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''));
+          if (docs[0]) { target = docs[0].id; pj.gdocId = target; }
+        } catch (e) { /* a new document below */ }
+      }
       const parent = target ? '' : pr.gdocFolder || await protoGdocFolder(pr);
       const name = pj ? pj.name + ' - דוחות וסיכומים' : protoFileName(pr, 'docx').replace(/\.docx$/, '');
       const f = await G.drive.save(name, await buildProtocolDocx(pr), target, parent, { gdoc: true, keepName: !!(pj && target), noFallback: !!target });
       if (pj && pj.gdocId !== f.id) { pj.gdocId = f.id; save(); }
+      // A separate document the site made for this report before (instead of the project's document): its
+      // content is now in the project's document, so it goes to the trash.
+      if (pj && pr.gdocId && !pr.gdocShared && pr.gdocId !== f.id && !projGdocs(pj.id).some((x) => x.id === pr.gdocId)) {
+        const old = pr.gdocId;
+        G.drive.trash(old).then(() => toast('הקובץ הנפרד שנוצר קודם הועבר לאשפה. מעכשיו הכול בקובץ הקבוע של הפרויקט')).catch(() => {});
+      }
       const cur = byId(db.protocols, id);
       if (cur && (cur.gdocId !== f.id || cur.gdocLink !== (f.webViewLink || '') || !cur.gdocShared !== !pj)) {
         cur.gdocId = f.id; cur.gdocLink = f.webViewLink || ('https://docs.google.com/document/d/' + f.id + '/edit');
