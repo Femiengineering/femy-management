@@ -2260,9 +2260,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function fillPhotos(root) {
     $$('img[data-photo]', root).forEach((im) => { if (!im.getAttribute('src')) photoGet(im.dataset.photo).then((v) => { if (v) im.src = v; }); });
   }
-  const photoImg = (id, cls) => { const v = photoCache.get(id); return `<img class="${cls}" data-photo="${esc(id)}" ${v ? `src="${v}"` : ''} alt="">`; };
+  const photoImg = (id, cls, sc) => { const v = photoCache.get(id); return `<img class="${cls}" data-photo="${esc(id)}" ${v ? `src="${v}"` : ''}${sc && sc !== 1 ? ` style="max-width:${Math.min(100, Math.round(sc * 100))}%;max-height:${Math.round(240 * sc)}px"` : ''} alt="">`; };
+  // The size of a topic's photos in the document, in percent of the usual size (photoScale, 20 to 150).
+  const photoScaleOf = (it) => { const n = parseInt(it && it.photoScale, 10); return n >= 20 && n <= 150 ? n : 100; };
   // photoPos "left": the photos beside the text, at its left (the text keeps the right side). Otherwise under it.
-  const photoLines = (it) => photoIds(it.photos).map((id) => ({ img: id, t: '(תמונה)', side: it.photoPos === 'left' }));
+  const photoLines = (it) => photoIds(it.photos).map((id) => ({ img: id, t: '(תמונה)', side: it.photoPos === 'left', sc: photoScaleOf(it) / 100 }));
 
   // The document model every output (card, PDF, Word, email) is drawn from.
   // A cell is a list of lines: [{ t: text, b: bold }].
@@ -2372,11 +2374,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // HTML for the card and for the PDF print view.
   const cellHtml = (cell) => {
     const side = cell.filter((l) => l.img && l.side);
-    if (side.length) return `<div class="pd-split"><div class="pd-split-t">${cellHtml(cell.filter((l) => !(l.img && l.side)))}</div><div class="pd-split-i">${side.map((l) => photoImg(l.img, 'pd-img')).join('')}</div></div>`;
+    if (side.length) return `<div class="pd-split"><div class="pd-split-t">${cellHtml(cell.filter((l) => !(l.img && l.side)))}</div><div class="pd-split-i">${side.map((l) => photoImg(l.img, 'pd-img', l.sc)).join('')}</div></div>`;
     return cellLinesHtml(cell);
   };
   const cellLinesHtml = (cell) => cell.map((l) => {
-    if (l.img) return photoImg(l.img, 'pd-img');
+    if (l.img) return photoImg(l.img, 'pd-img', l.sc);
     let h = esc(l.t);
     if (l.u) h = `<u>${h}</u>`;
     if (l.b) h = `<b>${h}</b>`;
@@ -3240,7 +3242,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!prev) { toast(projSel.value ? 'אין פרוטוקול קודם מאותו סוג בפרויקט הזה' : 'בחרו קודם פרויקט'); return; }
       if (!confirm('להחליף את הנושאים בנושאים מהפרוטוקול מ-' + fmtDate(prev.date) + '?')) return;
       protoAsk = null;
-      drawProtoItems(curTpl, (prev.items || []).map((i) => { const c = Object.assign({}, i); delete c.photos; delete c.photoPos; return c; }));
+      drawProtoItems(curTpl, (prev.items || []).map((i) => { const c = Object.assign({}, i); delete c.photos; delete c.photoPos; delete c.photoScale; return c; }));
       ['participants', 'location', 'copies', 'status'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && !f.value.trim() && prev[k]) f.value = prev[k]; });
       toast('הנושאים הועתקו מהפרוטוקול הקודם');
     });
@@ -3297,16 +3299,22 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
       <div class="pi-photos">${photoIds(it.photos).map((id) => `<span class="pi-ph">${photoImg(id, '')}<button type="button" data-phdel="${esc(id)}" title="הסרת התמונה">✕</button></span>`).join('')}
         <label class="btn sm pi-phadd" title="צילום או תמונה מהגלריה">📷 תמונה<input type="file" accept="image/*" multiple hidden data-phadd></label>
-        ${photoIds(it.photos).length ? `<span class="pi-phpos"><span>מיקום התמונה:</span><button type="button" class="btn sm${it.photoPos === 'left' ? '' : ' primary'}" data-phpos="">⬇ בתחתית הסעיף</button><button type="button" class="btn sm${it.photoPos === 'left' ? ' primary' : ''}" data-phpos="left">⬅ משמאל למלל</button></span>` : ''}
-        <input type="hidden" data-k="photos" value="${esc(it.photos || '')}"><input type="hidden" data-k="photoPos" value="${esc(it.photos && it.photoPos ? it.photoPos : '')}"></div>
-      ${Object.keys(it).filter((k) => k !== 'topic' && k !== 'photos' && k !== 'photoPos' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
+        ${photoIds(it.photos).length ? `<span class="pi-phpos"><span>מיקום התמונה:</span><button type="button" class="btn sm${it.photoPos === 'left' ? '' : ' primary'}" data-phpos="">⬇ בתחתית הסעיף</button><button type="button" class="btn sm${it.photoPos === 'left' ? ' primary' : ''}" data-phpos="left">⬅ משמאל למלל</button></span>
+          <span class="pi-phpos"><span>גודל:</span><button type="button" class="btn sm" data-phsz="-10" title="הקטנה">−</button><b>${photoScaleOf(it)}%</b><button type="button" class="btn sm" data-phsz="10" title="הגדלה">+</button></span>` : ''}
+        <input type="hidden" data-k="photos" value="${esc(it.photos || '')}"><input type="hidden" data-k="photoPos" value="${esc(it.photos && it.photoPos ? it.photoPos : '')}"><input type="hidden" data-k="photoScale" value="${it.photos && photoScaleOf(it) !== 100 ? photoScaleOf(it) : ''}"></div>
+      ${Object.keys(it).filter((k) => k !== 'topic' && k !== 'photos' && k !== 'photoPos' && k !== 'photoScale' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
     </div>`).join('') || '<div class="hint">אין נושאים. לחצו "+ נושא".</div>';
     $$('.pi-row', box).forEach((row, n) => {
       const move = (d) => { const cur = readProtoItems(); const j = n + d; if (j < 0 || j >= cur.length) return; [cur[n], cur[j]] = [cur[j], cur[n]]; drawProtoItems(tpl, cur); };
       $('[data-up]', row).addEventListener('click', () => move(-1));
       $('[data-down]', row).addEventListener('click', () => move(1));
       $('[data-del]', row).addEventListener('click', () => { const cur = readProtoItems(); cur.splice(n, 1); drawProtoItems(tpl, cur); });
-      const setPhotos = (fn) => { const cur = readProtoItems(); const ids = fn(photoIds(cur[n].photos)); if (ids.length) cur[n].photos = ids.join(','); else { delete cur[n].photos; delete cur[n].photoPos; } drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true })); };
+      const setPhotos = (fn) => { const cur = readProtoItems(); const ids = fn(photoIds(cur[n].photos)); if (ids.length) cur[n].photos = ids.join(','); else { delete cur[n].photos; delete cur[n].photoPos; delete cur[n].photoScale; } drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true })); };
+      $$('[data-phsz]', row).forEach((b) => b.addEventListener('click', () => {
+        const cur = readProtoItems(); const v = Math.max(20, Math.min(150, photoScaleOf(cur[n]) + Number(b.dataset.phsz)));
+        if (v === 100) delete cur[n].photoScale; else cur[n].photoScale = String(v);
+        drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true }));
+      }));
       $$('[data-phpos]', row).forEach((b) => b.addEventListener('click', () => {
         const cur = readProtoItems(); if (b.dataset.phpos) cur[n].photoPos = b.dataset.phpos; else delete cur[n].photoPos;
         drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3422,27 +3430,28 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // A cell is a list of lines [{ t, b, u, r }]; o: fill, color, bold, size, center, vcenter, span.
   // A photo in a cell, as wide as the cell allows and at most 6.4 cm high. The image files are added by buildProtocolDocx.
   let wImgs = null;
-  function wImgPara(id, cellW) {
+  function wImgPara(id, cellW, sc) {
     const data = photoCache.get(id);
     if (!data || !wImgs) return '';
     const n = wImgs.length + 1; const rid = 'rIdPhoto' + n;
     wImgs.push({ rid, name: 'photo' + n + '.jpeg', data });
     const [pw, ph] = photoSize(id);
-    const k = Math.min(Math.max(600, cellW - 220) * 635 / pw, 2300000 / ph);
+    const kw = Math.max(600, cellW - 220) * 635 / pw; // as wide as the cell
+    const k = Math.min(kw, Math.min(kw, 2300000 / ph) * (sc || 1)); // the chosen size, never wider than the cell
     const cx = Math.round(pw * k), cy = Math.round(ph * k);
     return `<w:p><w:pPr><w:bidi/><w:spacing w:before="40" w:after="40"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${1000 + n}" name="Photo ${n}"/>`
       + `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`
       + `<pic:nvPicPr><pic:cNvPr id="${1000 + n}" name="photo${n}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
       + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
   }
-  const wLines = (lines, w, o) => (lines && lines.length ? lines : [{ t: '' }]).map((l) => l.img ? wImgPara(l.img, w) : wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
+  const wLines = (lines, w, o) => (lines && lines.length ? lines : [{ t: '' }]).map((l) => l.img ? wImgPara(l.img, w, l.sc) : wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
   // Photos at the left of the text: a borderless table of two cells inside the cell (the text at the right).
   function wSplit(w, text, imgs, o) {
     const inner = Math.max(1200, w - 160); const iw = Math.round(inner * 0.42), tw = inner - iw;
     const nil = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((x) => `<w:${x} w:val="nil"/>`).join('');
     const tc = (cw, paras) => `<w:tc><w:tcPr><w:tcW w:w="${cw}" w:type="dxa"/></w:tcPr>${paras}</w:tc>`;
     return `<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${inner}" w:type="dxa"/><w:tblBorders>${nil}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr>`
-      + `<w:tblGrid><w:gridCol w:w="${tw}"/><w:gridCol w:w="${iw}"/></w:tblGrid><w:tr>${tc(tw, wLines(text, tw, o))}${tc(iw, imgs.map((l) => wImgPara(l.img, iw)).join('') || wPara(''))}</w:tr></w:tbl>` + wPara('', { after: 0 });
+      + `<w:tblGrid><w:gridCol w:w="${tw}"/><w:gridCol w:w="${iw}"/></w:tblGrid><w:tr>${tc(tw, wLines(text, tw, o))}${tc(iw, imgs.map((l) => wImgPara(l.img, iw, l.sc)).join('') || wPara(''))}</w:tr></w:tbl>` + wPara('', { after: 0 });
   }
   function wCell(w, lines, o) {
     o = o || {};
