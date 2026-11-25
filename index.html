@@ -1724,7 +1724,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       draw(false, files.length > 1 ? files.length + ' תמונות' : 'תמונה');
       const n = await docUpload(p, todayStr(), files, camera);
       if (n) toast((n === 1 ? 'התמונה נשמרה' : n + ' תמונות נשמרו') + ' ב-Drive: ' + G.drive.docName + ' / ' + todayStr());
-      draw(true);
+      draw(n > 0);
     };
     $('[data-doccam]', el).addEventListener('change', (e) => up(e.target, true));
     $('[data-docgal]', el).addEventListener('change', (e) => up(e.target, false));
@@ -2702,11 +2702,41 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const d = new Date(); return `${date} ${two(d.getHours())}-${two(d.getMinutes())}-${two(d.getSeconds())}${ext}`;
   };
   const docErr = (e) => (e && (e.status === 403 || e.status === 404) ? 'אין הרשאה לכתוב בתיקיית הפרויקט ב-Drive. חברו מחדש את חשבון ה-Google בלשונית "יומן, מייל ו-Drive" ואשרו גישה מלאה ל-Drive.' : 'השמירה ב-Drive נכשלה' + (e && e.message ? ': ' + e.message : ''));
+  // Photos that could not reach Drive (no connection for a moment, typically right after the camera on a phone):
+  // they are tried again when the page is back in front / online, and every half minute, until saved.
+  const docQueue = [];
+  let docRetryT = null;
+  const docNet = (e) => !!(e && (e.network || e.status >= 500 || e.status === 429));
+  async function docFlush() {
+    clearTimeout(docRetryT); docRetryT = null;
+    if (!docQueue.length || !GOOGLE || !G.valid()) { if (docQueue.length) docRetryT = setTimeout(docFlush, 30000); return; }
+    let ok = 0;
+    while (docQueue.length) {
+      const q = docQueue[0];
+      try { await G.drive.docUpload(q.folder, q.date, q.name, q.file); docQueue.shift(); ok++; delete docCache[q.folder]; }
+      catch (e) {
+        if (docNet(e) && ++q.tries < 40) { docRetryT = setTimeout(docFlush, 30000); break; }
+        docQueue.shift(); toast(docErr(e));
+      }
+    }
+    if (ok) { toast((ok === 1 ? 'התמונה שחיכתה נשמרה' : ok + ' תמונות שחיכו נשמרו') + ' ב-Drive'); if (location.hash.startsWith('#project/')) render(); }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && docQueue.length) setTimeout(docFlush, 1500); });
+  window.addEventListener('online', () => { if (docQueue.length) setTimeout(docFlush, 1500); });
+  window.addEventListener('beforeunload', (e) => { if (docQueue.length) { e.preventDefault(); e.returnValue = ''; } });
   async function docUpload(p, date, files, camera) {
     let ok = 0;
-    for (const f of files) {
-      try { await G.drive.docUpload(p.driveFolder, date, docFileName(f, date, camera && files.length === 1), f); ok++; }
-      catch (e) { toast(docErr(e)); break; }
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i], name = docFileName(f, date, camera && files.length === 1);
+      try { await G.drive.docUpload(p.driveFolder, date, name, f); ok++; }
+      catch (e) {
+        if (docNet(e)) {
+          files.slice(i).forEach((x, j) => docQueue.push({ folder: p.driveFolder, date, name: j ? docFileName(x, date, false) : name, file: x, tries: 0 }));
+          toast('אין כרגע חיבור ל-Google. ' + (files.length - i === 1 ? 'התמונה תישמר' : 'התמונות יישמרו') + ' ב-Drive אוטומטית כשהחיבור יחזור (השאירו את האתר פתוח)');
+          clearTimeout(docRetryT); docRetryT = setTimeout(docFlush, 8000);
+        } else toast(docErr(e));
+        break;
+      }
     }
     if (ok) delete docCache[p.driveFolder];
     return ok;
