@@ -305,6 +305,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 7px; margin-inline-end: 7px; vertical-align: 1px; background: var(--primary-soft); color: var(--primary); }
 .tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
+.tpl-tag.tpl-draft { background: #fef3c7; color: #92400e; }
+.pi-phpos { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+.pv-gdoc { font-size: 12px; }
 .pv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 13px; }
 .pv-bar b { font-size: 14px; }
 /* Protocol form: the form on the right, a fixed live preview on the left (on top on narrow screens). */
@@ -1153,12 +1156,29 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       ${GOOGLE ? `<div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:500;color:var(--text)"><input type="checkbox" name="toCal" ${taskCalId(t) ? 'checked' : ''}> ${taskCalId(t) ? 'לעדכן את האירוע ביומן Google שלי' : 'להוסיף ליומן Google שלי (ביום היעד)'}</label></div>` : ''}`,
     (data) => {
       const toCal = data.toCal; delete data.toCal;
-      let saved = task;
-      if (task) Object.assign(task, data); else db.tasks.push(saved = Object.assign({ id: uid() }, data));
+      if (rec && !db.tasks.includes(rec)) rec = byId(db.tasks, rec.id) || null;
+      const saved = rec || Object.assign({ id: uid() }, data);
+      if (rec) Object.assign(rec, data); else db.tasks.push(saved);
       save(); render(); toast(task ? 'המשימה עודכנה' : 'המשימה נוספה');
       if (toCal) taskToCalendar(saved);
     },
     task ? () => { db.tasks = db.tasks.filter((x) => x !== task); save(); render(); toast('המשימה נמחקה'); } : null);
+    // Saved while typing, so the other users see it at once (a new task once it has a title).
+    // A task from the sheet is not: the next sync of the sheet replaces it anyway.
+    let rec = task;
+    if (!t.sheet) liveForm(() => {
+      const data = modalData(); delete data.toCal;
+      if (!data.title) return;
+      if (rec && !db.tasks.includes(rec)) rec = byId(db.tasks, rec.id) || null;
+      const isNew = !rec;
+      if (rec) Object.assign(rec, data); else db.tasks.push(rec = Object.assign({ id: uid() }, data));
+      save();
+      if (isNew) {
+        render();
+        modalDelete = () => { db.tasks = db.tasks.filter((x) => x.id !== rec.id); save(); render(); toast('המשימה נמחקה'); };
+        $('#modalDelete').style.display = '';
+      }
+    });
   }
 
   // ---------- Sync from the tasks sheet ("משימות פמי" in Drive) ----------
@@ -2239,7 +2259,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     $$('img[data-photo]', root).forEach((im) => { if (!im.getAttribute('src')) photoGet(im.dataset.photo).then((v) => { if (v) im.src = v; }); });
   }
   const photoImg = (id, cls) => { const v = photoCache.get(id); return `<img class="${cls}" data-photo="${esc(id)}" ${v ? `src="${v}"` : ''} alt="">`; };
-  const photoLines = (it) => photoIds(it.photos).map((id) => ({ img: id, t: '(תמונה)' }));
+  // photoPos "left": the photos beside the text, at its left (the text keeps the right side). Otherwise under it.
+  const photoLines = (it) => photoIds(it.photos).map((id) => ({ img: id, t: '(תמונה)', side: it.photoPos === 'left' }));
 
   // The document model every output (card, PDF, Word, email) is drawn from.
   // A cell is a list of lines: [{ t: text, b: bold }].
@@ -2337,13 +2358,22 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     .fdoc .pd-main tr.pd-sec td { background: #d9d9d9; color: #1f4e79; font-size: 1.55em; text-align: center; padding: 1px 6px 3px; }
     .fdoc .red { color: #ff0000; }
     .fdoc img.pd-img { display: block; max-width: 100%; max-height: 240px; margin: 4px auto; object-fit: contain; }
+    .fdoc .pd-split { display: flex; gap: 8px; align-items: flex-start; }
+    .fdoc .pd-split-t { flex: 1 1 0; min-width: 0; }
+    .fdoc .pd-split-i { flex: 0 0 42%; }
+    .fdoc .pd-split-i img.pd-img { max-height: 200px; margin: 0 0 4px; }
     .fdoc .pd-title { font-weight: bold; margin: 14px 0 6px; break-after: avoid; }
     .fdoc .pd-note { text-align: center; font-weight: bold; margin-top: 14px; }
     .fdoc p { margin: 0 0 6px; white-space: pre-wrap; } .fdoc ol { margin: 0; padding-inline-start: 22px; } .fdoc li { margin-bottom: 3px; }`;
   document.head.insertAdjacentHTML('beforeend', '<style>' + PROTO_DOC_CSS + '</style>');
 
   // HTML for the card and for the PDF print view.
-  const cellHtml = (cell) => cell.map((l) => {
+  const cellHtml = (cell) => {
+    const side = cell.filter((l) => l.img && l.side);
+    if (side.length) return `<div class="pd-split"><div class="pd-split-t">${cellHtml(cell.filter((l) => !(l.img && l.side)))}</div><div class="pd-split-i">${side.map((l) => photoImg(l.img, 'pd-img')).join('')}</div></div>`;
+    return cellLinesHtml(cell);
+  };
+  const cellLinesHtml = (cell) => cell.map((l) => {
     if (l.img) return photoImg(l.img, 'pd-img');
     let h = esc(l.t);
     if (l.u) h = `<u>${h}</u>`;
@@ -2400,7 +2430,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     return `<div class="card proto ${ui.openProto === pr.id ? 'open' : ''}" data-id="${pr.id}">
       <div class="proto-head">
         <div class="proto-date">${d.getDate()}<small>${d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' })}</small></div>
-        <div style="flex:1;min-width:0"><div class="proto-title">${t ? `<span class="tpl-tag tpl-${pr.template}">${esc(t.short)}</span>` : ''}${esc(pr.title || protoHeading(pr))}</div>
+        <div style="flex:1;min-width:0"><div class="proto-title">${t ? `<span class="tpl-tag tpl-${pr.template}">${esc(t.short)}</span>` : ''}${esc(pr.title || protoHeading(pr))}${pr.draft && !protoSent(pr) ? `<span class="tpl-tag tpl-draft" style="margin-inline-start:7px">✏️ בעריכה${pr.editing && pr.editing.by && Date.now() - pr.editing.at < 180000 ? ': ' + esc(pr.editing.by) + ' עכשיו' : ''}</span>` : ''}</div>
           <div class="proto-sub">${sub.map(esc).join(' · ')}</div></div>
         <span class="chev">◀</span>
       </div>
@@ -2408,6 +2438,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <div class="proto-doc">${protoDocHtml(protoDoc(pr))}</div>
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
           <button class="btn sm" data-edit>עריכה</button>
+          ${pr.draft && !protoSent(pr) ? '<button class="btn sm" data-finish title="בלי שליחה במייל. אחרי זה אפשרויות ההעתקה מהדוח הקודם לא יוצעו יותר">✓ סיום עריכה</button>' : ''}
           ${t ? '<button class="btn sm" data-dup>➕ פרוטוקול המשך</button>' : ''}
           ${p && !o.hideProject ? `<a class="btn sm" href="${projectHref(p)}">🏗️ לדף הפרויקט</a>` : ''}
           ${canTasks ? '<button class="btn sm" data-mktasks>יצירת משימות מהפרוטוקול</button>' : ''}
@@ -2415,6 +2446,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           <button class="btn sm" data-word>📄 ייצוא ל-Word</button>
           <button class="btn sm" data-pdf>📑 ייצוא ל-PDF</button>
           ${GOOGLE ? '<button class="btn sm" data-drive>☁️ שמירה ב-Google Drive</button>' : ''}
+          ${pr.gdocLink ? `<a class="btn sm" href="${esc(pr.gdocLink)}" target="_blank" rel="noopener" title="העותק ב-Google Docs, מתעדכן עם כל שמירה">📝 Google Docs</a>` : ''}
           ${GOOGLE ? '<button class="btn sm" data-cal>📅 הוספה ליומן</button>' : ''}
           ${GOOGLE && pr.driveLink ? `<a class="btn sm" href="#" data-lapp="${esc(protoFileName(pr, 'docx'))}" title="מעתיק את נתיב הקובץ במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋 העתק נתיב</a>` : ''}
         </div>
@@ -2434,6 +2466,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const pr = byId(db.protocols, c.dataset.id);
       $('.proto-head', c).addEventListener('click', () => { ui.openProto = ui.openProto === pr.id ? null : pr.id; c.classList.toggle('open'); });
       $('[data-edit]', c).addEventListener('click', () => openProtocolForm(pr));
+      const fin = $('[data-finish]', c);
+      if (fin) fin.addEventListener('click', () => { protoMarkSent(pr, true); save(); render(); toast('העריכה הסתיימה'); });
       const dup = $('[data-dup]', c);
       if (dup) dup.addEventListener('click', () => openProtocolForm(null, protoFollowUp(pr)));
       $('[data-word]', c).addEventListener('click', () => exportProtocolWord(pr));
@@ -2680,7 +2714,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Protocol form ----------
-  const protoPrev = (tpl, projectId, exceptId) => db.protocols.filter((x) => x.template === tpl && x.projectId === projectId && x.id !== exceptId && projectId)
+  // before: only one dated on or before it (the report before a report that is still being written).
+  const protoPrev = (tpl, projectId, exceptId, before) => db.protocols.filter((x) => x.template === tpl && x.projectId === projectId && x.id !== exceptId && projectId && (!before || (x.date || '') <= before))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
   // The next number of a supervision report / meeting summary in a project: after the highest number among the
   // reports written here and the documents in the project's Drive folder ("דוח פיקוח 09", "סיכום פגישה מס' 4"),
@@ -2695,7 +2730,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const kind = tpl === 'supervision' ? 'report' : 'meeting';
     const docs = db.protocols.filter((x) => x.projectId === projectId && x.id !== exceptId && x.template !== 'tour' && protoKind(x) === kind)
       .map((x) => ({ date: x.date || '', n: parseInt(x.reportNo, 10) || 0 }))
-      .concat(dprot.items.filter((it) => it.kind === kind && (dpProject(it) || {}).id === projectId)
+      .concat(dprot.items.filter((it) => it.kind === kind && (dpProject(it) || {}).id === projectId && !dpOwn(it))
         .map((it) => { const m = (it.title || '').match(PROTO_NO_RE[tpl]); return { date: it.date || '', n: m ? parseInt(m[1], 10) : 0 }; }));
     const numbered = docs.filter((d) => d.n > 0);
     let n = docs.length;
@@ -2707,16 +2742,39 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   const protoHasText = (tpl, it) => PROTO_TPL[tpl].cols.some((c) => c[0] !== 'topic' && (it[c[0]] || '').trim());
   const protoHasContent = (tpl, it) => protoHasText(tpl, it) || !!(it.photos || '').trim();
+  // A report / summary is "being written" until it is sent (or marked finished): until then, also after saving
+  // part of it, it keeps offering the previous one's topics for copying. Written before this rule: the latest of
+  // its kind in the project counts as still being written.
+  const protoSent = (pr) => !!(pr && (pr.sentAt || pr.doneAt));
+  function protoInEdit(pr) {
+    if (!pr || !protoTpl(pr) || protoSent(pr)) return false;
+    if (pr.draft) return true;
+    return !!pr.projectId && !db.protocols.some((x) => x !== pr && x.template === pr.template && x.projectId === pr.projectId && (x.date || '') > (pr.date || ''));
+  }
+  function protoMarkSent(pr, finishedOnly) {
+    pr[finishedOnly ? 'doneAt' : 'sentAt'] = new Date().toISOString();
+    ['draft', 'draftRows', 'askDone', 'prevSnap', 'editing'].forEach((k) => { delete pr[k]; });
+  }
+  // What a draft keeps of the previous report, so the same options come back when it is opened again.
+  const protoPrevSnap = (pv) => JSON.parse(JSON.stringify({
+    id: pv.id || '', template: pv.template, projectId: pv.projectId || '', reportNo: pv.reportNo || '', date: pv.date || '', _drive: pv._drive || null,
+    participants: pv.participants || '', location: pv.location || '', status: pv.status || '', copies: pv.copies || '',
+    doneWork: pv.doneWork || '', nextWork: pv.nextWork || '', notDone: pv.notDone || '',
+    items: (pv.items || []).filter((i) => (i.topic || '').trim() || protoHasText(pv.template, i)),
+  }));
+  // A Drive document that is the Google Docs copy of a protocol written here.
+  const dpOwn = (it) => { const own = new Set(db.protocols.map((x) => x.gdocId).filter(Boolean)); return (it.files || []).some((f) => own.has(f.id)); };
 
   // ---------- The latest report in Drive (a Google Doc or a Word file) ----------
   // The office keeps the latest report / summary of each project as a Google Doc in the project's folder.
   // Its header and topics table are read so the new report can offer them for copying, like a report written here.
   const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   const driveDocCache = new Map(); // file id @ modified -> parsed protocol, or null
-  function driveLatestDoc(tpl, projectId) {
+  function driveLatestDoc(tpl, projectId, before) {
     if (!projectId || !PROTO_NO_RE[tpl]) return null;
     const kind = tpl === 'supervision' ? 'report' : 'meeting';
-    const list = dprot.items.filter((it) => it.kind === kind && (dpProject(it) || {}).id === projectId && (it.files || []).some((f) => f.ext === 'gdoc' || f.ext === 'docx'))
+    const list = dprot.items.filter((it) => it.kind === kind && (dpProject(it) || {}).id === projectId && !dpOwn(it) && (!before || (it.date || it.modified || '') <= before)
+      && (it.files || []).some((f) => f.ext === 'gdoc' || f.ext === 'docx'))
       .sort((a, b) => (b.modified || b.date || '').localeCompare(a.modified || a.date || ''));
     const it = list[0]; if (!it) return null;
     return { item: it, file: it.files.find((f) => f.ext === 'gdoc') || it.files.find((f) => f.ext === 'docx'), at: it.modified || it.date || '' };
@@ -2822,16 +2880,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // and each one asks whether to copy its content or skip it. Topics not answered are left out of the document.
   let protoAsk = null; // { prev, tpl, map: topic#n -> previous item, done: Set }
   const protoTopicKeys = (items) => { const seen = {}; return items.map((it) => { const t = (it.topic || '').trim(); seen[t] = (seen[t] || 0) + 1; return t + '#' + seen[t]; }); };
-  function protoAskSetup(tpl, prev, items) {
+  // done: the topics already answered (copied or skipped) in an earlier session of the same draft.
+  function protoAskSetup(tpl, prev, items, done) {
     protoAsk = null;
     if (!prev || tpl === 'tour' || !PROTO_TPL[tpl]) return items;
     const pitems = (prev.items || []).filter((i) => (i.topic || '').trim() || protoHasText(tpl, i));
     const map = new Map();
     protoTopicKeys(pitems).forEach((k, n) => { if (protoHasText(tpl, pitems[n])) map.set(k, pitems[n]); });
-    protoAsk = { prev, tpl, map, done: new Set() };
+    protoAsk = { prev, tpl, map, done: new Set((done || []).filter((k) => !/^f:/.test(k))) };
     const cur = items.map((i) => Object.assign({}, i));
-    const fromPrev = pitems.map((i) => (protoHasText(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
-    const want = protoTopicKeys(fromPrev);
+    let fromPrev = pitems.map((i) => (protoHasText(tpl, i) ? { topic: i.topic || '', _fromPrev: '1' } : { topic: i.topic }));
+    let want = protoTopicKeys(fromPrev);
+    const keepRow = fromPrev.map((i, n) => !(i._fromPrev && protoAsk.done.has(want[n])));
+    fromPrev = fromPrev.filter((i, n) => keepRow[n]); want = want.filter((k, n) => keepRow[n]);
     if (!cur.some((i) => protoHasContent(tpl, i))) {
       // Nothing typed yet: the previous report's topics in its order, then the standard topics it did not have.
       const have = new Set(want.map((k) => k.replace(/#\d+$/, '')));
@@ -2873,13 +2934,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function openProtocolForm(proto, defaults) {
     if (proto && !protoTpl(proto)) { openLegacyProtocolForm(proto); return; }
     const p = proto ? Object.assign({}, proto) : Object.assign({ date: todayStr(), template: 'meeting', title: '', projectId: ui.protoProject && ui.protoProject !== '_none' ? ui.protoProject : '', location: '', participants: '', copies: '', status: '', reportNo: '' }, defaults || {});
-    const prevFor = (tpl, pid) => (proto ? null : (p.prevId && byId(db.protocols, p.prevId) && byId(db.protocols, p.prevId).template === tpl && byId(db.protocols, p.prevId).projectId === pid
-      ? byId(db.protocols, p.prevId) : protoPrev(tpl, pid)));
-    let prev = prevFor(p.template, p.projectId);
+    // Until it is sent, a report keeps offering the previous one's topics, also when it is opened again after a save.
+    const inEdit = !proto || protoInEdit(proto);
+    const prevFor = (tpl, pid) => (proto ? (inEdit ? protoPrev(tpl, pid, proto.id, proto.date) : null)
+      : (p.prevId && byId(db.protocols, p.prevId) && byId(db.protocols, p.prevId).template === tpl && byId(db.protocols, p.prevId).projectId === pid
+        ? byId(db.protocols, p.prevId) : protoPrev(tpl, pid)));
+    let prev = proto && inEdit && proto.prevSnap && proto.prevSnap.template === p.template ? proto.prevSnap : prevFor(p.template, p.projectId);
+    const askDone0 = (proto && inEdit && proto.askDone) || [];
     delete p.prevId;
+    ['draft', 'draftRows', 'askDone', 'prevSnap', 'editing'].forEach((k) => { delete p[k]; });
     protoAsk = null;
     if (!proto && !p.items) p.items = defaultItems(p.template);
     if (!proto) p.items = protoAskSetup(p.template, prev, p.items);
+    else if (inEdit && prev) {
+      // The rows as they were left, with the topics still waiting for "copy / skip".
+      if ((proto.draftRows || []).length) { p.items = proto.draftRows.map((i) => Object.assign({}, i)); protoAskSetup(p.template, prev, [], askDone0); }
+      else p.items = protoAskSetup(p.template, prev, p.items || [], askDone0);
+    }
+    let rec = proto; // the saved record: a new one is created by the first save while typing
     if (!proto && prev) ['participants', 'location', 'status'].forEach((k) => { if (!p[k] && prev[k]) p[k] = prev[k]; });
     if (!proto && prev && prev.copies && !p.copies) p.copies = prev.copies;
     let autoNo = '';
@@ -2891,7 +2963,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!proto && !p.copies) p.copies = p.template === 'supervision' ? 'המזמין, הקבלן וניהול הפרויקט' : 'משתתפים';
     const vis = (tpls) => `data-tpls="${tpls}" style="${tpls.split(' ').includes(p.template) ? '' : 'display:none'}"`;
     openModal(proto ? 'עריכת ' + PROTO_TPL[p.template].label : 'פרוטוקול חדש', `
-      <div class="pv-pane"><div class="pv-bar"><b>👁️ תצוגה מקדימה</b><span class="hint">המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span><span class="spacer" style="flex:1"></span><button type="button" class="btn sm" data-preview>הסתרה</button></div><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
+      <div class="pv-pane"><div class="pv-bar"><b>👁️ תצוגה מקדימה</b><span class="hint">המסמך כפי שיודפס, על נייר החברה. מתעדכן תוך כדי עריכה.</span><span class="spacer" style="flex:1"></span><span class="hint pv-gdoc" id="gdocState" data-id="${esc(proto ? proto.id : '')}">${protoGdocHtml(proto)}</span><button type="button" class="btn sm" data-preview>הסתרה</button></div><iframe title="תצוגה מקדימה" data-pvframe></iframe></div>
       <div class="pv-form">
       <div class="field"><label>תבנית</label><select class="input" name="template">${PROTO_TPL_KEYS.map((k) => `<option value="${k}" ${k === p.template ? 'selected' : ''}>${esc(PROTO_TPL[k].label)}</option>`).join('')}</select></div>
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
@@ -2918,14 +2990,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="hint" data-mail-hint>${autoMail ? 'הנמענים מהפעם הקודמת בפרויקט. אפשר להוסיף או למחוק כתובות, מופרדות בפסיק.' : 'כתובות מייל מופרדות בפסיק. בפעם הבאה בפרויקט הן ימולאו מראש.'}</span></div>
       </div>`,
     (data) => {
-      protoFormFinish(data);
-      data.emailTo = cleanEmails(data.emailTo).split(',').filter(Boolean).join(', ');
-      let saved = proto;
-      if (proto) Object.assign(proto, data); else { saved = Object.assign({ id: uid() }, data); db.protocols.push(saved); ui.openProto = saved.id; }
-      if (sendAfter) { sendAfter = false; save(); render(); emailProtocol(saved); return; }
-      save(); render(); toast(proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר');
+      const saved = persist(data, false);
+      if (!proto) ui.openProto = saved.id;
+      render();
+      if (sendAfter) { sendAfter = false; emailProtocol(saved); return; }
+      toast((proto ? 'הפרוטוקול עודכן' : 'הפרוטוקול נשמר') + (inEdit && protoAsk && protoAsk.map.size ? '. ההעתקה מהדוח הקודם נשארת זמינה עד השליחה' : ''));
     },
-    proto ? () => { db.protocols = db.protocols.filter((x) => x !== proto); save(); render(); toast('הפרוטוקול נמחק'); } : null);
+    proto ? () => { db.protocols = db.protocols.filter((x) => x.id !== proto.id); save(); render(); toast('הפרוטוקול נמחק'); } : null);
     $('#modalForm').classList.add('wide', 'with-pv');
     const body = $('#modalBody');
     const tplSel = $('[name="template"]', body);
@@ -2940,13 +3011,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       $('[data-no-hint]', body).textContent = autoNo ? 'נקבע אוטומטית לפי המסמכים הקודמים בפרויקט' : '';
     };
     // The general status of a supervision report asks the same "copy from the previous report?".
-    const fieldDone = new Set();
+    const fieldDone = new Set(askDone0.filter((k) => /^f:/.test(k)).map((k) => k.slice(2)));
     // The latest report in Drive (a Google Doc), when it is newer than the last one written here.
     let driveTry = 0;
     const tryDrivePrev = async () => {
-      if (proto) return;
+      if (proto && (!inEdit || proto.prevSnap)) return;
       const tpl = curTpl, pid = projSel.value, mine = ++driveTry;
-      const d = driveLatestDoc(tpl, pid);
+      const d = driveLatestDoc(tpl, pid, proto && proto.date);
       if (!d || (prev && (prev.date || '') >= (d.at || '').slice(0, 10))) return;
       const bar = $('#protoAskBar', body);
       if (bar && !bar.innerHTML) bar.innerHTML = `<div class="pi-askbar">☁️ קורא את המסמך האחרון מה-Drive: ${esc(d.item.title || '')}...</div>`;
@@ -2955,10 +3026,42 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (mine !== driveTry || !document.body.contains(body) || curTpl !== tpl || projSel.value !== pid) return;
       if (!dp || !((dp.items || []).length || dp.nextWork || dp.doneWork) || (prev && (prev.date || '') > (dp.date || ''))) { drawProtoItems(curTpl, readProtoItems()); return; }
       prev = dp;
-      drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
-      ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
+      drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev), askDone0));
+      if (!proto) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
       drawFieldAsks(); schedulePreview();
     };
+    // Saving: the document as typed, and while it is not sent also the rows still waiting for "copy / skip",
+    // what was answered, and the previous report, so the options are there again when it is reopened.
+    const persist = (data, auto) => {
+      const raw = readProtoItems();
+      protoFormFinish(data);
+      data.emailTo = cleanEmails(data.emailTo).split(',').filter(Boolean).join(', ');
+      if (rec && !db.protocols.includes(rec)) rec = byId(db.protocols, rec.id) || null;
+      if (!rec) { rec = Object.assign({ id: uid() }, data); db.protocols.push(rec); } else Object.assign(rec, data);
+      if (inEdit && !protoSent(rec)) {
+        rec.draft = true;
+        if (prev && PROTO_TPL[prev.template]) {
+          rec.prevSnap = protoPrevSnap(prev);
+          rec.draftRows = raw;
+          rec.askDone = (protoAsk ? Array.from(protoAsk.done) : []).concat(Array.from(fieldDone).map((k) => 'f:' + k));
+        } else ['prevSnap', 'draftRows', 'askDone'].forEach((k) => { delete rec[k]; });
+      }
+      if (auto) rec.editing = { by: (me && me.name) || '', at: Date.now() }; else delete rec.editing;
+      save();
+      protoGdocSync(rec, !auto);
+      return rec;
+    };
+    // Saved while typing: the other users see the document as it is being written, and the Google Docs copy follows.
+    liveForm(() => {
+      const isNew = !rec;
+      persist(modalData(), true);
+      const st = $('#gdocState'); if (st) { st.dataset.id = rec.id; st.innerHTML = protoGdocHtml(rec); }
+      if (isNew) {
+        render();
+        modalDelete = () => { db.protocols = db.protocols.filter((x) => x.id !== rec.id); save(); render(); toast('הפרוטוקול נמחק'); };
+        $('#modalDelete').style.display = '';
+      }
+    });
     const drawFieldAsks = () => {
       $$('[data-fask]', body).forEach((box) => {
         const k = box.dataset.fask; const f = $(`[name="${k}"]`, body);
@@ -3039,7 +3142,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!prev) { toast(projSel.value ? 'אין פרוטוקול קודם מאותו סוג בפרויקט הזה' : 'בחרו קודם פרויקט'); return; }
       if (!confirm('להחליף את הנושאים בנושאים מהפרוטוקול מ-' + fmtDate(prev.date) + '?')) return;
       protoAsk = null;
-      drawProtoItems(curTpl, (prev.items || []).map((i) => { const c = Object.assign({}, i); delete c.photos; return c; }));
+      drawProtoItems(curTpl, (prev.items || []).map((i) => { const c = Object.assign({}, i); delete c.photos; delete c.photoPos; return c; }));
       ['participants', 'location', 'copies', 'status'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && !f.value.trim() && prev[k]) f.value = prev[k]; });
       toast('הנושאים הועתקו מהפרוטוקול הקודם');
     });
@@ -3096,21 +3199,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
       <div class="pi-photos">${photoIds(it.photos).map((id) => `<span class="pi-ph">${photoImg(id, '')}<button type="button" data-phdel="${esc(id)}" title="הסרת התמונה">✕</button></span>`).join('')}
         <label class="btn sm pi-phadd" title="צילום או תמונה מהגלריה">📷 תמונה<input type="file" accept="image/*" multiple hidden data-phadd></label>
-        <input type="hidden" data-k="photos" value="${esc(it.photos || '')}"></div>
-      ${Object.keys(it).filter((k) => k !== 'topic' && k !== 'photos' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
+        ${photoIds(it.photos).length ? `<span class="pi-phpos"><span>מיקום התמונה:</span><button type="button" class="btn sm${it.photoPos === 'left' ? '' : ' primary'}" data-phpos="">⬇ בתחתית הסעיף</button><button type="button" class="btn sm${it.photoPos === 'left' ? ' primary' : ''}" data-phpos="left">⬅ משמאל למלל</button></span>` : ''}
+        <input type="hidden" data-k="photos" value="${esc(it.photos || '')}"><input type="hidden" data-k="photoPos" value="${esc(it.photos && it.photoPos ? it.photoPos : '')}"></div>
+      ${Object.keys(it).filter((k) => k !== 'topic' && k !== 'photos' && k !== 'photoPos' && !fields.some((c) => c[0] === k) && it[k]).map((k) => `<input type="hidden" data-k="${k}" value="${esc(it[k])}">`).join('')}
     </div>`).join('') || '<div class="hint">אין נושאים. לחצו "+ נושא".</div>';
     $$('.pi-row', box).forEach((row, n) => {
       const move = (d) => { const cur = readProtoItems(); const j = n + d; if (j < 0 || j >= cur.length) return; [cur[n], cur[j]] = [cur[j], cur[n]]; drawProtoItems(tpl, cur); };
       $('[data-up]', row).addEventListener('click', () => move(-1));
       $('[data-down]', row).addEventListener('click', () => move(1));
       $('[data-del]', row).addEventListener('click', () => { const cur = readProtoItems(); cur.splice(n, 1); drawProtoItems(tpl, cur); });
-      const setPhotos = (fn) => { const cur = readProtoItems(); const ids = fn(photoIds(cur[n].photos)); if (ids.length) cur[n].photos = ids.join(','); else delete cur[n].photos; drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true })); };
+      const setPhotos = (fn) => { const cur = readProtoItems(); const ids = fn(photoIds(cur[n].photos)); if (ids.length) cur[n].photos = ids.join(','); else { delete cur[n].photos; delete cur[n].photoPos; } drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true })); };
+      $$('[data-phpos]', row).forEach((b) => b.addEventListener('click', () => {
+        const cur = readProtoItems(); if (b.dataset.phpos) cur[n].photoPos = b.dataset.phpos; else delete cur[n].photoPos;
+        drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true }));
+      }));
       $('[data-phadd]', row).addEventListener('change', async (e) => {
         const files = Array.from(e.target.files || []); if (!files.length) return;
         toast(files.length > 1 ? 'מעבד ' + files.length + ' תמונות...' : 'מעבד תמונה...');
         const ids = [];
         for (const f of files) { try { ids.push(await makePhoto(f)); } catch (x) { toast('לא ניתן לקרוא את הקובץ ' + f.name); } }
-        if (ids.length) setPhotos((cur) => cur.concat(ids));
+        if (ids.length) { setPhotos((cur) => cur.concat(ids)); toast('בחרו את מיקום התמונה: בתחתית הסעיף או משמאל למלל'); }
       });
       $$('[data-phdel]', row).forEach((b) => b.addEventListener('click', () => setPhotos((cur) => cur.filter((x) => x !== b.dataset.phdel))));
       fillPhotos(row);
@@ -3229,9 +3337,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       + `<pic:nvPicPr><pic:cNvPr id="${1000 + n}" name="photo${n}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
       + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
   }
+  const wLines = (lines, w, o) => (lines && lines.length ? lines : [{ t: '' }]).map((l) => l.img ? wImgPara(l.img, w) : wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
+  // Photos at the left of the text: a borderless table of two cells inside the cell (the text at the right).
+  function wSplit(w, text, imgs, o) {
+    const inner = Math.max(1200, w - 160); const iw = Math.round(inner * 0.42), tw = inner - iw;
+    const nil = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((x) => `<w:${x} w:val="nil"/>`).join('');
+    const tc = (cw, paras) => `<w:tc><w:tcPr><w:tcW w:w="${cw}" w:type="dxa"/></w:tcPr>${paras}</w:tc>`;
+    return `<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${inner}" w:type="dxa"/><w:tblBorders>${nil}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr>`
+      + `<w:tblGrid><w:gridCol w:w="${tw}"/><w:gridCol w:w="${iw}"/></w:tblGrid><w:tr>${tc(tw, wLines(text, tw, o))}${tc(iw, imgs.map((l) => wImgPara(l.img, iw)).join('') || wPara(''))}</w:tr></w:tbl>` + wPara('', { after: 0 });
+  }
   function wCell(w, lines, o) {
     o = o || {};
-    const paras = (lines && lines.length ? lines : [{ t: '' }]).map((l) => l.img ? wImgPara(l.img, w) : wPara(wRun(l.t, { bold: l.b || o.bold, u: l.u, color: l.r ? 'FF0000' : o.color, size: o.size || (l.r ? 18 : 20) }), { after: 20, center: o.center })).join('');
+    const side = (lines || []).filter((l) => l.img && l.side);
+    const paras = side.length ? wSplit(w, lines.filter((l) => !(l.img && l.side)), side, o) : wLines(lines, w, o);
     return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${o.span ? `<w:gridSpan w:val="${o.span}"/>` : ''}${o.blank ? '<w:tcBorders><w:top w:val="nil"/><w:start w:val="nil"/><w:bottom w:val="nil"/><w:end w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/></w:tcBorders>' : ''}${o.fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.fill}"/>` : ''}${o.vcenter ? '<w:vAlign w:val="center"/>' : ''}</w:tcPr>${paras}</w:tc>`;
   }
   const wRow = (cells) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells}</w:tr>`;
@@ -3248,7 +3366,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const zip = await JSZip.loadAsync(tpl);
       const docXml = await zip.file('word/document.xml').async('string');
       await ensurePhotos(pr);
-      wImgs = [];
+      const imgs = wImgs = [];
       const doc = protoDoc(pr);
       const tour = doc.tpl === 'tour';
       const head = { meeting: ['6666EF', 'FFFFFF'], supervision: ['3C78D8', 'FFFFFF'] }[doc.tpl] || ['D9D9D9', ''];
@@ -3289,13 +3407,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const i2 = docXml.indexOf('<w:sectPr');
       if (i1 < 8 || i2 < 0) throw new Error('template structure');
       zip.file('word/document.xml', docXml.slice(0, i1) + body + docXml.slice(i2));
-      if (wImgs.length) {
+      if (wImgs === imgs) wImgs = null;
+      if (imgs.length) {
         const relsPath = 'word/_rels/document.xml.rels';
         const rels = await zip.file(relsPath).async('string');
-        wImgs.forEach((im) => zip.file('word/media/' + im.name, im.data.split(',')[1], { base64: true }));
-        zip.file(relsPath, rels.replace('</Relationships>', wImgs.map((im) => `<Relationship Id="${im.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.name}"/>`).join('') + '</Relationships>'));
+        imgs.forEach((im) => zip.file('word/media/' + im.name, im.data.split(',')[1], { base64: true }));
+        zip.file(relsPath, rels.replace('</Relationships>', imgs.map((im) => `<Relationship Id="${im.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.name}"/>`).join('') + '</Relationships>'));
       }
-      wImgs = null;
       return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   }
   async function exportProtocolWord(pr) {
@@ -3315,6 +3433,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const to = cleanEmails(pr.emailTo || st.emailTo), cc = cleanEmails(st.emailCc);
     let url;
     if (GOOGLE && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
+    // Sent: the editing is over, the options to copy from the previous report are not offered any more.
+    if (protoTpl(pr) && !protoSent(pr)) { protoMarkSent(pr); save(); render(); }
     if (st.mailApp === 'mailto') {
       const q = [cc && 'cc=' + encodeURIComponent(cc), 'subject=' + encodeURIComponent(subject), 'body=' + encodeURIComponent(body)].filter(Boolean).join('&');
       url = 'mailto:' + to + '?' + q;
@@ -3526,6 +3646,51 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       save(); render(); toast('נשמר ב-Google Drive');
     } catch (e) { toast('השמירה ב-Drive נכשלה: ' + gErr(e)); }
   }
+  // The Google Docs copy of a report: kept in the project's folder in Drive (next to its latest report of the
+  // same kind), and updated a few seconds after every change while it is written, and at once on "שמירה".
+  const gdocTimers = new Map(); const gdocState = {}; const gdocBusy = {};
+  function protoGdocHtml(pr) {
+    if (!GOOGLE) return '';
+    const st = pr && gdocState[pr.id];
+    if (!G.valid()) return '📝 Google Docs: חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive) כדי שהמסמך יתעדכן גם שם';
+    if (st && st.s === 'busy') return '📝 מעדכן ב-Google Docs...';
+    if (st && st.s === 'err') return '⚠️ Google Docs: ' + esc(st.m);
+    if (pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 Google Docs ✓ מעודכן</a>`;
+    return '📝 יישמר גם כ-Google Docs';
+  }
+  const gdocShow = (id) => { const el = $('#gdocState'); if (el && el.dataset.id === id) el.innerHTML = protoGdocHtml(byId(db.protocols, id)); };
+  function protoGdocSync(pr, now) {
+    if (!GOOGLE || !G.valid() || !pr || !protoTpl(pr)) return;
+    clearTimeout(gdocTimers.get(pr.id));
+    gdocTimers.set(pr.id, setTimeout(() => protoGdocPush(pr.id), now ? 0 : 8000));
+  }
+  async function protoGdocFolder(pr) {
+    const kind = protoKind(pr);
+    const it = dprot.items.filter((x) => x.kind === kind && (dpProject(x) || {}).id === pr.projectId && (x.files || []).length && !dpOwn(x))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+    if (it) { try { const m = await G.drive.meta(it.files[0].id, 'parents'); if (m.parents && m.parents[0]) return m.parents[0]; } catch (e) {} }
+    const p = byId(db.projects, pr.projectId);
+    return (p && p.driveFolder) || '';
+  }
+  async function protoGdocPush(id) {
+    if (gdocBusy[id]) { gdocBusy[id] = 'again'; return; }
+    const pr = byId(db.protocols, id); if (!pr) return;
+    gdocBusy[id] = true; gdocState[id] = { s: 'busy' }; gdocShow(id);
+    try {
+      const parent = pr.gdocId ? '' : pr.gdocFolder || await protoGdocFolder(pr);
+      const name = protoFileName(pr, 'docx').replace(/\.docx$/, '');
+      const f = await G.drive.save(name, await buildProtocolDocx(pr), pr.gdocId, parent, { gdoc: true });
+      const cur = byId(db.protocols, id);
+      if (cur && (cur.gdocId !== f.id || cur.gdocLink !== (f.webViewLink || ''))) {
+        cur.gdocId = f.id; cur.gdocLink = f.webViewLink || ''; if (parent && f.inFolder) cur.gdocFolder = parent;
+        save();
+      }
+      gdocState[id] = { s: 'ok' };
+    } catch (e) { gdocState[id] = { s: 'err', m: gErr(e) }; }
+    gdocShow(id);
+    const again = gdocBusy[id] === 'again'; delete gdocBusy[id];
+    if (again) protoGdocPush(id);
+  }
   async function sendProtocolGmail(pr, to, cc, subject, text) {
     if (!to) { toast('אין נמענים. הגדירו נמענים בעמוד ההגדרות'); location.hash = 'settings'; return; }
     if (!confirm('לשלוח את הפרוטוקול מה-Gmail שלך אל:\n' + to.split(',').join('\n') + (cc ? '\nהעתק: ' + cc.split(',').join(', ') : '') + '\n\nקובץ Word יצורף למייל.')) return;
@@ -3534,6 +3699,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       toast('שולח...');
       await G.gmail.send({ to, cc, subject, text, attachment: { name: protoFileName(pr, 'docx'), blob: await buildProtocolDocx(pr) } });
       toast('המייל נשלח');
+      if (protoTpl(pr) && !protoSent(pr)) { protoMarkSent(pr); save(); render(); }
     } catch (e) { toast('השליחה נכשלה: ' + gErr(e)); }
   }
 
@@ -4069,12 +4235,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
 
   // ---------- Modal ----------
-  let modalSubmit = null; let modalDelete = null;
+  let modalSubmit = null; let modalDelete = null; let modalOnClose = null; let modalGen = 0;
   function openModal(title, bodyHtml, onSubmit, onDelete, deleteNote) {
     $('#modalTitle').textContent = title;
     $('#modalForm').classList.remove('wide', 'with-pv');
     $('#modalBody').innerHTML = bodyHtml;
-    modalSubmit = onSubmit; modalDelete = onDelete;
+    modalSubmit = onSubmit; modalDelete = onDelete; modalOnClose = null; modalGen++;
     const del = $('#modalDelete');
     del.style.display = onDelete ? '' : 'none';
     del.dataset.note = deleteNote || '';
@@ -4082,7 +4248,29 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const first = $('#modalBody input, #modalBody select, #modalBody textarea');
     if (first && window.matchMedia('(min-width: 800px)').matches) first.focus();
   }
-  function closeModal() { $('#modalBg').classList.remove('show'); modalSubmit = modalDelete = null; }
+  function closeModal() {
+    const fn = modalOnClose; modalOnClose = null;
+    if (fn) try { fn(); } catch (e) {}
+    $('#modalBg').classList.remove('show'); modalSubmit = modalDelete = null;
+  }
+  // The form's fields, as the submit hands them over.
+  function modalData() {
+    const fd = new FormData($('#modalForm')); const data = {};
+    $$('#modalBody [name]').forEach((inp) => { data[inp.name] = inp.type === 'checkbox' ? inp.checked : (fd.get(inp.name) || '').toString().trim(); });
+    return data;
+  }
+  // Saves the open form while it is being typed in (a moment after the last change, and when it closes), so
+  // everyone sees the document / task as it is being written, not only after "שמירה".
+  function liveForm(fn, delay) {
+    const gen = modalGen; let timer = null;
+    const run = () => { clearTimeout(timer); timer = null; if (gen === modalGen) fn(); };
+    const later = () => { if (gen !== modalGen) return; clearTimeout(timer); timer = setTimeout(run, delay || 1500); };
+    const body = $('#modalBody');
+    body.addEventListener('input', later);
+    body.addEventListener('change', later);
+    body.addEventListener('click', (e) => { if (e.target.closest('button')) later(); });
+    modalOnClose = () => { if (timer) run(); };
+  }
 
   // ---------- Misc ----------
   // When running inside the phone app (Expo WebView), hand files to the native side.
@@ -4127,9 +4315,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     initAi();
     $('#modalForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      const fd = new FormData(e.target); const data = {};
-      $$('#modalBody [name]').forEach((inp) => { data[inp.name] = inp.type === 'checkbox' ? inp.checked : (fd.get(inp.name) || '').toString().trim(); });
-      const fn = modalSubmit; closeModal(); if (fn) fn(data);
+      const data = modalData();
+      const fn = modalSubmit; modalOnClose = null; closeModal(); if (fn) fn(data);
     });
     $('#modalDelete').addEventListener('click', () => {
       const note = $('#modalDelete').dataset.note;

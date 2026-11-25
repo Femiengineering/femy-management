@@ -332,8 +332,10 @@
     return (await (await api(tok, `${DAPI}?q=${q}&orderBy=modifiedTime desc&pageSize=50&fields=${FIELDS}`)).json()).files || [];
   }
   // Creates the file in the site's folder, or replaces it when fileId is given and still reachable.
-  async function save(name, blob, fileId, parentId) {
+  // opts.gdoc: a Word file is kept as a Google Doc (Drive converts it on every upload).
+  async function save(name, blob, fileId, parentId, opts) {
     const tok = await token();
+    const conv = opts && opts.gdoc ? { mimeType: 'application/vnd.google-apps.document' } : {};
     const form = (meta) => {
       const f = new FormData();
       f.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
@@ -341,17 +343,17 @@
       return f;
     };
     if (fileId) {
-      try { return await (await api(tok, `${UP}/${fileId}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'PATCH', body: form({ name }) })).json(); }
+      try { return await (await api(tok, `${UP}/${fileId}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'PATCH', body: form({ name }) })).json(); }
       catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
     }
     if (parentId) {
       // Into a folder the user chose (for example a project folder). Falls back to the site's own folder
       // when Google does not let the site write there.
-      try { const f = await (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'POST', body: form({ name, parents: [parentId] }) })).json(); f.inFolder = true; return f; }
+      try { const f = await (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'POST', body: form(Object.assign({ name, parents: [parentId] }, conv)) })).json(); f.inFolder = true; return f; }
       catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
     }
     const parent = await folder(tok);
-    return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form({ name, parents: [parent] }) })).json();
+    return (await api(tok, `${UP}?uploadType=multipart&fields=id,name,webViewLink`, { method: 'POST', body: form(Object.assign({ name, parents: [parent] }, conv)) })).json();
   }
   // A search over every file the user can see (My Drive, shared with them and shared drives), page after page.
   async function search(q, fields, maxPages) {
