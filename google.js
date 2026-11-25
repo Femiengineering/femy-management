@@ -16,6 +16,7 @@
     'https://www.googleapis.com/auth/gmail.readonly', // read the inbox
     'https://www.googleapis.com/auth/gmail.send', // send mail as the user
     'https://www.googleapis.com/auth/gmail.compose', // a reply ready in the project's thread, to send from Gmail
+    'https://www.googleapis.com/auth/gmail.modify', // a mail read on the site is marked as read in Gmail too
     'https://www.googleapis.com/auth/drive.readonly', // browse the user's Drive files
     'https://www.googleapis.com/auth/drive.file', // create and update files the site made
     'https://www.googleapis.com/auth/drive', // write the reports into the Google Docs the office opened in the project folders
@@ -70,7 +71,7 @@
   // "valid" = the site can call Google now without asking the user for anything.
   const valid = () => fresh() || !!(persistent && rec && rec.device);
   function status() {
-    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), gmailCompose: rec && rec.scope ? /auth\/gmail\.compose( |$)/.test(rec.scope) : null, driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
+    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), gmailCompose: rec && rec.scope ? /auth\/gmail\.compose( |$)/.test(rec.scope) : null, gmailModify: rec && rec.scope ? /auth\/gmail\.modify( |$)/.test(rec.scope) : null, driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
   }
   const onChange = (f) => listeners.push(f);
 
@@ -243,6 +244,78 @@
       from: (head(m, 'From') || {}).value || '', subject: (head(m, 'Subject') || {}).value || '(ללא נושא)',
       date: Number(m.internalDate) || 0, unread: (m.labelIds || []).includes('UNREAD'),
     }));
+  }
+  // One page of mails for the mail section: { messages, next } (next: the token for the following page).
+  async function list(query, n, pageToken) {
+    const tok = await token();
+    const q = new URLSearchParams({ maxResults: String(n || 25), q: query || '' });
+    if (pageToken) q.set('pageToken', pageToken);
+    const r = await (await api(tok, GM + '/messages?' + q)).json();
+    const ids = r.messages || [];
+    const full = await Promise.all(ids.map((m) => api(tok, GM + '/messages/' + m.id + '?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date')
+      .then((x) => x.json()).catch(() => null)));
+    return {
+      next: r.nextPageToken || '',
+      messages: full.filter(Boolean).map((m) => ({
+        id: m.id, threadId: m.threadId, snippet: decode(m.snippet || ''),
+        from: hdr(m, 'From'), to: hdr(m, 'To'), subject: hdr(m, 'Subject') || '(ללא נושא)',
+        date: Number(m.internalDate) || 0, unread: (m.labelIds || []).includes('UNREAD'),
+        sent: (m.labelIds || []).includes('SENT'),
+      })),
+    };
+  }
+  // How many unread mails are in the inbox.
+  async function unreadCount() { return Number((await json(GM + '/labels/INBOX')).messagesUnread) || 0; }
+  // A mail's parts: its text (html and plain), its files and the pictures inside it (cid:).
+  function walk(p, out) {
+    if (!p) return out;
+    const type = (p.mimeType || '').toLowerCase();
+    const cid = (((p.headers || []).find((h) => h.name.toLowerCase() === 'content-id') || {}).value || '').replace(/[<>]/g, '');
+    const disp = (((p.headers || []).find((h) => h.name.toLowerCase() === 'content-disposition') || {}).value || '').toLowerCase();
+    if (p.filename || (p.body && p.body.attachmentId && !type.startsWith('text/'))) {
+      const f = { name: p.filename || 'קובץ', mime: p.mimeType, size: (p.body && p.body.size) || 0, id: p.body && p.body.attachmentId, data: p.body && p.body.data, cid };
+      if (cid && type.startsWith('image/') && !disp.startsWith('attachment')) out.inline.push(f); else out.files.push(f);
+    } else if (type === 'text/html' && p.body && p.body.data && !out.html) out.html = partDecode(p);
+    else if (type === 'text/plain' && p.body && p.body.data && !out.text) out.text = partDecode(p);
+    (p.parts || []).forEach((c) => walk(c, out));
+    return out;
+  }
+  // A text part in its own charset (Hebrew mail often comes as windows-1255 or iso-8859-8).
+  function partDecode(p) {
+    const ct = (((p.headers || []).find((h) => h.name.toLowerCase() === 'content-type') || {}).value || '');
+    const cs = ((/charset="?([^";\s]+)/i.exec(ct) || [])[1] || 'utf-8').toLowerCase();
+    const bin = atob(p.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    try { return new TextDecoder(cs === 'iso-8859-8-i' ? 'iso-8859-8' : cs).decode(bytes); } catch (e) { return new TextDecoder('utf-8').decode(bytes); }
+  }
+  // A whole conversation, for reading on the site: every mail in it, oldest first.
+  async function conversation(threadId) {
+    const t = await json(GM + '/threads/' + encodeURIComponent(threadId) + '?format=full');
+    return (t.messages || []).map((m) => {
+      const b = walk(m.payload, { html: '', text: '', files: [], inline: [] });
+      return {
+        id: m.id, threadId: m.threadId, labels: m.labelIds || [], unread: (m.labelIds || []).includes('UNREAD'),
+        from: hdr(m, 'From'), to: hdr(m, 'To'), cc: hdr(m, 'Cc'), replyTo: hdr(m, 'Reply-To'), subject: hdr(m, 'Subject') || '(ללא נושא)',
+        messageId: hdr(m, 'Message-ID') || hdr(m, 'Message-Id'), references: hdr(m, 'References'),
+        date: Number(m.internalDate) || 0, snippet: decode(m.snippet || ''), html: b.html, text: b.text, files: b.files, inline: b.inline,
+      };
+    });
+  }
+  // A file attached to a mail, as a Blob.
+  async function attachment(messageId, att) {
+    let data = att.data;
+    if (!data) data = (await json(GM + '/messages/' + encodeURIComponent(messageId) + '/attachments/' + encodeURIComponent(att.id))).data || '';
+    const bin = atob(data.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: att.mime || 'application/octet-stream' });
+  }
+  // Marks the conversation as read in Gmail (needs the gmail.modify permission; without it, does nothing).
+  async function markRead(threadId) {
+    if (!(rec && rec.scope && /auth\/gmail\.modify( |$)/.test(rec.scope))) return false;
+    await json(GM + '/threads/' + encodeURIComponent(threadId) + '/modify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ removeLabelIds: ['UNREAD'] }) });
+    return true;
   }
   // The newest mail thread that matches a Gmail search, or null.
   async function findThread(query) {
@@ -422,7 +495,7 @@
   window.FemyGoogle = {
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
-    gmail: { inbox, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
+    gmail: { inbox, list, unreadCount, conversation, attachment, markRead, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
     drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer },
   };
 })();
