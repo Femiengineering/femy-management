@@ -307,6 +307,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
 .tpl-tag.tpl-draft { background: #fef3c7; color: #92400e; }
 .pi-del { color: #b91c1c; white-space: nowrap; }
+.pi-top .input { min-width: 0; }
+@media (max-width: 700px) { .pi-del-l { display: none; } }
 .pi-phpos { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
 .pv-gdoc { font-size: 12px; }
 .pv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 13px; }
@@ -320,7 +322,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pv-pane [data-preview] { display: none; }
 @media (max-width: 1099px) {
   .modal.with-pv .modal-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "pv" "form"; }
-  .pv-pane { top: -40px; }
+  .pv-pane { position: static; }
   .pv-pane iframe { height: min(440px, 42vh); }
   .pv-pane [data-preview] { display: inline-flex; }
 }
@@ -3294,7 +3296,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     box.innerHTML = items.map((it, n) => `<div class="pi-row${askOf(it, n) ? ' asking' : ''}">
       ${askOf(it, n) ? protoAskHtml(protoPrevText(tpl, askOf(it, n)), tpl) : ''}
       <div class="pi-top"><span class="pi-num">${n + 1}</span><input class="input" data-k="topic" value="${esc(it.topic)}" placeholder="נושא">
-        <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm pi-del" data-del title="מחיקת הסעיף כולו: הנושא, התוכן והתמונות">🗑 מחיקת הסעיף</button></div>
+        <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm pi-del" data-del title="מחיקת הסעיף כולו: הנושא, התוכן והתמונות">🗑<span class="pi-del-l"> מחיקת הסעיף</span></button></div>
       <div class="pi-fields pi-${tpl}">${fields.map((c) => (c[0] === 'details' || c[0] === 'instructions'
         ? `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><textarea class="input" data-k="${c[0]}" rows="${tpl === 'tour' ? 4 : 2}">${esc(it[c[0]])}</textarea></label>`
         : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
@@ -3548,7 +3550,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const to = cleanEmails(pr.emailTo || st.emailTo), cc = cleanEmails(st.emailCc);
     let url;
     // With Google connected, a report / summary goes as a reply in the project's usual mail thread.
-    if (GOOGLE && protoTpl(pr) && st.mailApp !== 'mailto' && G.silent()) { openProtoMail(pr); return; }
+    if (GOOGLE && protoTpl(pr) && st.mailApp !== 'mailto') { openProtoMail(pr); return; }
     if (GOOGLE && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
     // Sent: the editing is over, the options to copy from the previous report are not offered any more.
     if (protoTpl(pr) && !protoSent(pr)) { protoMarkSent(pr); save(); render(); }
@@ -3884,8 +3886,17 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const tmp = await G.drive.save('זמני - ' + protoFileName(pr, 'docx').replace(/\.docx$/, ''), await buildProtocolDocx(pr), '', '', { gdoc: true });
     try { return pdf(await G.drive.exportFile(tmp.id, 'application/pdf')); } finally { G.drive.remove(tmp.id).catch(() => {}); }
   }
+  // A problem with the mail is shown in a window that stays, not in a toast that disappears.
+  function mailProblem(msg, retry) {
+    openModal('שליחה במייל', `<div class="field full">${msg}</div>${retry ? '<div class="field full"><button type="button" class="btn primary" data-mretry>חיבור לחשבון Google והמשך</button></div>' : ''}`, () => {});
+    $('#modalForm button[type=submit]').textContent = 'סגירה';
+    const b = $('[data-mretry]', $('#modalBody'));
+    if (b) b.addEventListener('click', () => { G.connect().then(() => { closeModal(); retry(); }).catch((e) => toast('החיבור נכשל: ' + gErr(e))); });
+  }
   async function openProtoMail(pr) {
     const pj = byId(db.projects, pr.projectId);
+    // Not connected (or the connection lapsed): connect from a click, then go on.
+    if (!G.silent()) { mailProblem('כדי לשלוח את המסמך בשרשור של הפרויקט עם PDF צריך לחבר את חשבון ה-Google.', () => openProtoMail(pr)); return; }
     toast('מחפש את שרשור המייל של הפרויקט...');
     let th = null;
     try { const id = await protoFindThread(pr, pj); if (id) th = await G.gmail.thread(id); } catch (e) { th = null; }
@@ -3919,7 +3930,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         const att = await protoMailAttachment(pr);
         const mail = { to: toList, cc: cleanEmails(data.cc), subject: data.subject, text: data.body, attachment: att,
           threadId: th && th.id, inReplyTo: th && th.messageId, references: th && th.references };
-        const r = inGmail ? await G.gmail.draft(mail) : await G.gmail.send(mail);
+        let r; let fellBack = false;
+        if (inGmail) {
+          try { r = await G.gmail.draft(mail); }
+          catch (e) {
+            // No permission yet to prepare a draft: the mail (already checked in this window) is sent from here.
+            if (e && (e.status === 403 || e.status === 401)) { r = await G.gmail.send(mail); fellBack = true; } else throw e;
+          }
+        } else r = await G.gmail.send(mail);
         const tid = (r && (r.threadId || (r.message && r.message.threadId))) || (th && th.id);
         if (inGmail) {
           const url = tid ? G.gmail.link({ threadId: tid }) : 'https://mail.google.com/mail/u/#drafts';
@@ -3929,10 +3947,11 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         const cur = byId(db.protocols, pr.id) || pr;
         cur.emailTo = toList.split(',').join(', ');
         protoMarkSent(cur); save(); render();
-        toast(inGmail ? 'התשובה מוכנה בשרשור ב-Gmail, עם ה-PDF. בדקו ושלחו משם' : th ? 'המייל נשלח בשרשור של הפרויקט' : 'המייל נשלח');
+        toast(fellBack ? 'המייל נשלח בשרשור של הפרויקט (אין עדיין הרשאה להכין טיוטה ב-Gmail)' : inGmail ? 'התשובה מוכנה בשרשור ב-Gmail, עם ה-PDF. בדקו ושלחו משם' : th ? 'המייל נשלח בשרשור של הפרויקט' : 'המייל נשלח');
       } catch (e) {
         if (w) w.close();
-        toast((inGmail ? 'הכנת התשובה ב-Gmail נכשלה: ' : 'השליחה נכשלה: ') + gErr(e));
+        const reconnect = e && (e.status === 401 || e.code === 'reconnect');
+        mailProblem((inGmail ? 'הכנת התשובה ב-Gmail נכשלה: ' : 'השליחה נכשלה: ') + esc(gErr(e)) + (e && e.status ? ' (' + e.status + ')' : ''), reconnect || (e && e.status === 403) ? () => openProtoMail(pr) : null);
       }
     });
     let direct = false;
