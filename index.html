@@ -2786,12 +2786,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   }
   // The Google Doc a report writes into: the one it already writes into, else the one chosen for the project,
   // else the project's open document of the same kind. '' = a new document.
+  // One fixed Google Doc per project: every report / summary of the project is saved into it. It is the one
+  // set on the project, else the project's newest open Google Doc (of the same kind first). '' = none yet:
+  // the first save makes it, in the project's folder, and it stays the project's document.
+  function projGdoc(pj, kind) {
+    if (!pj) return '';
+    if (pj.gdocId) return pj.gdocId;
+    const g = pj.gdocs || {};
+    if (g[kind] || g.report || g.meeting) return g[kind] || g.report || g.meeting;
+    const list = projGdocs(pj.id);
+    return ((kind && list.find((x) => x.kind === kind)) || list[0] || {}).id || '';
+  }
   function protoGdocDefault(pr) {
-    if (pr.gdocId) return pr.gdocId;
-    const kind = protoKind(pr); const pj = byId(db.projects, pr.projectId);
-    if (pj && pj.gdocs && pj.gdocs[kind]) return pj.gdocs[kind];
-    const g = projGdocs(pr.projectId).find((x) => x.kind === kind);
-    return g ? g.id : '';
+    const pj = byId(db.projects, pr.projectId);
+    return pj ? projGdoc(pj, protoKind(pr)) : pr.gdocId || '';
   }
   // A Drive document that is the Google Docs copy of a protocol written here.
   const dpOwn = (it) => { const own = new Set(db.protocols.map((x) => x.gdocId).filter(Boolean)); return (it.files || []).some((f) => own.has(f.id)); };
@@ -3017,8 +3025,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field full"><label>הערות</label><textarea class="input" name="notes" style="min-height:50px">${esc(p.notes)}</textarea></div>
       <div class="field" ${vis('supervision meeting')}><label>📋 תבנית מפרויקט אחר</label><select class="input" name="tplFrom" data-tplfrom></select>
         <span class="hint">הנושאים של המסמך האחרון בפרויקט שנבחר מוצעים להעתקה, בלי המשתתפים והנמענים.</span></div>
-      ${GOOGLE ? `<div class="field"><label>📝 מסמך Google Docs לסנכרון</label><select class="input" name="gdocPick" data-gdocpick></select>
-        <span class="hint">המסמך מתעדכן תוך כדי העריכה, עד השליחה.</span></div>` : ''}
+      ${GOOGLE ? `<div class="field"><label>📝 מסמך ה-Google Docs הקבוע של הפרויקט</label><select class="input" name="gdocPick" data-gdocpick></select>
+        <span class="hint">כל השמירות של כל הדוחות והסיכומים בפרויקט נכתבות לאותו קובץ. בחירת קובץ אחר משנה אותו לכל הפרויקט.</span></div>` : ''}
       <div class="field full pf-mail"><label>📧 שליחה במייל: נמענים</label>
         <div class="pf-mail-row"><input class="input" name="emailTo" dir="ltr" value="${esc(p.emailTo)}" placeholder="name@example.com, ...">
         <button type="button" class="btn primary" data-savemail>שמירה ושליחה במייל</button></div>
@@ -3084,13 +3092,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           rec.askDone = (protoAsk ? Array.from(protoAsk.done) : []).concat(Array.from(fieldDone).map((k) => 'f:' + k));
         } else ['prevSnap', 'draftRows', 'askDone'].forEach((k) => { delete rec[k]; });
       }
-      if (pick !== undefined && !protoSent(rec) && pick !== (rec.gdocId || '')) {
-        // The office's open document of the project (written into, keeping its name), or a new one.
-        if (pick) { rec.gdocId = pick; rec.gdocLink = 'https://docs.google.com/document/d/' + pick + '/edit'; rec.gdocShared = true; delete rec.gdocNew; }
-        else { delete rec.gdocId; delete rec.gdocLink; delete rec.gdocShared; rec.gdocNew = true; }
-        const pj = byId(db.projects, rec.projectId);
-        if (pj) { pj.gdocs = Object.assign({}, pj.gdocs); if (pick) pj.gdocs[protoKind(rec)] = pick; else delete pj.gdocs[protoKind(rec)]; }
-      }
+      // Another document chosen as the project's fixed document: from now on all its reports go there.
+      const pjPick = byId(db.projects, rec.projectId);
+      if (pick && pjPick && pick !== projGdoc(pjPick, protoKind(rec))) pjPick.gdocId = pick;
       if (auto) rec.editing = { by: (me && me.name) || '', at: Date.now() }; else delete rec.editing;
       save();
       protoGdocSync(rec, !auto);
@@ -3141,12 +3145,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (gpSel) gpSel.addEventListener('change', () => { gpTouched = true; });
     const drawGdocPick = () => {
       if (!gpSel) return;
-      const pid = projSel.value, kind = protoKind({ template: curTpl });
-      const cur = rec && rec.gdocId ? rec.gdocId : protoGdocDefault({ projectId: pid, template: curTpl });
-      const list = projGdocs(pid);
-      if (cur && !list.some((g) => g.id === cur)) list.unshift({ id: cur, name: 'המסמך שנבחר קודם', kind });
-      gpSel.innerHTML = list.map((g) => `<option value="${esc(g.id)}" ${g.id === cur ? 'selected' : ''}>${esc(g.name)}${g.date ? ' · ' + esc(fmtDate(g.date)) : ''}</option>`).join('')
-        + `<option value="" ${cur ? '' : 'selected'}>מסמך חדש בתיקיית הפרויקט</option>`;
+      const pid = projSel.value, kind = protoKind({ template: curTpl }), pj = byId(db.projects, pid);
+      const cur = pj ? projGdoc(pj, kind) : (rec && rec.gdocId) || '';
+      const list = pj ? projGdocs(pid) : [];
+      if (cur && !list.some((g) => g.id === cur)) list.unshift({ id: cur, name: (pj ? pj.name + ' - ' : '') + 'המסמך הקבוע', kind });
+      gpSel.innerHTML = (cur ? '' : `<option value="" selected>${pj ? 'ייווצר מסמך קבוע לפרויקט בשמירה הראשונה' : 'ייווצר מסמך בשמירה הראשונה'}</option>`)
+        + list.map((g) => `<option value="${esc(g.id)}" ${g.id === cur ? 'selected' : ''}>${esc(g.name)}${g.date ? ' · ' + esc(fmtDate(g.date)) : ''}</option>`).join('');
       gpSel.disabled = !!(rec && protoSent(rec));
     };
     drawGdocPick();
@@ -3757,12 +3761,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     return (e && e.message) || 'הפעולה נכשלה';
   };
   async function saveProtocolToDrive(pr) {
+    if (pr.projectId && !confirm('לשמור את המסמך הזה בקובץ ה-Google Docs הקבוע של הפרויקט? התוכן שבקובץ כעת יוחלף בו (אפשר לשחזר מהיסטוריית הגרסאות).')) return;
     try {
       await G.token(); // first, while the click still allows a popup
-      toast('שומר ב-Drive...');
-      const f = await G.drive.save(protoFileName(pr, 'docx'), await buildProtocolDocx(pr), pr.driveId);
-      pr.driveId = f.id; pr.driveLink = f.webViewLink || '';
-      save(); render(); toast('נשמר ב-Google Drive');
+      toast('שומר ב-Google Docs של הפרויקט...');
+      await protoGdocPush(pr.id);
+      render();
+      if (gdocState[pr.id] && gdocState[pr.id].s === 'ok') toast('נשמר בקובץ הקבוע של הפרויקט ב-Drive');
     } catch (e) { toast('השמירה ב-Drive נכשלה: ' + gErr(e)); }
   }
   // The Google Docs copy of a report: kept in the project's folder in Drive (next to its latest report of the
@@ -3812,26 +3817,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const pr = byId(db.protocols, id); if (!pr) return;
     gdocBusy[id] = true; gdocState[id] = { s: 'busy' }; gdocShow(id);
     try {
-      // A report writes into the project's open document of its kind, when there is one (also one that wrote
-      // into a separate copy before the site could edit the office's documents).
-      if (!pr.gdocShared && !pr.gdocNew && !protoSent(pr)) {
-        const pj = byId(db.projects, pr.projectId); const kind = protoKind(pr);
-        const g = (pj && pj.gdocs && pj.gdocs[kind]) || (projGdocs(pr.projectId).find((x) => x.kind === kind) || {}).id;
-        if (g) { pr.gdocId = g; pr.gdocShared = true; }
-      }
-      const parent = pr.gdocId ? '' : pr.gdocFolder || await protoGdocFolder(pr);
-      const name = protoFileName(pr, 'docx').replace(/\.docx$/, '');
-      const f = await G.drive.save(name, await buildProtocolDocx(pr), pr.gdocId, parent, { gdoc: true, keepName: !!pr.gdocShared, noFallback: !!pr.gdocShared });
+      // Always the same file: the project's fixed Google Doc (made by the first save when there is none).
+      const pj = byId(db.projects, pr.projectId);
+      const target = pj ? projGdoc(pj, protoKind(pr)) : pr.gdocId || '';
+      const parent = target ? '' : pr.gdocFolder || await protoGdocFolder(pr);
+      const name = pj ? pj.name + ' - דוחות וסיכומים' : protoFileName(pr, 'docx').replace(/\.docx$/, '');
+      const f = await G.drive.save(name, await buildProtocolDocx(pr), target, parent, { gdoc: true, keepName: !!(pj && target), noFallback: !!target });
+      if (pj && pj.gdocId !== f.id) { pj.gdocId = f.id; save(); }
       const cur = byId(db.protocols, id);
-      if (cur && (cur.gdocId !== f.id || cur.gdocLink !== (f.webViewLink || ''))) {
-        if (cur.gdocShared && cur.gdocId && cur.gdocId !== f.id) delete cur.gdocShared; // the open document could not be written: a new one was made
-        cur.gdocId = f.id; cur.gdocLink = f.webViewLink || ''; if (parent && f.inFolder) cur.gdocFolder = parent;
-        if (cur.gdocShared) { const pj = byId(db.projects, cur.projectId); if (pj && !(pj.gdocs || {})[protoKind(cur)]) pj.gdocs = Object.assign({}, pj.gdocs, { [protoKind(cur)]: f.id }); }
+      if (cur && (cur.gdocId !== f.id || cur.gdocLink !== (f.webViewLink || '') || !cur.gdocShared !== !pj)) {
+        cur.gdocId = f.id; cur.gdocLink = f.webViewLink || ('https://docs.google.com/document/d/' + f.id + '/edit');
+        if (pj) cur.gdocShared = true; else delete cur.gdocShared;
+        delete cur.gdocNew;
+        if (parent && f.inFolder) cur.gdocFolder = parent;
         save();
       }
       gdocState[id] = { s: 'ok' };
     } catch (e) {
-      gdocState[id] = { s: 'err', m: e && (e.status === 403 || e.status === 404) && pr.gdocShared ? 'אין הרשאת עריכה למסמך של הפרויקט. בדקו שהוא משותף אליכם לעריכה' : gErr(e) };
+      gdocState[id] = { s: 'err', m: e && (e.status === 403 || e.status === 404) ? 'אין הרשאת עריכה למסמך הקבוע של הפרויקט. בדקו שהוא משותף אליכם לעריכה' : gErr(e) };
     }
     if (gdocState[id].s === 'err') toast('Google Docs לא עודכן: ' + gdocState[id].m);
     gdocShow(id);
