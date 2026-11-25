@@ -3539,6 +3539,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (body.length > 6000) body = body.slice(0, 6000) + '\n...\n(הפרוטוקול קוצר. את הגרסה המלאה אפשר לצרף כקובץ Word או PDF מהמערכת)';
     const to = cleanEmails(pr.emailTo || st.emailTo), cc = cleanEmails(st.emailCc);
     let url;
+    // With Google connected, a report / summary goes as a reply in the project's usual mail thread.
+    if (GOOGLE && protoTpl(pr) && st.mailApp !== 'mailto' && G.silent()) { openProtoMail(pr); return; }
     if (GOOGLE && st.mailApp === 'gmailApi') { sendProtocolGmail(pr, to, cc, subject, protocolText(pr)); return; }
     // Sent: the editing is over, the options to copy from the previous report are not offered any more.
     if (protoTpl(pr) && !protoSent(pr)) { protoMarkSent(pr); save(); render(); }
@@ -3825,6 +3827,87 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     gdocShow(id);
     const again = gdocBusy[id] === 'again'; delete gdocBusy[id];
     if (again) protoGdocPush(id);
+  }
+  // ---------- A report by mail, in the project's usual thread ----------
+  // The thread: the one the last report / summary of the project went in (kept on the project), else the newest
+  // mail the user sent about the project (by its name, then by the report's recipients).
+  async function protoFindThread(pr, pj) {
+    const kind = protoKind(pr);
+    const known = pj && pj.mailThreads && (pj.mailThreads[kind] || pj.mailThreads.any);
+    if (known) return known;
+    const word = kind === 'report' ? 'דוח' : 'סיכום';
+    const name = ((pj && pj.name) || '').replace(/["()]/g, ' ').trim();
+    const first = cleanEmails(pr.emailTo).split(',')[0];
+    const qs = [];
+    if (name) qs.push(`subject:"${name}" ${word}`, `subject:"${name}"`, `"${name}" ${word}`);
+    if (first) qs.push(`to:${first} ${word}`);
+    for (const q of qs) { try { const id = await G.gmail.findSent(q); if (id) return id; } catch (e) {} }
+    return '';
+  }
+  // The usual text, as in the last mail of the thread, with this report's date and number; a standard text otherwise.
+  function protoMailBody(pr, prevText) {
+    const [y, mo, d] = (pr.date || todayStr()).split('-');
+    const no = protoNo(pr);
+    let t = String(prevText || '').replace(/\r/g, '');
+    // Only what the user wrote: not the quoted earlier mails.
+    const cut = t.search(/\n[^\n]*(?:wrote:|כתב\/ה:|כתב:|נכתב:)\s*\n|\n-{2,}\s*Original Message|\n-{5,}\s*Forwarded|\nFrom: |\nמאת: /);
+    if (cut > 0) t = t.slice(0, cut);
+    t = t.split('\n').filter((l) => !/^\s*>/.test(l)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (t) {
+      t = t.replace(/\b(\d{1,2})([./])(\d{1,2})\2(\d{4}|\d{2})\b/g, (m, a, sep, b, yy) => [+d, +mo].map((x, i) => (String(i ? b : a).length === 2 ? String(x).padStart(2, '0') : String(x))).join(sep) + sep + (yy.length === 4 ? y : y.slice(2)));
+      if (no) t = t.replace(/((?:דוח|דו"ח|ד"ח|סיכום|פרוטוקול)[^\d\n]{0,25}?(?:מס['׳"]?\.?|מספר|#)?\s*)(\d{1,3})(?![\d./])/g, (m, pre, n) => pre + (n.length > 1 ? no.padStart(n.length, '0') : String(parseInt(no, 10))));
+      return t;
+    }
+    const pj = byId(db.projects, pr.projectId);
+    const what = pr.template === 'supervision' ? 'דוח פיקוח' + (no ? ' מס\' ' + no : '') : pr.template === 'meeting' ? 'סיכום פגישה' + (no ? ' מס\' ' + no : '') + (pr.title ? ' - ' + pr.title : '') : 'פרוטוקול ' + (pr.title || '');
+    return `שלום רב,\n\nמצורף ${what} מיום ${fmtDate(pr.date)}${pj ? ' בפרויקט ' + pj.name : ''}.\nנבקש לעבור על ההנחיות והמשימות שבאחריותכם.\n\nבברכה,\n${(me && me.name) || ''}\nפמי הנדסה בע"מ`;
+  }
+  // The attachment: the PDF of the report's Google Doc (as the office sends), else the Word file.
+  async function protoMailAttachment(pr) {
+    if (pr.gdocId && G.status().driveWrite !== false) {
+      try {
+        await protoGdocPush(pr.id);
+        const cur = byId(db.protocols, pr.id) || pr;
+        if (cur.gdocId) return { name: protoFileName(pr, 'pdf'), blob: new Blob([await G.drive.exportFile(cur.gdocId, 'application/pdf')], { type: 'application/pdf' }) };
+      } catch (e) { /* the Word file instead */ }
+    }
+    return { name: protoFileName(pr, 'docx'), blob: await buildProtocolDocx(pr) };
+  }
+  async function openProtoMail(pr) {
+    const pj = byId(db.projects, pr.projectId);
+    toast('מחפש את שרשור המייל של הפרויקט...');
+    let th = null;
+    try { const id = await protoFindThread(pr, pj); if (id) th = await G.gmail.thread(id); } catch (e) { th = null; }
+    const to = cleanEmails(pr.emailTo) || cleanEmails(th && th.to) || cleanEmails(settings().emailTo);
+    const cc = cleanEmails([settings().emailCc, th && th.cc].filter(Boolean).join(','));
+    const subject = th && th.subject ? (/^(re|השב|תשובה)\s*:/i.test(th.subject) ? th.subject : 'Re: ' + th.subject)
+      : [protoProjName(pr), protoHeading(pr), fmtDate(pr.date)].filter(Boolean).join(' - ');
+    openModal('שליחה במייל', `
+      <div class="field full hint" style="background:var(--primary-soft);padding:8px 10px;border-radius:8px">${th
+        ? `📧 יישלח כתשובה בשרשור של הפרויקט: <b>${esc(th.subject || '')}</b> (${th.count} הודעות). <a href="${esc(G.gmail.link({ threadId: th.id }))}" target="_blank" rel="noopener">פתיחת השרשור</a>`
+        : '📧 לא נמצא שרשור קודם לפרויקט: יישלח מייל חדש, והדוחות הבאים יישלחו בשרשור שלו.'}</div>
+      <div class="field full"><label>אל</label><input class="input" name="to" dir="ltr" value="${esc(to.split(',').join(', '))}" required></div>
+      <div class="field full"><label>העתק</label><input class="input" name="cc" dir="ltr" value="${esc(cc.split(',').filter(Boolean).join(', '))}"></div>
+      <div class="field full"><label>נושא</label><input class="input" name="subject" value="${esc(subject)}"></div>
+      <div class="field full"><label>תוכן ${th && th.text ? '(הטקסט הקבוע מהמייל הקודם, עם התאריך והמספר של המסמך הזה)' : ''}</label><textarea class="input" name="body" rows="9">${esc(protoMailBody(pr, th && th.text))}</textarea></div>
+      <div class="field full hint">📎 יצורף: ${esc(pr.gdocId ? protoFileName(pr, 'pdf') + ' (מה-Google Docs)' : protoFileName(pr, 'docx'))}</div>`,
+    async (data) => {
+      const toList = cleanEmails(data.to);
+      if (!toList) { toast('הוסיפו לפחות כתובת מייל אחת'); return; }
+      try {
+        toast('שולח...');
+        const att = await protoMailAttachment(pr);
+        const r = await G.gmail.send({ to: toList, cc: cleanEmails(data.cc), subject: data.subject, text: data.body, attachment: att,
+          threadId: th && th.id, inReplyTo: th && th.messageId, references: th && th.references });
+        const tid = (r && r.threadId) || (th && th.id);
+        if (pj && tid) { pj.mailThreads = Object.assign({}, pj.mailThreads, { [protoKind(pr)]: tid, any: (pj.mailThreads && pj.mailThreads.any) || tid }); }
+        const cur = byId(db.protocols, pr.id) || pr;
+        cur.emailTo = toList.split(',').join(', ');
+        protoMarkSent(cur); save(); render();
+        toast(th ? 'המייל נשלח בשרשור של הפרויקט' : 'המייל נשלח');
+      } catch (e) { toast('השליחה נכשלה: ' + gErr(e)); }
+    });
+    $('#modalForm').classList.add('wide');
   }
   async function sendProtocolGmail(pr, to, cc, subject, text) {
     if (!to) { toast('אין נמענים. הגדירו נמענים בעמוד ההגדרות'); location.hash = 'settings'; return; }

@@ -249,6 +249,31 @@
     const m = ((await json(GM + '/messages?' + q)).messages || [])[0];
     return m ? m.threadId : null;
   }
+  // The newest thread with a mail the user sent that matches a Gmail search, or null.
+  const findSent = (query) => findThread('in:sent ' + query);
+  const hdr = (m, name) => ((m && m.payload && m.payload.headers) || []).reduce((v, x) => (!v && x.name.toLowerCase() === name.toLowerCase() ? x.value : v), '');
+  const unb64 = (d) => { const bin = atob(d.replace(/-/g, '+').replace(/_/g, '/')); try { return decodeURIComponent(escape(bin)); } catch (e) { return bin; } };
+  function partText(p, type) {
+    if (!p) return '';
+    if (p.mimeType === type && p.body && p.body.data) return unb64(p.body.data);
+    for (const c of p.parts || []) { const t = partText(c, type); if (t) return t; }
+    return '';
+  }
+  const htmlText = (html) => new DOMParser().parseFromString(html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|tr)>/gi, '\n'), 'text/html').body.textContent || '';
+  // A mail thread: its subject, what a reply needs (Message-ID, References), and the last mail the user sent in it.
+  async function thread(id) {
+    const t = await json(GM + '/threads/' + encodeURIComponent(id) + '?format=full');
+    const msgs = t.messages || [];
+    const last = msgs[msgs.length - 1];
+    const mine = msgs.filter((m) => (m.labelIds || []).includes('SENT')).pop();
+    let text = mine ? partText(mine.payload, 'text/plain') : '';
+    if (!text && mine) text = htmlText(partText(mine.payload, 'text/html'));
+    const mid = hdr(last, 'Message-ID') || hdr(last, 'Message-Id');
+    return {
+      id, subject: hdr(msgs[0], 'Subject'), messageId: mid, references: [hdr(last, 'References'), mid].filter(Boolean).join(' '),
+      to: hdr(mine || last, 'To'), cc: hdr(mine || last, 'Cc'), text, count: msgs.length, date: Number(last && last.internalDate) || 0,
+    };
+  }
   const searchLink = (query) => 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent((rec && rec.email) || '') + '#search/' + encodeURIComponent(query);
   function decode(s) { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; }
   const mailLink = (m) => 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent((rec && rec.email) || '') + '#all/' + m.threadId;
@@ -262,10 +287,12 @@
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     return btoa(bin);
   }
-  async function send({ to, cc, subject, text, attachment }) {
+  // threadId / inReplyTo / references: sent as a reply in that thread.
+  async function send({ to, cc, subject, text, attachment, threadId, inReplyTo, references }) {
     const tok = await token();
     const bd = 'femy' + Math.random().toString(36).slice(2);
     let m = `To: ${to}\r\n` + (cc ? `Cc: ${cc}\r\n` : '') + `Subject: ${encWord(subject || '')}\r\nMIME-Version: 1.0\r\n`
+      + (inReplyTo ? `In-Reply-To: ${inReplyTo}\r\nReferences: ${references || inReplyTo}\r\n` : '')
       + `Content-Type: multipart/mixed; boundary="${bd}"\r\n\r\n`
       + `--${bd}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(b64utf8(text || ''))}`;
     if (attachment) {
@@ -275,7 +302,7 @@
     }
     m += `--${bd}--\r\n`;
     const raw = btoa(m).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    await api(tok, GM + '/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }) });
+    return (await api(tok, GM + '/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(threadId ? { raw, threadId } : { raw }) })).json();
   }
 
   // ---------- Drive ----------
@@ -379,7 +406,7 @@
   window.FemyGoogle = {
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
-    gmail: { inbox, send, link: mailLink, findThread, searchLink },
+    gmail: { inbox, send, link: mailLink, findThread, findSent, thread, searchLink },
     drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, read: readFile, readBuffer },
   };
 })();
