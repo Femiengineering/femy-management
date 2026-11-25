@@ -4914,6 +4914,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <h2>חשבון Google שלי (יומן, Gmail, Drive)</h2>
         <p>כל משתמש מחבר את חשבון ה-Google שלו, ורואה רק את היומן, המיילים והקבצים שלו. ${s.persistent ? 'החיבור קבוע: מאשרים פעם אחת בכל מכשיר, והוא נשאר פעיל עד שלוחצים "ניתוק". ניתוק מבטל את הגישה בכל המכשירים.' : 'החיבור נשמר בדפדפן הזה בלבד, ומתחדש בלחיצה אחת כל שעה בערך.'}</p>
         <p>${s.connected ? `מחובר כ-<b dir="ltr">${esc(s.email)}</b>${s.valid ? '' : ' (צריך לחדש את החיבור)'}` : 'לא מחובר'}</p>
+        ${s.serverDown ? '<p class="hint" style="color:var(--amber)">⚠️ שרת החיבור הקבוע לא זמין כרגע. לחצו "חידוש החיבור" כדי להתחבר ישירות ל-Google לשעה. כשהשרת יחזור, החיבור הקבוע יחזור לבד.</p>' : ''}
         <div class="row">${s.connected && s.valid ? '' : `<button class="btn primary" id="gConnectSet">${s.connected ? 'חידוש החיבור' : 'חיבור לחשבון Google'}</button>`}
           ${s.connected ? '<button class="btn" id="gDisconnectSet">ניתוק</button>' : ''}</div>
       </div>

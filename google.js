@@ -66,12 +66,15 @@
   // user stays connected. Without one, tokens last an hour and renewing needs a click.
   const server = String(cfg.tokenServer || '').replace(/\/+$/, '');
   const persistent = enabled && !!server;
+  // The connection server could not be reached: until it answers again, the site works like the hourly mode
+  // (a token straight from Google's popup), so calendar, mail and Drive keep working.
+  let serverDown = false;
 
   const fresh = () => !!(rec && rec.token && rec.exp > Date.now() + 60000);
   // "valid" = the site can call Google now without asking the user for anything.
-  const valid = () => fresh() || !!(persistent && rec && rec.device);
+  const valid = () => fresh() || !!(persistent && !serverDown && rec && rec.device);
   function status() {
-    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), gmailCompose: rec && rec.scope ? /auth\/gmail\.compose( |$)/.test(rec.scope) : null, gmailModify: rec && rec.scope ? /auth\/gmail\.modify( |$)/.test(rec.scope) : null, driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
+    return { enabled, persistent, serverDown, connected: !!(rec && rec.email), valid: valid(), gmailCompose: rec && rec.scope ? /auth\/gmail\.compose( |$)/.test(rec.scope) : null, gmailModify: rec && rec.scope ? /auth\/gmail\.modify( |$)/.test(rec.scope) : null, driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
   }
   const onChange = (f) => listeners.push(f);
 
@@ -90,10 +93,14 @@
     for (let i = 0; ; i++) {
       try { r = await fetch(server + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); break; }
       catch (e) {
-        if (i >= 3) throw Object.assign(new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת החיבור ל-Google לא זמין'), { network: true });
+        if (i >= 3) {
+          if (navigator.onLine !== false && !serverDown) { serverDown = true; setTimeout(() => { serverDown = false; }, 10 * 60 * 1000); listeners.forEach((f) => { try { f(status()); } catch (x) { /* ignore */ } }); }
+          throw Object.assign(new Error(navigator.onLine === false ? 'אין חיבור לאינטרנט' : 'שרת החיבור ל-Google לא זמין. לחצו "חיבור לחשבון Google" כדי להתחבר ישירות לשעה'), { network: true, code: 'reconnect' });
+        }
         await new Promise((res) => setTimeout(res, 700 * (i + 1)));
       }
     }
+    serverDown = false;
     let j = {};
     try { j = await r.json(); } catch (e) { /* ignore */ }
     if (!r.ok) throw Object.assign(new Error(j.error || 'HTTP ' + r.status), { status: r.status, code: j.error });
@@ -113,7 +120,7 @@
     if (!userKey) return Promise.reject(new Error('לא מחובר למערכת'));
     if (fresh()) return Promise.resolve(rec.token);
     if (pending) return pending;
-    if (persistent && rec && rec.device) {
+    if (persistent && !serverDown && rec && rec.device) {
       const device = rec.device;
       pending = post('/token', { device }).then((j) => { pending = null; return keep(j); }, (e) => {
         pending = null;
@@ -126,7 +133,7 @@
   }
 
   // True when a token can be had without a popup (for background work such as syncing).
-  const silent = () => !!(enabled && userKey && (fresh() || (persistent && rec && rec.device)));
+  const silent = () => !!(enabled && userKey && (fresh() || (persistent && !serverDown && rec && rec.device)));
 
   // Opens Google's popup and asks the user to approve. Call straight from a click.
   function connect() {
@@ -135,7 +142,7 @@
     if (pending) return pending;
     pending = new Promise((resolve, reject) => {
       const fail = (e) => { pending = null; reject(e); };
-      if (persistent) {
+      if (persistent && !serverDown) {
         // Authorization code flow: the server trades the code for a long-lived refresh token.
         const cc = google.accounts.oauth2.initCodeClient({
           client_id: cfg.clientId, scope: SCOPES.join(' '), ux_mode: 'popup', include_granted_scopes: true, login_hint: hintFor(),
