@@ -2201,6 +2201,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (pr.template === 'supervision') return t.label + (pr.reportNo ? ' - ' + pr.reportNo : '');
     return t.label + (protoNo(pr) ? ' ' + protoNo(pr) : '') + (pr.title ? ' - ' + pr.title : '');
   };
+  // "הנדון" at the top of the document: typed by hand (pr.subject), else made from the project, the name and the number.
+  function protoAutoSubject(pr) {
+    const proj = byId(db.projects, pr.projectId);
+    return [proj && proj.name, pr.template === 'supervision' ? (pr.title ? pr.title + ' - ' : '') + 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '')
+      : pr.template === 'meeting' && protoNo(pr) ? (pr.title ? pr.title + ' - ' : '') + 'סיכום מס\' ' + protoNo(pr) : pr.title].filter(Boolean).join('\n');
+  }
   const protoFileName = (pr, ext) => {
     const t = protoTpl(pr);
     const parts = t ? [protoProjName(pr), t.short + (protoNo(pr) ? ' ' + protoNo(pr) : ''), pr.template === 'supervision' ? '' : pr.title]
@@ -2284,8 +2290,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (protoLines(pr.actions).length) blocks.push({ kind: 'section', title: 'משימות להמשך', list: protoLines(pr.actions) });
       return { tpl: 'legacy', heading: protoHeading(pr), blocks };
     }
-    const subject = [proj && proj.name, pr.template === 'supervision' ? 'דוח פיקוח' + (pr.reportNo ? ' - ' + pr.reportNo : '')
-      : pr.template === 'meeting' && protoNo(pr) ? (pr.title ? pr.title + ' - ' : '') + 'סיכום מס\' ' + protoNo(pr) : pr.title].filter(Boolean).join('\n');
+    const subject = (pr.subject || '').trim() || protoAutoSubject(pr);
     const date = fmtDate(pr.date).replace(/\/\d{2}(\d{2})$/, '/$1'); // 15/11/26, as on the documents sent so far
     let meta;
     if (pr.template === 'tour') meta = [['שם הפרויקט', [proj && proj.name, pr.title].filter(Boolean).join(' - ')], ['תאריך', date], ['מיקום', pr.location], ['משתתפים', pr.participants], ['העתקים', pr.copies]];
@@ -2437,7 +2442,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     return `<div class="card proto ${ui.openProto === pr.id ? 'open' : ''}" data-id="${pr.id}">
       <div class="proto-head">
         <div class="proto-date">${d.getDate()}<small>${d.toLocaleDateString('he-IL', { month: 'short', year: '2-digit' })}</small></div>
-        <div style="flex:1;min-width:0"><div class="proto-title">${t ? `<span class="tpl-tag tpl-${pr.template}">${esc(t.short)}</span>` : ''}${esc(pr.title || protoHeading(pr))}${pr.draft && !protoSent(pr) ? `<span class="tpl-tag tpl-draft" style="margin-inline-start:7px">✏️ בעריכה${pr.editing && pr.editing.by && Date.now() - pr.editing.at < 180000 ? ': ' + esc(pr.editing.by) + ' עכשיו' : ''}</span>` : ''}</div>
+        <div style="flex:1;min-width:0"><div class="proto-title">${t ? `<span class="tpl-tag tpl-${pr.template}">${esc(t.short)}</span>` : ''}${esc((pr.subject || '').trim().replace(/\s*\n\s*/g, ' - ') || pr.title || protoHeading(pr))}${pr.draft && !protoSent(pr) ? `<span class="tpl-tag tpl-draft" style="margin-inline-start:7px">✏️ בעריכה${pr.editing && pr.editing.by && Date.now() - pr.editing.at < 180000 ? ': ' + esc(pr.editing.by) + ' עכשיו' : ''}</span>` : ''}</div>
           <div class="proto-sub">${sub.map(esc).join(' · ')}</div></div>
         <span class="chev">◀</span>
       </div>
@@ -3008,7 +3013,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field"><label>תאריך</label><input class="input" type="date" name="date" required value="${esc(p.date)}"></div>
       <div class="field"><label>פרויקט</label><select class="input" name="projectId">${projectOptions(p.projectId, 'כללי / ללא פרויקט')}</select></div>
       <div class="field" ${vis('supervision meeting')}><label data-lbl-no>${p.template === 'meeting' ? 'מספר סיכום' : 'מספר דוח'}</label><input class="input" name="reportNo" value="${esc(p.reportNo)}" placeholder="01"><span class="hint" data-no-hint>${autoNo ? 'נקבע אוטומטית לפי המסמכים הקודמים בפרויקט' : ''}</span></div>
-      <div class="field" ${vis('meeting tour')}><label data-lbl-title>${p.template === 'tour' ? 'תיאור העבודה (בכותרת)' : 'הנדון'}</label><input class="input" name="title" value="${esc(p.title)}" placeholder="${p.template === 'tour' ? 'למשל: בניית מרפאה / פירוקים והריסות' : 'למשל: סיכום פגישת תיאום תכנון'}"></div>
+      <div class="field"><label data-lbl-title>${p.template === 'tour' ? 'תיאור העבודה (בכותרת)' : p.template === 'supervision' ? 'נושא / שם הביקור (לא חובה)' : 'שם הפגישה'}</label><input class="input" name="title" value="${esc(p.title)}" placeholder="${p.template === 'tour' ? 'למשל: בניית מרפאה / פירוקים והריסות' : p.template === 'supervision' ? 'למשל: ביקור שלד קומה 3' : 'למשל: סיכום פגישת תיאום תכנון'}"></div>
+      <div class="field full" ${vis('supervision meeting')}><label>הנדון (כפי שיופיע בראש המסמך) <a href="#" data-subjedit>✏️ עריכה</a></label><textarea class="input" name="subject" rows="2" style="min-height:44px" data-subject>${esc(p.subject)}</textarea>
+        <span class="hint">ריק = נבנה אוטומטית משם הפרויקט, השם והמספר. אפשר לכתוב כאן כל נושא, ולשנות אותו בכל עת.</span></div>
       <div class="field" ${vis('supervision')}><label>סטטוס פרויקט</label><input class="input" name="status" value="${esc(p.status)}" placeholder="ביצוע" list="protoStatusList"><datalist id="protoStatusList"><option>תכנון</option><option>מכרז</option><option>ביצוע</option><option>מסירה</option></datalist></div>
       <div class="field"><label>מיקום</label><input class="input" name="location" value="${esc(p.location)}" placeholder="משרד / זום / שטח הפרויקט"></div>
       <div class="field full"><label>משתתפים</label><textarea class="input" name="participants" rows="3" style="min-height:60px" placeholder="גורם: שם, שורה לכל גורם. למשל: ניהול פרויקט: מוטי דיקמן">${esc(p.participants)}</textarea></div>
@@ -3026,6 +3033,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field" ${vis('supervision meeting')}><label>📋 תבנית מפרויקט אחר</label><select class="input" name="tplFrom" data-tplfrom></select>
         <span class="hint">הנושאים של המסמך האחרון בפרויקט שנבחר מוצעים להעתקה, בלי המשתתפים והנמענים.</span></div>
       ${GOOGLE ? `<div class="field"><label>📝 מסמך ה-Google Docs הקבוע של הפרויקט</label><select class="input" name="gdocPick" data-gdocpick></select>
+        <span class="hint" data-gdocst data-id="${esc(proto ? proto.id : '')}">${protoGdocHtml(proto)}</span>
         <span class="hint">כל השמירות של כל הדוחות והסיכומים בפרויקט נכתבות לאותו קובץ. בחירת קובץ אחר משנה אותו לכל הפרויקט.</span></div>` : ''}
       <div class="field full pf-mail"><label>📧 שליחה במייל: נמענים</label>
         <div class="pf-mail-row"><input class="input" name="emailTo" dir="ltr" value="${esc(p.emailTo)}" placeholder="name@example.com, ...">
@@ -3151,14 +3159,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (cur && !list.some((g) => g.id === cur)) list.unshift({ id: cur, name: (pj ? pj.name + ' - ' : '') + 'המסמך הקבוע', kind });
       gpSel.innerHTML = (cur ? '' : `<option value="" selected>${pj ? 'ייווצר מסמך קבוע לפרויקט בשמירה הראשונה' : 'ייווצר מסמך בשמירה הראשונה'}</option>`)
         + list.map((g) => `<option value="${esc(g.id)}" ${g.id === cur ? 'selected' : ''}>${esc(g.name)}${g.date ? ' · ' + esc(fmtDate(g.date)) : ''}</option>`).join('');
-      gpSel.disabled = !!(rec && protoSent(rec));
+      gpSel.disabled = false;
     };
     drawGdocPick();
     // Saved while typing: the other users see the document as it is being written, and the Google Docs copy follows.
     liveForm(() => {
       const isNew = !rec;
       persist(modalData(), true);
-      const st = $('#gdocState'); if (st) { st.dataset.id = rec.id; st.innerHTML = protoGdocHtml(rec); }
+      document.querySelectorAll('#gdocState, [data-gdocst]').forEach((st) => { st.dataset.id = rec.id; st.innerHTML = protoGdocHtml(rec); });
       if (isNew) {
         render();
         modalDelete = () => { db.protocols = db.protocols.filter((x) => x.id !== rec.id); save(); render(); toast('הפרוטוקול נמחק'); };
@@ -3187,6 +3195,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const drawPreview = () => {
       if (pvFrame.style.display === 'none') return;
       const data = {}; new FormData($('#modalForm')).forEach((v, k) => { data[k] = v; });
+      const sj = $('[data-subject]', body); if (sj) sj.placeholder = protoAutoSubject(Object.assign({}, p, data));
       const keep = pvFrame.contentWindow ? pvFrame.contentWindow.scrollY : 0;
       pvFrame.onload = () => { try { pvFrame.contentWindow.scrollTo(0, keep); } catch (e) {} };
       pvFrame.srcdoc = protoPrintHtml(protoFormFinish(Object.assign({}, p, data)), true);
@@ -3199,6 +3208,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (show) drawPreview();
     });
     drawPreview();
+    const sjEdit = $('[data-subjedit]', body);
+    if (sjEdit) sjEdit.addEventListener('click', (e) => {
+      e.preventDefault(); const sj = $('[data-subject]', body);
+      const data = {}; new FormData($('#modalForm')).forEach((v, k) => { data[k] = v; });
+      if (!sj.value.trim()) sj.value = protoAutoSubject(Object.assign({}, p, data));
+      sj.focus(); sj.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     body.addEventListener('input', schedulePreview);
     body.addEventListener('change', schedulePreview);
     body.addEventListener('click', (e) => { if (e.target.closest('button') && !e.target.closest('[data-preview]')) schedulePreview(); });
@@ -3211,7 +3227,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       curTpl = newTpl;
       drawProtoItems(newTpl, untouched || !old.length ? defaultItems(newTpl) : old);
       $$('[data-tpls]', body).forEach((f) => { f.style.display = f.dataset.tpls.split(' ').includes(newTpl) ? '' : 'none'; });
-      $('[data-lbl-title]', body).textContent = newTpl === 'tour' ? 'תיאור העבודה (בכותרת)' : 'הנדון';
+      $('[data-lbl-title]', body).textContent = newTpl === 'tour' ? 'תיאור העבודה (בכותרת)' : newTpl === 'supervision' ? 'נושא / שם הביקור (לא חובה)' : 'שם הפגישה';
       $('[data-lbl-items]', body).textContent = newTpl === 'tour' ? 'סיכום החלטות, הבהרות והנחיות' : 'נושאים';
       $('#modalTitle').textContent = (proto ? 'עריכת ' : 'פרוטוקול חדש: ') + PROTO_TPL[newTpl].label;
       $('[data-lbl-no]', body).textContent = newTpl === 'meeting' ? 'מספר סיכום' : 'מספר דוח';
@@ -3779,12 +3795,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     if (!G.silent()) return '📝 Google Docs: חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive) כדי שהמסמך יתעדכן גם שם';
     // Connected before the site could write into the office's documents: one more approval is needed.
     if (G.status().driveWrite === false) return '📝 כדי לעדכן את מסמך ה-Google Docs של הפרויקט צריך לאשר הרשאה נוספת: <a href="#" data-gdocauth>אישור עכשיו</a>';
+    if (pr && protoOlder(pr) && !(st && st.s)) return '📝 בקובץ ה-Google Docs של הפרויקט נמצא מסמך חדש יותר, ולכן הוא לא מתעדכן מהמסמך הזה';
     if (st && st.s === 'busy') return '📝 מעדכן ב-Google Docs...';
     if (st && st.s === 'err') return '⚠️ Google Docs: ' + esc(st.m);
-    if (pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 Google Docs ✓ מעודכן</a>`;
+    if (st && st.s === 'ok' && pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 Google Docs ✓ עודכן ${new Date(st.at || Date.now()).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</a>`;
+    if (pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 פתיחת ה-Google Docs</a> (יתעדכן בשמירה)`;
     return '📝 יישמר גם כ-Google Docs';
   }
-  const gdocShow = (id) => { const el = $('#gdocState'); if (el && el.dataset.id === id) el.innerHTML = protoGdocHtml(byId(db.protocols, id)); };
+  const gdocShow = (id) => { document.querySelectorAll('#gdocState, [data-gdocst]').forEach((el) => { if (el.dataset.id === id) el.innerHTML = protoGdocHtml(byId(db.protocols, id)); }); };
   // "אישור עכשיו": Google's window asks for the permission to edit the Drive documents, then the report is written.
   document.addEventListener('click', (e) => {
     const a = e.target.closest('[data-gdocauth]'); if (!a) return;
@@ -3798,12 +3816,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   });
   function protoGdocSync(pr, now) {
     if (!GOOGLE || !G.silent() || G.status().driveWrite === false || !pr || !protoTpl(pr)) return;
-    // The project's open document is written into only while the report is being written: editing an old,
-    // sent report must not overwrite the newer one in it.
-    if (pr.gdocShared && protoSent(pr)) return;
+    // The project's file holds its newest report: editing an older one must not overwrite it.
+    if (protoOlder(pr)) return;
     clearTimeout(gdocTimers.get(pr.id));
     gdocTimers.set(pr.id, setTimeout(() => protoGdocPush(pr.id), now ? 0 : 8000));
   }
+  // A newer report / summary of the same project exists (its file holds that one).
+  const protoOlder = (pr) => !!(pr && pr.projectId && db.protocols.some((x) => x !== pr && protoTpl(x) && x.projectId === pr.projectId
+    && ((x.date || '') > (pr.date || '') || ((x.date || '') === (pr.date || '') && x.template === pr.template && Number(x.reportNo) > Number(pr.reportNo)))));
   async function protoGdocFolder(pr) {
     const kind = protoKind(pr);
     const it = dprot.items.filter((x) => x.kind === kind && (dpProject(x) || {}).id === pr.projectId && (x.files || []).length && !dpOwn(x))
@@ -3847,7 +3867,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         if (parent && f.inFolder) cur.gdocFolder = parent;
         save();
       }
-      gdocState[id] = { s: 'ok' };
+      gdocState[id] = { s: 'ok', at: Date.now() };
     } catch (e) {
       gdocState[id] = { s: 'err', m: e && (e.status === 403 || e.status === 404) ? 'אין הרשאת עריכה למסמך הקבוע של הפרויקט. בדקו שהוא משותף אליכם לעריכה' : gErr(e) };
     }
