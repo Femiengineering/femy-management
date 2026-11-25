@@ -414,6 +414,8 @@
   // Downloads a Google file converted to another format (for example a Sheet as .xlsx).
   async function exportFile(id, mime) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`)).arrayBuffer(); }
   async function readBuffer(id) { return (await api(await token(), `${DAPI}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`)).arrayBuffer(); }
+  // To the trash (can be restored from Drive's trash).
+  async function trash(id) { await api(await token(), `${DAPI}/${encodeURIComponent(id)}?supportsAllDrives=true`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) }); }
   async function remove(id) { await api(await token(), `${DAPI}/${encodeURIComponent(id)}?supportsAllDrives=true`, { method: 'DELETE' }); }
   async function readFile(id) { return (await api(await token(), `${DAPI}/${id}?alt=media`)).text(); }
 
@@ -421,6 +423,6 @@
     enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
-    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, read: readFile, readBuffer },
+    drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer },
   };
 })();
