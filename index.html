@@ -3750,15 +3750,28 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function protoGdocHtml(pr) {
     if (!GOOGLE) return '';
     const st = pr && gdocState[pr.id];
-    if (!G.valid()) return '📝 Google Docs: חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive) כדי שהמסמך יתעדכן גם שם';
+    if (!G.silent()) return '📝 Google Docs: חברו את חשבון ה-Google (בלשונית יומן, מייל ו-Drive) כדי שהמסמך יתעדכן גם שם';
+    // Connected before the site could write into the office's documents: one more approval is needed.
+    if (G.status().driveWrite === false) return '📝 כדי לעדכן את מסמך ה-Google Docs של הפרויקט צריך לאשר הרשאה נוספת: <a href="#" data-gdocauth>אישור עכשיו</a>';
     if (st && st.s === 'busy') return '📝 מעדכן ב-Google Docs...';
     if (st && st.s === 'err') return '⚠️ Google Docs: ' + esc(st.m);
     if (pr && pr.gdocLink) return `<a href="${esc(pr.gdocLink)}" target="_blank" rel="noopener">📝 Google Docs ✓ מעודכן</a>`;
     return '📝 יישמר גם כ-Google Docs';
   }
   const gdocShow = (id) => { const el = $('#gdocState'); if (el && el.dataset.id === id) el.innerHTML = protoGdocHtml(byId(db.protocols, id)); };
+  // "אישור עכשיו": Google's window asks for the permission to edit the Drive documents, then the report is written.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-gdocauth]'); if (!a) return;
+    e.preventDefault();
+    G.connect().then(() => {
+      const el = $('#gdocState'); const id = el && el.dataset.id;
+      if (el) el.innerHTML = protoGdocHtml(byId(db.protocols, id));
+      if (id) protoGdocPush(id);
+      toast('ההרשאה אושרה');
+    }).catch((x) => toast('האישור נכשל: ' + gErr(x)));
+  });
   function protoGdocSync(pr, now) {
-    if (!GOOGLE || !G.valid() || !pr || !protoTpl(pr)) return;
+    if (!GOOGLE || !G.silent() || G.status().driveWrite === false || !pr || !protoTpl(pr)) return;
     // The project's open document is written into only while the report is being written: editing an old,
     // sent report must not overwrite the newer one in it.
     if (pr.gdocShared && protoSent(pr)) return;
@@ -3778,14 +3791,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const pr = byId(db.protocols, id); if (!pr) return;
     gdocBusy[id] = true; gdocState[id] = { s: 'busy' }; gdocShow(id);
     try {
-      // A new report writes into the project's open document of its kind, when there is one.
-      if (!pr.gdocId && !pr.gdocNew && !protoSent(pr)) {
-        const g = protoGdocDefault(pr);
+      // A report writes into the project's open document of its kind, when there is one (also one that wrote
+      // into a separate copy before the site could edit the office's documents).
+      if (!pr.gdocShared && !pr.gdocNew && !protoSent(pr)) {
+        const pj = byId(db.projects, pr.projectId); const kind = protoKind(pr);
+        const g = (pj && pj.gdocs && pj.gdocs[kind]) || (projGdocs(pr.projectId).find((x) => x.kind === kind) || {}).id;
         if (g) { pr.gdocId = g; pr.gdocShared = true; }
       }
       const parent = pr.gdocId ? '' : pr.gdocFolder || await protoGdocFolder(pr);
       const name = protoFileName(pr, 'docx').replace(/\.docx$/, '');
-      const f = await G.drive.save(name, await buildProtocolDocx(pr), pr.gdocId, parent, { gdoc: true, keepName: !!pr.gdocShared });
+      const f = await G.drive.save(name, await buildProtocolDocx(pr), pr.gdocId, parent, { gdoc: true, keepName: !!pr.gdocShared, noFallback: !!pr.gdocShared });
       const cur = byId(db.protocols, id);
       if (cur && (cur.gdocId !== f.id || cur.gdocLink !== (f.webViewLink || ''))) {
         if (cur.gdocShared && cur.gdocId && cur.gdocId !== f.id) delete cur.gdocShared; // the open document could not be written: a new one was made
@@ -3794,7 +3809,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         save();
       }
       gdocState[id] = { s: 'ok' };
-    } catch (e) { gdocState[id] = { s: 'err', m: gErr(e) }; }
+    } catch (e) {
+      gdocState[id] = { s: 'err', m: e && (e.status === 403 || e.status === 404) && pr.gdocShared ? 'אין הרשאת עריכה למסמך של הפרויקט. בדקו שהוא משותף אליכם לעריכה' : gErr(e) };
+    }
+    if (gdocState[id].s === 'err') toast('Google Docs לא עודכן: ' + gdocState[id].m);
     gdocShow(id);
     const again = gdocBusy[id] === 'again'; delete gdocBusy[id];
     if (again) protoGdocPush(id);
