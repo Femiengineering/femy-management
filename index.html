@@ -3863,7 +3863,10 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (gdocOk.has(id)) { if (pj.gdocId !== id) { pj.gdocId = id; save(); } return id; }
       try {
         const m = await G.drive.meta(id, 'id,trashed,mimeType,capabilities(canEdit)');
-        if (m.trashed || m.mimeType !== 'application/vnd.google-apps.document' || (m.capabilities && m.capabilities.canEdit === false)) continue;
+        if (m.trashed || m.mimeType !== 'application/vnd.google-apps.document') continue;
+        // Not editable with this connection (an approval from before the site could edit the office's files): never
+        // a new file instead, but the request to approve.
+        if (m.capabilities && m.capabilities.canEdit === false) throw Object.assign(new Error('insufficient permission to edit'), { status: 403 });
         gdocOk.add(id);
         if (pj.gdocId !== id) { pj.gdocId = id; save(); }
         return id;
