@@ -317,6 +317,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .modal.wide.with-pv { max-width: 1480px; }
 .modal.with-pv .modal-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 44%); grid-template-areas: "form pv"; gap: 18px; align-items: start; }
 .pv-form { grid-area: form; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; min-width: 0; }
+/* Nothing in the form may grow under the preview (it would cover buttons such as "שמירה ושליחה במייל"). */
+.pv-form > * { min-width: 0; }
+.pv-form .input, .pv-form select, .pv-form textarea { max-width: 100%; }
 .pv-pane { grid-area: pv; position: sticky; top: -28px; z-index: 3; background: var(--surface); padding: 6px 0; min-width: 0; }
 .pv-pane iframe { width: 100%; height: calc(100vh - 70px); border: 1px solid var(--border); border-radius: 8px; background: #9aa1a8; display: block; }
 .pv-pane [data-preview] { display: none; }
