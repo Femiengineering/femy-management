@@ -364,6 +364,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .proto-doc .fdoc { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 14px 12px 2px; min-width: 560px; font-size: 13px; }
 .modal.wide { max-width: 940px; }
 .pi-head { display: flex; align-items: center; gap: 8px; }
+/* Project team: the people linked to a project, and picking who took part in a meeting */
+.tp-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tp-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; background: var(--surface); user-select: none; }
+.tp-chip input { margin: 0; }
+.tp-chip.on { background: var(--primary-soft); border-color: var(--primary); }
+.tp-chip small { color: var(--muted); }
+.tp-chip.sugg { border-style: dashed; color: var(--muted); }
+.tp-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tp-add .input { width: auto; flex: 1 1 140px; min-width: 0; }
+.team-rows { display: flex; flex-direction: column; gap: 6px; }
+.team-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+@media (max-width: 640px) { .team-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } .team-row [data-tk="phone"] { display: none; } }
+.team-list { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.team-list span b { font-weight: 600; }
 .pi-head .spacer { flex: 1; }
 .pi-row { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 8px; background: var(--bg); }
 .pi-top { display: flex; gap: 6px; align-items: center; }
@@ -1542,6 +1556,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
           ${p.budget ? `<dt>תקציב</dt><dd>${fmtMoney(p.budget)}</dd>` : ''}
           ${st.billed ? `<dt>חויב עד כה</dt><dd>${fmtMoney(st.billed)}${p.budget ? ` <span class="hint">(${Math.round((st.billed / p.budget) * 100)}%)</span>` : ''}</dd>` : ''}
         </dl>
+        <h4 style="margin:14px 0 4px;font-size:14px;color:var(--muted)">אנשי הפרויקט</h4>
+        ${(p.team || []).length ? `<div class="team-list">${p.team.map((m) => `<span>${m.role ? `<b>${esc(m.role)}:</b> ` : ''}${esc(m.name)}${m.phone ? ` <a href="tel:${esc(m.phone.replace(/[^\d+]/g, ''))}" dir="ltr">${esc(m.phone)}</a>` : ''}</span>`).join('')}</div>` : '<div class="hint">עוד לא הוגדרו. לחצו "עריכה" כדי להוסיף את האדריכל, היועצים, הקבלן וכו\'. מהם בוחרים את המשתתפים בכל פרוטוקול.</div>'}
         ${p.notes ? `<h4 style="margin:14px 0 4px;font-size:14px;color:var(--muted)">סיכום מצב</h4><div style="white-space:pre-line">${esc(p.notes)}</div>` : ''}
       </div>
 
@@ -1775,6 +1791,32 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     else if (manual) toast('כל הפרויקטים מה-Drive כבר נמצאים במערכת');
   }
 
+  // ---------- Project team: the people linked to a project, each with a fixed role ----------
+  // Saved on the project as team: [{ role, name, phone }]. Protocols pick who took part from this list,
+  // and the participants line reads "role: name" (e.g. "אדריכל: X").
+  const TEAM_ROLES = ['מזמין', 'נציג המזמין', 'ניהול פרויקט', 'מפקח', 'אדריכל', 'מעצב פנים', 'קונסטרוקטור', 'יועץ חשמל', 'יועץ אינסטלציה', 'יועץ מיזוג אוויר', 'יועץ בטיחות', 'יועץ נגישות', 'יועץ קרקע', 'יועץ איטום', 'יועץ אקוסטיקה', 'יועץ מעליות', 'יועץ תנועה', 'אדריכל נוף', 'מודד', 'קבלן ראשי', 'קבלן משנה'];
+  const teamLine = (m) => (m.role ? m.role + ': ' : '') + m.name;
+  function projectTeam(pid) { const p = pid && byId(db.projects, pid); return (p && p.team) || []; }
+  // "role: name" lines (one per line) -> [{ role, name }]; lines with a role and no name are left out.
+  function parseParticipants(txt) {
+    return String(txt || '').split('\n').map((l) => l.trim()).filter(Boolean)
+      .map((l) => { const m = l.match(/^([^:]{1,40}):\s*(.*)$/); return m ? { role: m[1].trim(), name: m[2].trim() } : { role: '', name: l }; })
+      .filter((m) => m.name);
+  }
+  // People not yet on the team: from the project's earlier documents, and contacts linked to the project in the sheet.
+  function teamSuggestions(p, team) {
+    const have = new Set((team || p.team || []).map((m) => normName(m.name)));
+    const out = [];
+    const add = (role, name, phone) => { const n = normName(name); if (!n || have.has(n) || n.length > 60) return; have.add(n); const c = phone ? null : contactFor(name); out.push(Object.assign({ role: (role || '').trim(), name: String(name).trim() }, (phone || (c && c.phone)) ? { phone: phone || c.phone } : {})); };
+    if (p.id) db.protocols.filter((pr) => pr.projectId === p.id).sort((a, b) => (b.date || '').localeCompare(a.date || '')).forEach((pr) => parseParticipants(pr.participants).forEach((m) => add(m.role, m.name)));
+    const pn = normName(p.name);
+    if (pn) (db.contacts || []).filter((c) => c.projects && normName(c.projects).includes(pn)).forEach((c) => add(c.role || c.category, c.name, c.phone));
+    return out.slice(0, 30);
+  }
+  const teamRowHtml = (m) => `<div class="team-row"><input class="input" data-tk="role" list="teamRoleList" placeholder="תפקיד, למשל: אדריכל" value="${esc(m.role || '')}"><input class="input" data-tk="name" list="teamNameList" placeholder="שם / משרד" value="${esc(m.name || '')}"><input class="input" data-tk="phone" dir="ltr" placeholder="טלפון (לא חובה)" value="${esc(m.phone || '')}"><button type="button" class="btn sm" data-tdel title="הסרה">✕</button></div>`;
+  const teamDatalists = () => `<datalist id="teamRoleList">${TEAM_ROLES.map((r) => `<option value="${esc(r)}">`).join('')}</datalist>
+    <datalist id="teamNameList">${(db.contacts || []).map((c) => `<option value="${esc(c.name)}">${esc(c.role || c.category || '')}</option>`).join('')}</datalist>`;
+
   function openProjectForm(proj) {
     const p = proj || { name: '', client: '', location: '', manager: '', status: 'planning', progress: 0, start: todayStr(), end: '', budget: '', notes: '' };
     openModal(proj ? 'עריכת פרויקט' : 'פרויקט חדש', `
@@ -1790,8 +1832,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       <div class="field full"><label>קישור לתיקיית הפרויקט ב-Google Drive</label><input class="input" name="driveFolder" dir="ltr" placeholder="https://drive.google.com/drive/folders/..." value="${p.driveFolder ? esc(driveUrl(p)) : ''}"></div>
       <div class="field full"><label>תבנית לדוחות פיקוח ולסיכומי פגישות: מפרויקט אחר</label><select class="input" name="templateFrom"><option value="">ללא (לפי המסמכים של הפרויקט עצמו)</option>${db.projects.filter((x) => x !== proj).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')).map((x) => `<option value="${esc(x.id)}" ${x.id === p.templateFrom ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
         <span class="hint">עד שיהיה לפרויקט דוח או סיכום משלו, המסמך החדש יציע להעתיק את הנושאים מהמסמך האחרון של הפרויקט שנבחר.</span></div>
+      <div class="field full"><label>אנשי הפרויקט (תפקיד ושם)</label>
+        <div class="team-rows" data-team>${(p.team || []).map(teamRowHtml).join('')}</div>
+        <div class="tp-box"><button type="button" class="btn sm" data-tadd>+ הוספת איש קשר</button><span class="hint">מהרשימה הזאת בוחרים את המשתתפים בכל פרוטוקול, דוח או סיכום של הפרויקט.</span></div>
+        <div class="tp-box" data-tsugg></div>${teamDatalists()}</div>
       <div class="field full"><label>הערות / סיכום מצב</label><textarea class="input" name="notes">${esc(p.notes)}</textarea></div>`,
     (data) => {
+      data.team = readTeamRows($('#modalBody'));
       data.progress = Number(data.progress) || 0; data.budget = data.budget === '' ? '' : Number(data.budget);
       // Keep only the folder id, from a full Drive link or a bare id.
       const fm = (data.driveFolder || '').match(/folders\/([\w-]+)/) || (data.driveFolder || '').match(/[?&]id=([\w-]+)/) || (data.driveFolder || '').match(/^([\w-]{10,})$/);
@@ -1805,6 +1852,31 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       save(); toast('הפרויקט נמחק');
       if (currentView() === 'project') location.hash = 'projects'; else render();
     } : null, 'המשימות, החשבונות והפרוטוקולים של הפרויקט יישארו, בלי שיוך לפרויקט.');
+    wireTeamEditor($('#modalBody'), p);
+  }
+  function readTeamRows(root) {
+    return $$('[data-team] .team-row', root).map((r) => ({ role: $('[data-tk="role"]', r).value.trim(), name: $('[data-tk="name"]', r).value.trim(), phone: $('[data-tk="phone"]', r).value.trim() }))
+      .filter((m) => m.name).map((m) => { if (!m.phone) delete m.phone; return m; });
+  }
+  // The team rows in the project form: add, remove, and one-click suggestions from earlier documents and contacts.
+  function wireTeamEditor(root, p) {
+    const box = $('[data-team]', root);
+    const sugg = () => {
+      const s = teamSuggestions({ id: p.id, name: ($('[name="name"]', root) || {}).value || p.name }, readTeamRows(root));
+      $('[data-tsugg]', root).innerHTML = s.length ? `<span class="hint">מוצעים (מהמסמכים הקודמים ומאנשי הקשר):</span>${s.map((m, i) => `<button type="button" class="tp-chip sugg" data-ts="${i}">+ ${esc(teamLine(m))}</button>`).join('')}` : '';
+      $$('[data-ts]', root).forEach((b) => b.addEventListener('click', () => { box.insertAdjacentHTML('beforeend', teamRowHtml(s[+b.dataset.ts])); sugg(); }));
+    };
+    $('[data-tadd]', root).addEventListener('click', () => { box.insertAdjacentHTML('beforeend', teamRowHtml({})); const r = box.lastElementChild; $('[data-tk="role"]', r).focus(); });
+    box.addEventListener('click', (e) => { const d = e.target.closest('[data-tdel]'); if (d) { d.closest('.team-row').remove(); sugg(); } });
+    // A name picked from the contacts fills in the role and phone, when they are empty.
+    box.addEventListener('change', (e) => {
+      if (e.target.dataset.tk !== 'name') return;
+      const c = contactFor(e.target.value); if (!c) return;
+      const r = e.target.closest('.team-row'), role = $('[data-tk="role"]', r), ph = $('[data-tk="phone"]', r);
+      if (!role.value.trim() && (c.role || c.category)) role.value = c.role || c.category;
+      if (!ph.value.trim() && c.phone) ph.value = c.phone;
+    });
+    sugg();
   }
 
   // ---------- Accounts ----------
@@ -3062,7 +3134,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         <span class="hint">ריק = נבנה אוטומטית משם הפרויקט, השם והמספר. אפשר לכתוב כאן כל נושא, ולשנות אותו בכל עת.</span></div>
       <div class="field" ${vis('supervision')}><label>סטטוס פרויקט</label><input class="input" name="status" value="${esc(p.status)}" placeholder="ביצוע" list="protoStatusList"><datalist id="protoStatusList"><option>תכנון</option><option>מכרז</option><option>ביצוע</option><option>מסירה</option></datalist></div>
       <div class="field"><label>מיקום</label><input class="input" name="location" value="${esc(p.location)}" placeholder="משרד / זום / שטח הפרויקט"></div>
-      <div class="field full"><label>משתתפים</label><textarea class="input" name="participants" rows="3" style="min-height:60px" placeholder="גורם: שם, שורה לכל גורם. למשל: ניהול פרויקט: מוטי דיקמן">${esc(p.participants)}</textarea></div>
+      <div class="field full"><label>משתתפים</label><textarea class="input" name="participants" rows="3" style="min-height:60px" placeholder="גורם: שם, שורה לכל גורם. למשל: ניהול פרויקט: מוטי דיקמן">${esc(p.participants)}</textarea><div data-teampick></div></div>
       <div class="field full"><label>העתקים</label><input class="input" name="copies" value="${esc(p.copies)}"></div>
       <div class="field full" ${vis('supervision')}><label>סטטוס כללי: עבודות שבוצעו</label><textarea class="input" name="doneWork" style="min-height:56px">${esc(p.doneWork)}</textarea><div data-fask="doneWork"></div></div>
       <div class="field" ${vis('supervision')}><label>הספקים לשבוע הקרוב</label><textarea class="input" name="nextWork" style="min-height:56px">${esc(p.nextWork)}</textarea><div data-fask="nextWork"></div></div>
@@ -3097,6 +3169,50 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     const tplSel = $('[name="template"]', body);
     const projSel = $('[name="projectId"]', body);
     let curTpl = p.template;
+    // Participants: tick who took part, from the people linked to the project; each adds / removes a "role: name" line.
+    const partBox = $('[name="participants"]', body);
+    let teamAdding = false;
+    function drawTeamPick() {
+      const el = $('[data-teampick]', body); if (!el) return;
+      const proj = projSel.value && byId(db.projects, projSel.value);
+      if (!proj) { el.innerHTML = ''; return; }
+      const team = proj.team || [];
+      const inText = new Set(parseParticipants(partBox.value).map((m) => normName(m.name)));
+      el.innerHTML = `<div class="tp-box">${team.length ? '<span class="hint">מי השתתף?</span>' : '<span class="hint">עוד לא הוגדרו אנשי קשר לפרויקט הזה.</span>'}
+        ${team.map((m, i) => `<label class="tp-chip ${inText.has(normName(m.name)) ? 'on' : ''}"><input type="checkbox" data-tp="${i}" ${inText.has(normName(m.name)) ? 'checked' : ''}>${m.role ? `<small>${esc(m.role)}:</small>` : ''} ${esc(m.name)}</label>`).join('')}
+        ${team.length > 1 ? '<a href="#" class="hint" data-tpall>סימון כולם</a>' : ''}
+        <a href="#" class="hint" data-tpnew>+ איש קשר חדש לפרויקט</a></div>
+        ${teamAdding ? `<div class="tp-add"><input class="input" data-tpr list="teamRoleList" placeholder="תפקיד, למשל: יועץ חשמל"><input class="input" data-tpn list="teamNameList" placeholder="שם"><button type="button" class="btn sm primary" data-tpsave>הוספה</button><button type="button" class="btn sm" data-tpcancel>ביטול</button>${teamDatalists()}</div>` : ''}`;
+      const setLine = (m, on) => {
+        const n = normName(m.name);
+        let lines = partBox.value.split('\n');
+        if (on) {
+          if (parseParticipants(partBox.value).some((x) => normName(x.name) === n)) return;
+          // A line left with the role and no name (e.g. "ניהול פרויקט: ") takes the name.
+          const empty = m.role ? lines.findIndex((l) => { const x = l.match(/^([^:]{1,40}):\s*$/); return x && x[1].trim() === m.role; }) : -1;
+          if (empty >= 0) lines[empty] = teamLine(m);
+          else { lines = lines.filter((l, i) => l.trim() || i < lines.length - 1); lines.push(teamLine(m)); }
+        } else lines = lines.filter((l) => { const x = parseParticipants(l)[0]; return !(x && normName(x.name) === n); });
+        partBox.value = lines.join('\n').replace(/^\n+/, '');
+        partBox.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      $$('[data-tp]', el).forEach((cb) => cb.addEventListener('change', () => { setLine(team[+cb.dataset.tp], cb.checked); drawTeamPick(); }));
+      const all = $('[data-tpall]', el); if (all) all.addEventListener('click', (e) => { e.preventDefault(); team.forEach((m) => setLine(m, true)); drawTeamPick(); });
+      $('[data-tpnew]', el).addEventListener('click', (e) => { e.preventDefault(); teamAdding = true; drawTeamPick(); $('[data-tpr]', el).focus(); });
+      if (!teamAdding) return;
+      const r = $('[data-tpr]', el), nm = $('[data-tpn]', el);
+      nm.addEventListener('change', () => { const c = contactFor(nm.value); if (c && !r.value.trim() && (c.role || c.category)) r.value = c.role || c.category; });
+      const addNew = () => {
+        const m = { role: r.value.trim(), name: nm.value.trim() };
+        if (!m.name) { nm.focus(); return; }
+        const c = contactFor(m.name); if (c && c.phone) m.phone = c.phone;
+        proj.team = (proj.team || []).filter((x) => normName(x.name) !== normName(m.name)).concat(m);
+        save(); teamAdding = false; setLine(m, true); drawTeamPick(); toast('נוסף לאנשי הפרויקט: ' + teamLine(m));
+      };
+      $('[data-tpsave]', el).addEventListener('click', addNew);
+      [r, nm].forEach((x) => x.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addNew(); } }));
+      $('[data-tpcancel]', el).addEventListener('click', () => { teamAdding = false; drawTeamPick(); });
+    }
     // The number follows the project and the template, unless it was typed by hand.
     const renumber = () => {
       if (proto) return;
@@ -3125,7 +3241,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const tf = $('[data-tplfrom]', body); if (tf) tf.value = '';
       drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev), askDone0));
       if (!proto) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
-      drawFieldAsks(); schedulePreview();
+      drawFieldAsks(); schedulePreview(); drawTeamPick();
     };
     // Saving: the document as typed, and while it is not sent also the rows still waiting for "copy / skip",
     // what was answered, and the previous report, so the options are there again when it is reopened.
@@ -3173,7 +3289,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!src) { toast('לא נמצא מסמך מהסוג הזה בפרויקט ' + other.name); return; }
       prev = Object.assign({}, src, { _tpl: other.name, _tplId: other.id });
       drawProtoItems(curTpl, protoAskSetup(curTpl, prev, readProtoItems().filter((i) => !i._fromPrev)));
-      drawFieldAsks(); schedulePreview();
+      drawFieldAsks(); schedulePreview(); drawTeamPick();
     };
     // A project with no report of its own yet takes the template chosen in the project's settings.
     const autoTplFrom = () => {
@@ -3324,6 +3440,12 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (prev && !prev._tpl) ['participants', 'location', 'status', 'copies'].forEach((k) => { const f = $(`[name="${k}"]`, body); if (f && prev[k] && (!f.value.trim() || (k === 'copies' && ['משתתפים', 'המזמין, הקבלן וניהול הפרויקט'].includes(f.value.trim())))) f.value = prev[k]; });
       drawFieldAsks();
     });
+    // After the project / template listeners above have refilled the participants.
+    projSel.addEventListener('change', () => { teamAdding = false; drawTeamPick(); });
+    tplSel.addEventListener('change', drawTeamPick);
+    partBox.addEventListener('input', (e) => { if (e.isTrusted) drawTeamPick(); });
+    $('[data-prev]', body).addEventListener('click', () => setTimeout(drawTeamPick));
+    drawTeamPick();
     $('[data-additem]', body).addEventListener('click', () => { const cur = readProtoItems(); cur.push({}); drawProtoItems(curTpl, cur); const last = $$('.pi-row', body).pop(); if (last) $('[data-k="topic"]', last).focus(); });
     $('[data-prev]', body).addEventListener('click', () => {
       if (protoAsk && protoAskPending().length) { protoAskAll(true); return; }
