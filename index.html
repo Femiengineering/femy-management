@@ -447,6 +447,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pi-ph img { width: 84px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: var(--surface-2); }
 .pi-ph button { position: absolute; top: -6px; inset-inline-end: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: #ef4444; color: #fff; font-size: 11px; cursor: pointer; line-height: 20px; padding: 0; }
 .pi-phadd { cursor: pointer; }
+#docQueueBar { position: fixed; bottom: 14px; inset-inline: 14px; z-index: 2000; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: #fff7e6; border: 1px solid #f3c77a; color: #7a4a00; border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 14px; }
+#docQueueBar span { flex: 1 1 220px; }
 .pi-docpick { flex-basis: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--gray-soft); }
 .pi-docpick-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
 .doc-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -2719,7 +2721,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         docQueue.shift(); toast(docErr(e));
       }
     }
+    docBar();
     if (ok) { toast((ok === 1 ? 'התמונה שחיכתה נשמרה' : ok + ' תמונות שחיכו נשמרו') + ' ב-Drive'); if (location.hash.startsWith('#project/')) render(); }
+  }
+  // A bar at the bottom while photos are waiting: try now, or connect straight to Google (a popup, without the
+  // connection server) when the server cannot be reached.
+  function docBar() {
+    let bar = $('#docQueueBar');
+    if (!docQueue.length) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement('div'); bar.id = 'docQueueBar'; document.body.appendChild(bar); }
+    bar.innerHTML = `<span>📷 ${docQueue.length === 1 ? 'תמונה אחת ממתינה' : docQueue.length + ' תמונות ממתינות'} לשמירה ב-Drive (אין חיבור לשרת של Google)</span>
+      <button type="button" class="btn sm" data-qnow>נסה שוב</button>${G.direct ? '<button type="button" class="btn sm primary" data-qdirect>🔑 חיבור ישיר ל-Google ושמירה</button>' : ''}`;
+    $('[data-qnow]', bar).addEventListener('click', () => docFlush());
+    const d = $('[data-qdirect]', bar);
+    if (d) d.addEventListener('click', () => { G.direct().then(() => docFlush(), (e) => toast('החיבור נכשל: ' + (e && e.message || ''))); });
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden && docQueue.length) setTimeout(docFlush, 1500); });
   window.addEventListener('online', () => { if (docQueue.length) setTimeout(docFlush, 1500); });
@@ -2733,7 +2748,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         if (docNet(e)) {
           files.slice(i).forEach((x, j) => docQueue.push({ folder: p.driveFolder, date, name: j ? docFileName(x, date, false) : name, file: x, tries: 0 }));
           toast('אין כרגע חיבור ל-Google. ' + (files.length - i === 1 ? 'התמונה תישמר' : 'התמונות יישמרו') + ' ב-Drive אוטומטית כשהחיבור יחזור (השאירו את האתר פתוח)');
-          clearTimeout(docRetryT); docRetryT = setTimeout(docFlush, 8000);
+          clearTimeout(docRetryT); docRetryT = setTimeout(docFlush, 8000); docBar();
         } else toast(docErr(e));
         break;
       }

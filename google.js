@@ -167,6 +167,24 @@
     return pending;
   }
 
+  // A one-hour token straight from Google's popup, without the connection server: for when the server cannot be
+  // reached. The device stays connected to the server as before. Call it straight from a click.
+  function direct() {
+    if (!enabled) return token();
+    if (gisMissing()) return notReady();
+    return new Promise((resolve, reject) => {
+      const c = google.accounts.oauth2.initTokenClient({
+        client_id: cfg.clientId, scope: SCOPES.join(' '), include_granted_scopes: true,
+        callback: (r) => {
+          if (!r || r.error || !r.access_token) { reject(Object.assign(new Error(r && (r.error_description || r.error) || 'החיבור נכשל'), { code: r && r.error })); return; }
+          pending = null; keep(r); resolve(rec.token);
+        },
+        error_callback: (e) => reject(popupError(e)),
+      });
+      c.requestAccessToken({ prompt: '', login_hint: hintFor() });
+    });
+  }
+
   // "ניתוק": removes access in Google itself (on all devices, in always-on mode).
   function disconnect() {
     const t = rec && rec.token, device = rec && rec.device;
@@ -554,7 +572,7 @@
   async function readFile(id) { return (await api(await token(), `${DAPI}/${id}?alt=media`)).text(); }
 
   window.FemyGoogle = {
-    enabled, init, status, valid, silent, onChange, token, connect, disconnect, forget,
+    enabled, init, status, valid, silent, onChange, token, connect, direct, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, list, unreadCount, conversation, attachment, markRead, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
     drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer, readBlob, docRoot, docUpload, docPhotos, docName: DOC_NAME },
