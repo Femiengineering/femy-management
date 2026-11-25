@@ -306,6 +306,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .tpl-tag.tpl-supervision { background: #fff1dc; color: #9a5b00; }
 .tpl-tag.tpl-tour { background: #e8eefc; color: #2f55b5; }
 .tpl-tag.tpl-draft { background: #fef3c7; color: #92400e; }
+.pi-del { color: #b91c1c; white-space: nowrap; }
 .pi-phpos { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
 .pv-gdoc { font-size: 12px; }
 .pv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 13px; }
@@ -3293,7 +3294,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     box.innerHTML = items.map((it, n) => `<div class="pi-row${askOf(it, n) ? ' asking' : ''}">
       ${askOf(it, n) ? protoAskHtml(protoPrevText(tpl, askOf(it, n)), tpl) : ''}
       <div class="pi-top"><span class="pi-num">${n + 1}</span><input class="input" data-k="topic" value="${esc(it.topic)}" placeholder="נושא">
-        <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm" data-del title="מחיקת נושא">✕</button></div>
+        <button type="button" class="btn sm" data-up title="למעלה">▲</button><button type="button" class="btn sm" data-down title="למטה">▼</button><button type="button" class="btn sm pi-del" data-del title="מחיקת הסעיף כולו: הנושא, התוכן והתמונות">🗑 מחיקת הסעיף</button></div>
       <div class="pi-fields pi-${tpl}">${fields.map((c) => (c[0] === 'details' || c[0] === 'instructions'
         ? `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><textarea class="input" data-k="${c[0]}" rows="${tpl === 'tour' ? 4 : 2}">${esc(it[c[0]])}</textarea></label>`
         : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
@@ -3308,7 +3309,14 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       const move = (d) => { const cur = readProtoItems(); const j = n + d; if (j < 0 || j >= cur.length) return; [cur[n], cur[j]] = [cur[j], cur[n]]; drawProtoItems(tpl, cur); };
       $('[data-up]', row).addEventListener('click', () => move(-1));
       $('[data-down]', row).addEventListener('click', () => move(1));
-      $('[data-del]', row).addEventListener('click', () => { const cur = readProtoItems(); cur.splice(n, 1); drawProtoItems(tpl, cur); });
+      // Deletes the whole topic (text, photos). A topic offered from the previous report does not come back.
+      $('[data-del]', row).addEventListener('click', () => {
+        const cur = readProtoItems();
+        if (protoHasContent(tpl, cur[n]) && !confirm('למחוק את הסעיף "' + (cur[n].topic || (n + 1)) + '" כולו, עם התוכן והתמונות?')) return;
+        if (asking && keys[n] && asking.map.has(keys[n])) asking.done.add(keys[n]);
+        cur.splice(n, 1); drawProtoItems(tpl, cur);
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+      });
       const setPhotos = (fn) => { const cur = readProtoItems(); const ids = fn(photoIds(cur[n].photos)); if (ids.length) cur[n].photos = ids.join(','); else { delete cur[n].photos; delete cur[n].photoPos; delete cur[n].photoScale; } drawProtoItems(tpl, cur); box.dispatchEvent(new Event('input', { bubbles: true })); };
       $$('[data-phsz]', row).forEach((b) => b.addEventListener('click', () => {
         const cur = readProtoItems(); const v = Math.max(20, Math.min(150, photoScaleOf(cur[n]) + Number(b.dataset.phsz)));
