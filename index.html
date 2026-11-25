@@ -3178,10 +3178,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       if (!proj) { el.innerHTML = ''; return; }
       const team = proj.team || [];
       const inText = new Set(parseParticipants(partBox.value).map((m) => normName(m.name)));
-      el.innerHTML = `<div class="tp-box">${team.length ? '<span class="hint">מי השתתף?</span>' : '<span class="hint">עוד לא הוגדרו אנשי קשר לפרויקט הזה.</span>'}
+      // People from the project's earlier reports / summaries (and contacts linked to it) who are not on the team yet.
+      const sugg = teamSuggestions(proj, team);
+      el.innerHTML = `<div class="tp-box">${team.length ? '<span class="hint">מי השתתף?</span>' : `<span class="hint">${sugg.length ? 'עוד לא הוגדרו אנשי הפרויקט. אפשר לבחור מהמסמכים הקודמים:' : 'עוד לא הוגדרו אנשי קשר לפרויקט הזה.'}</span>`}
         ${team.map((m, i) => `<label class="tp-chip ${inText.has(normName(m.name)) ? 'on' : ''}"><input type="checkbox" data-tp="${i}" ${inText.has(normName(m.name)) ? 'checked' : ''}>${m.role ? `<small>${esc(m.role)}:</small>` : ''} ${esc(m.name)}</label>`).join('')}
         ${team.length > 1 ? '<a href="#" class="hint" data-tpall>סימון כולם</a>' : ''}
-        <a href="#" class="hint" data-tpnew>+ איש קשר חדש לפרויקט</a></div>
+        <button type="button" class="btn sm" data-tpnew>+ הוספת איש קשר</button></div>
+        ${sugg.length ? `<div class="tp-box"><span class="hint">מדוחות וסיכומים קודמים:</span>${sugg.map((m, i) => `<label class="tp-chip sugg ${inText.has(normName(m.name)) ? 'on' : ''}" title="סימון מוסיף אותו גם לאנשי הפרויקט"><input type="checkbox" data-tps="${i}" ${inText.has(normName(m.name)) ? 'checked' : ''}>${m.role ? `<small>${esc(m.role)}:</small>` : ''} ${esc(m.name)}</label>`).join('')}</div>` : ''}
         ${teamAdding ? `<div class="tp-add"><input class="input" data-tpr list="teamRoleList" placeholder="תפקיד, למשל: יועץ חשמל"><input class="input" data-tpn list="teamNameList" placeholder="שם"><button type="button" class="btn sm primary" data-tpsave>הוספה</button><button type="button" class="btn sm" data-tpcancel>ביטול</button>${teamDatalists()}</div>` : ''}`;
       const setLine = (m, on) => {
         const n = normName(m.name);
@@ -3197,6 +3200,13 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         partBox.dispatchEvent(new Event('input', { bubbles: true }));
       };
       $$('[data-tp]', el).forEach((cb) => cb.addEventListener('change', () => { setLine(team[+cb.dataset.tp], cb.checked); drawTeamPick(); }));
+      // Ticking someone from an earlier document also keeps them on the project's team for next time.
+      $$('[data-tps]', el).forEach((cb) => cb.addEventListener('change', () => {
+        const m = sugg[+cb.dataset.tps];
+        setLine(m, cb.checked);
+        if (cb.checked) { proj.team = (proj.team || []).concat(m); save(); toast('נוסף לאנשי הפרויקט: ' + teamLine(m)); }
+        drawTeamPick();
+      }));
       const all = $('[data-tpall]', el); if (all) all.addEventListener('click', (e) => { e.preventDefault(); team.forEach((m) => setLine(m, true)); drawTeamPick(); });
       $('[data-tpnew]', el).addEventListener('click', (e) => { e.preventDefault(); teamAdding = true; drawTeamPick(); $('[data-tpr]', el).focus(); });
       if (!teamAdding) return;
