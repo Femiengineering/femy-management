@@ -17,6 +17,7 @@
     'https://www.googleapis.com/auth/gmail.send', // send mail as the user
     'https://www.googleapis.com/auth/drive.readonly', // browse the user's Drive files
     'https://www.googleapis.com/auth/drive.file', // create and update files the site made
+    'https://www.googleapis.com/auth/drive', // write the reports into the Google Docs the office opened in the project folders
   ];
   const STORE = 'femy-google:';
 
@@ -68,7 +69,7 @@
   // "valid" = the site can call Google now without asking the user for anything.
   const valid = () => fresh() || !!(persistent && rec && rec.device);
   function status() {
-    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
+    return { enabled, persistent, connected: !!(rec && rec.email), valid: valid(), driveWrite: rec && rec.scope ? / https:\/\/www\.googleapis\.com\/auth\/drive( |$)/.test(' ' + rec.scope) : null, email: (rec && rec.email) || '', exp: rec ? rec.exp : 0 };
   }
   const onChange = (f) => listeners.push(f);
 
@@ -345,7 +346,7 @@
     };
     if (fileId) {
       try { return await (await api(tok, `${UP}/${fileId}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`, { method: 'PATCH', body: form(opts && opts.keepName ? {} : { name }) })).json(); }
-      catch (e) { if (e.status !== 404 && e.status !== 403) throw e; }
+      catch (e) { if ((opts && opts.noFallback) || (e.status !== 404 && e.status !== 403)) throw e; }
     }
     if (parentId) {
       // Into a folder the user chose (for example a project folder). Falls back to the site's own folder
