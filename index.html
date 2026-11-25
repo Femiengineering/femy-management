@@ -447,6 +447,19 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pi-ph img { width: 84px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: var(--surface-2); }
 .pi-ph button { position: absolute; top: -6px; inset-inline-end: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: #ef4444; color: #fff; font-size: 11px; cursor: pointer; line-height: 20px; padding: 0; }
 .pi-phadd { cursor: pointer; }
+.pi-docpick { flex-basis: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--gray-soft); }
+.pi-docpick-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.doc-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.doc-acts label { cursor: pointer; }
+.doc-day + .doc-day { margin-top: 10px; }
+.doc-day h3 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+.doc-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.doc-th { position: relative; display: block; width: 96px; height: 72px; border-radius: 6px; overflow: hidden; border: 2px solid transparent; background: var(--gray-soft); cursor: pointer; padding: 0; }
+.doc-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.doc-th.sel { border-color: var(--primary, #2563eb); }
+.doc-th.sel::after { content: '✓'; position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--primary, #2563eb); color: #fff; font-size: 12px; line-height: 20px; text-align: center; }
+.doc-up { width: 96px; height: 72px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); border: 1px dashed var(--border); }
+@media (max-width: 700px) { .doc-th, .doc-up { width: calc(33.3% - 4px); height: 80px; } }
 .pi-ask, .pi-askbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; color: #1e3a8a; }
 .pi-askbar { margin: 8px 0 0; }
 .pi-ask-q { font-weight: 700; white-space: nowrap; }
@@ -1674,6 +1687,54 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   // The four tiles at the top of the project page. The folder and mail tiles fill in once their data arrives.
   const projMailCache = {};
   const projMailQuery = (p) => { const n = (p.name || '').replace(/["()]/g, ' ').replace(/\s+/g, ' ').trim(); return n ? `"${n}"` : ''; };
+  // The project's photo documentation: take a photo / upload from the gallery into Drive (<project>/תיעוד/<date>),
+  // and the latest photos, by date.
+  function projDocHtml(p) {
+    const ready = docOk(p);
+    return `<div class="card card-pad" id="projDocCard" style="margin-bottom:18px">
+      <div class="card-head"><h2>📷 תיעוד מהשטח</h2>${ready ? `<span class="doc-acts">
+        <label class="btn sm primary" title="צילום במצלמה. נשמר ב-Drive בתיקיית ${esc(G.drive.docName)} של הפרויקט, בתיקייה של התאריך של היום">📷 צילום תמונה<input type="file" accept="image/*" capture="environment" hidden data-doccam></label>
+        <label class="btn sm" title="העלאת תמונות קיימות מהגלריה או מהמחשב">🖼 העלאה מהגלריה<input type="file" accept="image/*" multiple hidden data-docgal></label>
+        <a class="btn sm" href="#" data-docopen>פתיחה ב-Drive ↗</a></span>` : ''}</div>
+      <div id="projDoc">${!p.driveFolder ? '<div class="hint">לפרויקט הזה עוד אין קישור לתיקייה ב-Drive. לחצו "עריכה" והדביקו את הקישור לתיקייה, והתמונות יישמרו בה בתיקיית "תיעוד".</div>'
+        : !ready ? '<div class="hint">כדי לצלם ולשמור תמונות בתיקיית הפרויקט, חברו את חשבון ה-Google בלשונית <a href="#google">יומן, מייל ו-Drive</a>.</div>'
+        : '<div class="hint">טוען תמונות...</div>'}</div>
+    </div>`;
+  }
+  function bindProjDoc(p, el) {
+    const box = $('#projDoc', el); if (!box || !docOk(p)) return;
+    let root = '';
+    const draw = (fresh, uploading) => {
+      docList(p, fresh).then((res) => {
+        if (!document.body.contains(box)) return;
+        root = res.root;
+        const up = uploading ? `<div class="doc-up">מעלה ${uploading}...</div>` : '';
+        box.innerHTML = res.files.length || up ? docDays(res.files.slice(0, 30)).map(([d, l], i) => `<div class="doc-day"><h3>${esc(fmtDate(d) || d)}</h3><div class="doc-grid">${i === 0 && d === todayStr() ? up : ''}${l.map((f) => docThumb(f)).join('')}</div></div>`).join('')
+          + (up && !(res.files[0] && res.files[0].day === todayStr()) ? `<div class="doc-day"><h3>${esc(fmtDate(todayStr()))}</h3><div class="doc-grid">${up}</div></div>` : '')
+          + (res.files.length > 30 ? `<div class="hint" style="margin-top:8px">מוצגות 30 התמונות האחרונות. כל התמונות בתיקייה ב-Drive.</div>` : '')
+          : `<div class="hint">אין עדיין תמונות. צלמו או העלו, והן יישמרו ב-Drive בתיקייה "${esc(p.name)} / ${esc(G.drive.docName)} / ${esc(todayStr())}".</div>`;
+        fixDocThumbs(box);
+        const byFile = new Map(res.files.map((f) => [f.id, f]));
+        $$('.doc-th', box).forEach((b) => b.addEventListener('click', () => { const f = byFile.get(b.dataset.docid); if (f && f.webViewLink) window.open(f.webViewLink, '_blank', 'noopener'); }));
+      }).catch((e) => { if (document.body.contains(box)) box.innerHTML = `<div class="hint">${esc(docErr(e))}</div>`; });
+    };
+    draw(false);
+    const up = async (input, camera) => {
+      const files = Array.from(input.files || []); input.value = ''; if (!files.length) return;
+      draw(false, files.length > 1 ? files.length + ' תמונות' : 'תמונה');
+      const n = await docUpload(p, todayStr(), files, camera);
+      if (n) toast((n === 1 ? 'התמונה נשמרה' : n + ' תמונות נשמרו') + ' ב-Drive: ' + G.drive.docName + ' / ' + todayStr());
+      draw(true);
+    };
+    $('[data-doccam]', el).addEventListener('change', (e) => up(e.target, true));
+    $('[data-docgal]', el).addEventListener('change', (e) => up(e.target, false));
+    $('[data-docopen]', el).addEventListener('click', async (e) => {
+      e.preventDefault();
+      const w = window.open('', '_blank');
+      try { const id = root || await G.drive.docRoot(p.driveFolder, true); if (w) w.location = docFolderUrl(id); }
+      catch (x) { if (w) w.close(); toast(docErr(x)); }
+    });
+  }
   function projTilesHtml(p, st, openT, doneT, counts) {
     const total = openT.length + doneT.length;
     const pct = total ? Math.round((doneT.length / total) * 100) : 0;
@@ -1785,6 +1846,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       </div>
       ${phaseCardHtml(p, docs)}
       ${projTilesHtml(p, st, openT, doneT, counts)}
+      ${projDocHtml(p)}
 
       ${p.ledger && p.ledger.rows ? (() => { const ls = ledSum(p.ledger.rows); return `<div class="card card-pad" style="margin-bottom:18px">
         <div class="card-head"><h2>חשבונות יועצים</h2><a href="#accounts" data-ledall>לפירוט המלא</a></div>
@@ -1825,6 +1887,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
       pr.addEventListener('change', () => { p.progress = Number(pr.value) || 0; logProgress(p); save(); render(); toast('ההתקדמות עודכנה: ' + p.progress + '%'); });
     }
     bindProjTiles(p, el);
+    bindProjDoc(p, el);
     $('[data-addtask]', el).addEventListener('click', () => openTaskForm(null, { projectId: p.id }));
     $('[data-addproto]', el).addEventListener('click', () => openProtocolForm(null, { projectId: p.id }));
     $$('#projTasks .tg-row', el).forEach((r) => {
@@ -2621,6 +2684,47 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
   function fillPhotos(root) {
     $$('img[data-photo]', root).forEach((im) => { if (!im.getAttribute('src')) photoGet(im.dataset.photo).then((v) => { if (v) im.src = v; }); });
   }
+  // ---------- Photo documentation in Drive: <project folder>/תיעוד/<date>/ ----------
+  // Photos taken on the site are kept in the project's Drive folder, one folder per date, and can be put from
+  // there into any section of a report.
+  const docOk = (p) => !!(p && p.driveFolder && GOOGLE && G.valid() && G.drive && G.drive.docUpload);
+  const docCache = {};
+  const docList = (p, fresh) => {
+    if (fresh || !docCache[p.driveFolder]) docCache[p.driveFolder] = G.drive.docPhotos(p.driveFolder, 60).catch((e) => { delete docCache[p.driveFolder]; throw e; });
+    return docCache[p.driveFolder];
+  };
+  const two = (n) => String(n).padStart(2, '0');
+  // A photo straight from the camera is called by the time it was taken ("2026-11-25 14-32-05.jpg"); a photo from
+  // the gallery keeps its own name.
+  const docFileName = (f, date, camera) => {
+    const ext = ((f.name || '').match(/\.\w{2,5}$/) || ['.jpg'])[0];
+    if (!camera && f.name && !/^image\.\w+$/i.test(f.name)) return f.name;
+    const d = new Date(); return `${date} ${two(d.getHours())}-${two(d.getMinutes())}-${two(d.getSeconds())}${ext}`;
+  };
+  const docErr = (e) => (e && (e.status === 403 || e.status === 404) ? 'אין הרשאה לכתוב בתיקיית הפרויקט ב-Drive. חברו מחדש את חשבון ה-Google בלשונית "יומן, מייל ו-Drive" ואשרו גישה מלאה ל-Drive.' : 'השמירה ב-Drive נכשלה' + (e && e.message ? ': ' + e.message : ''));
+  async function docUpload(p, date, files, camera) {
+    let ok = 0;
+    for (const f of files) {
+      try { await G.drive.docUpload(p.driveFolder, date, docFileName(f, date, camera && files.length === 1), f); ok++; }
+      catch (e) { toast(docErr(e)); break; }
+    }
+    if (ok) delete docCache[p.driveFolder];
+    return ok;
+  }
+  const docThumbUrl = (f) => (f.thumbnailLink ? f.thumbnailLink.replace(/=s\d+$/, '=s400') : '');
+  const docThumb = (f, attrs) => `<button type="button" class="doc-th" data-docid="${esc(f.id)}" ${attrs || ''} title="${esc(f.name)}"><img alt="" loading="lazy" referrerpolicy="no-referrer" ${docThumbUrl(f) ? `src="${esc(docThumbUrl(f))}"` : ''} data-docimg="${esc(f.id)}"></button>`;
+  // A thumbnail Drive does not hand over (or not yet made): the file itself.
+  function fixDocThumbs(root) {
+    $$('img[data-docimg]', root).forEach((im) => {
+      const load = () => { if (im.dataset.tried) return; im.dataset.tried = '1'; G.drive.readBlob(im.dataset.docimg).then((b) => { im.src = URL.createObjectURL(b); }).catch(() => {}); };
+      if (!im.getAttribute('src')) load(); else im.addEventListener('error', load, { once: true });
+    });
+  }
+  const docDays = (files) => {
+    const by = new Map(); files.forEach((f) => { if (!by.has(f.day)) by.set(f.day, []); by.get(f.day).push(f); });
+    return Array.from(by.entries());
+  };
+  const docFolderUrl = (id) => 'https://drive.google.com/drive/folders/' + encodeURIComponent(id);
   const photoImg = (id, cls, sc) => { const v = photoCache.get(id); return `<img class="${cls}" data-photo="${esc(id)}" ${v ? `src="${v}"` : ''}${sc && sc !== 1 ? ` style="max-width:${Math.min(100, Math.round(sc * 100))}%;max-height:${Math.round(240 * sc)}px"` : ''} alt="">`; };
   // The size of a topic's photos in the document, in percent of the usual size (photoScale, 20 to 150).
   const photoScaleOf = (it) => { const n = parseInt(it && it.photoScale, 10); return n >= 20 && n <= 150 ? n : 100; };
@@ -3762,7 +3866,9 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ? `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><textarea class="input" data-k="${c[0]}" rows="${tpl === 'tour' ? 4 : 2}">${esc(it[c[0]])}</textarea></label>`
         : `<label class="pi-f pi-${c[0]}"><span>${esc(c[1])}</span><input class="input" data-k="${c[0]}" value="${esc(it[c[0]])}"></label>`)).join('')}</div>
       <div class="pi-photos">${photoIds(it.photos).map((id) => `<span class="pi-ph">${photoImg(id, '')}<button type="button" data-phdel="${esc(id)}" title="הסרת התמונה">✕</button></span>`).join('')}
-        <label class="btn sm pi-phadd" title="צילום או תמונה מהגלריה">📷 תמונה<input type="file" accept="image/*" multiple hidden data-phadd></label>
+        <label class="btn sm pi-phadd" title="צילום במצלמה. התמונה נכנסת לסעיף ונשמרת גם ב-Drive בתיקיית תיעוד של הפרויקט, לפי תאריך הדוח">📷 צילום<input type="file" accept="image/*" capture="environment" hidden data-phcam></label>
+        <label class="btn sm pi-phadd" title="תמונה מהגלריה או מהמחשב">🖼 מהגלריה<input type="file" accept="image/*" multiple hidden data-phadd></label>
+        <button type="button" class="btn sm" data-phdoc title="בחירה מהתמונות האחרונות בתיקיית תיעוד של הפרויקט ב-Drive">🗂 מתמונות הפרויקט</button>
         ${photoIds(it.photos).length ? `<span class="pi-phpos"><span>מיקום התמונה:</span><button type="button" class="btn sm${it.photoPos === 'left' ? '' : ' primary'}" data-phpos="">⬇ בתחתית הסעיף</button><button type="button" class="btn sm${it.photoPos === 'left' ? ' primary' : ''}" data-phpos="left">⬅ משמאל למלל</button></span>
           <span class="pi-phpos"><span>גודל:</span><button type="button" class="btn sm" data-phsz="-10" title="הקטנה">−</button><b>${photoScaleOf(it)}%</b><button type="button" class="btn sm" data-phsz="10" title="הגדלה">+</button></span>` : ''}
         <input type="hidden" data-k="photos" value="${esc(it.photos || '')}"><input type="hidden" data-k="photoPos" value="${esc(it.photos && it.photoPos ? it.photoPos : '')}"><input type="hidden" data-k="photoScale" value="${it.photos && photoScaleOf(it) !== 100 ? photoScaleOf(it) : ''}"></div>
@@ -3798,6 +3904,47 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         if (ids.length) { setPhotos((cur) => cur.concat(ids)); toast('בחרו את מיקום התמונה: בתחתית הסעיף או משמאל למלל'); }
       });
       $$('[data-phdel]', row).forEach((b) => b.addEventListener('click', () => setPhotos((cur) => cur.filter((x) => x !== b.dataset.phdel))));
+      // Camera: into the section, and into the project's "תיעוד" folder in Drive (the report's date).
+      $('[data-phcam]', row).addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []); if (!files.length) return;
+        const pj = byId(db.projects, ($('#modalBody [name="projectId"]') || {}).value);
+        const date = ($('#modalBody [name="date"]') || {}).value || todayStr();
+        toast('מעבד תמונה...');
+        const ids = [];
+        for (const f of files) { try { ids.push(await makePhoto(f)); } catch (x) { toast('לא ניתן לקרוא את התמונה'); } }
+        if (ids.length) setPhotos((cur) => cur.concat(ids));
+        if (docOk(pj)) docUpload(pj, date, files, true).then((n) => { if (n) toast('התמונה נוספה לסעיף ונשמרה ב-Drive: ' + pj.name + ' / ' + G.drive.docName + ' / ' + date); });
+        else if (ids.length) toast(pj && pj.driveFolder ? 'התמונה נוספה לסעיף. כדי לשמור אותה גם ב-Drive, חברו את חשבון ה-Google' : 'התמונה נוספה לסעיף. כדי לשמור אותה גם ב-Drive, בחרו פרויקט עם תיקיית Drive');
+      });
+      // From the project's latest photos in Drive ("תיעוד"): pick one or more and they are put into the section.
+      $('[data-phdoc]', row).addEventListener('click', async () => {
+        const old = $('.pi-docpick', row); if (old) { old.remove(); return; }
+        const pj = byId(db.projects, ($('#modalBody [name="projectId"]') || {}).value);
+        const pick = document.createElement('div'); pick.className = 'pi-docpick';
+        $('.pi-photos', row).appendChild(pick);
+        if (!pj) { pick.innerHTML = '<div class="hint">בחרו קודם את הפרויקט של הדוח.</div>'; return; }
+        if (!pj.driveFolder) { pick.innerHTML = '<div class="hint">לפרויקט אין קישור לתיקייה ב-Drive. הוסיפו אותו בעריכת הפרויקט.</div>'; return; }
+        if (!docOk(pj)) { pick.innerHTML = '<div class="hint">כדי לבחור מתמונות הפרויקט, חברו את חשבון ה-Google בלשונית "יומן, מייל ו-Drive".</div>'; return; }
+        pick.innerHTML = '<div class="hint">טוען את התמונות האחרונות של הפרויקט...</div>';
+        let res;
+        try { res = await docList(pj); } catch (x) { pick.innerHTML = `<div class="hint">${esc(docErr(x))}</div>`; return; }
+        if (!res.files.length) { pick.innerHTML = `<div class="hint">אין עדיין תמונות בתיקיית ${esc(G.drive.docName)} של הפרויקט. צלמו מעמוד הפרויקט או בכפתור "📷 צילום".</div>`; return; }
+        pick.innerHTML = docDays(res.files).map(([d, l]) => `<div class="doc-day"><h3>${esc(fmtDate(d) || d)}</h3><div class="doc-grid">${l.map((f) => docThumb(f)).join('')}</div></div>`).join('')
+          + '<div class="pi-docpick-bar"><button type="button" class="btn sm primary" data-docadd disabled>הוספה לסעיף</button><button type="button" class="btn sm" data-docx>סגירה</button><span class="hint">לחצו על התמונות שרוצים להוסיף</span></div>';
+        fixDocThumbs(pick);
+        const addB = $('[data-docadd]', pick);
+        const count = () => { const n = $$('.doc-th.sel', pick).length; addB.disabled = !n; addB.textContent = n ? 'הוספה לסעיף (' + n + ')' : 'הוספה לסעיף'; };
+        $$('.doc-th', pick).forEach((b) => b.addEventListener('click', () => { b.classList.toggle('sel'); count(); }));
+        $('[data-docx]', pick).addEventListener('click', () => pick.remove());
+        addB.addEventListener('click', async () => {
+          const sel = $$('.doc-th.sel', pick).map((b) => b.dataset.docid);
+          addB.disabled = true; addB.textContent = 'מוסיף ' + sel.length + '...';
+          const ids = [];
+          for (const id of sel) { try { ids.push(await makePhoto(await G.drive.readBlob(id))); } catch (x) { toast('לא ניתן להוריד תמונה מה-Drive'); } }
+          if (ids.length) { setPhotos((cur) => cur.concat(ids)); toast(ids.length === 1 ? 'התמונה נוספה לסעיף' : ids.length + ' תמונות נוספו לסעיף'); }
+          else count();
+        });
+      });
       fillPhotos(row);
       const ask = askOf(items[n], n);
       if (ask) {
