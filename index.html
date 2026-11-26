@@ -264,21 +264,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 @media (max-width: 520px) { .pgroup-head { flex-wrap: wrap; } .pgroup-head .pg-sum { flex-basis: 100%; justify-content: flex-start; padding-inline-start: 24px; } }
 .plist { display: flex; flex-direction: column; gap: 6px; }
 .ptile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.ptile { aspect-ratio: auto; min-height: 76px; justify-content: space-between; }
 .ptile { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); cursor: pointer; font-size: 12px; line-height: 1.3; min-width: 0; }
 .ptile:hover { border-color: var(--primary); background: var(--primary-soft); }
 .ptile.s-done { opacity: .65; }
-.ptile-pic { position: relative; height: 64px; border-radius: 7px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.ptile-pic img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.ptile-av { width: 40px; height: 40px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; }
-.ptile-acts { position: absolute; top: 3px; inset-inline-start: 3px; display: flex; gap: 3px; opacity: 0; transition: opacity .15s; }
-.ptile:hover .ptile-acts, .ptile:focus-within .ptile-acts { opacity: 1; }
-@media (hover: none) { .ptile-acts { opacity: 1; } }
+.pgroup-top { display: flex; align-items: center; }
+.pgroup-top .pgroup-head { flex: 1; min-width: 0; }
+.pg-acts { display: flex; gap: 3px; padding-inline-end: 8px; flex: none; }
 .ptile-act { width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
 .ptile-act:hover { border-color: var(--primary); }
 .ptile-name { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
 .ptile-meta { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
-.pg-logo { width: 26px; height: 26px; border-radius: 50%; flex: none; object-fit: contain; background: #fff; border: 1px solid var(--border); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+.pg-logo { width: 40px; height: 40px; border-radius: 50%; flex: none; object-fit: contain; background: #fff; border: 1px solid var(--border); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
 span.pg-logo { border: 0; }
+img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .pdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #94a3b8; }
 .pdot.blue { background: var(--primary); } .pdot.green { background: var(--green); } .pdot.amber { background: var(--amber); } .pdot.purple { background: var(--purple); } .pdot.red { background: var(--red); }
 /* Project page: the phase, its progress chart and the four tiles */
@@ -1936,13 +1935,14 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     }));
   }
 
-  // ---------- Project tiles: a small square with the client's logo (or initials), the name and a status dot ----------
-  // A project's picture: its own (p.logo, a photo id), or else the logo of another project of the same client.
+  // ---------- Project tiles: a small square with the name and a status dot; the client's logo is on the client's row ----------
+  // A client's logo (a photo id) is kept in db.settings.clientLogos by client name (older logos were kept on a project, p.logo).
   const clientKey = (p) => (p.client || '').trim();
-  function projLogo(p) {
-    if (p.logo) return p.logo;
-    const k = clientKey(p); if (!k) return '';
-    const o = db.projects.find((x) => x.logo && clientKey(x) === k);
+  const clientLogos = () => { db.settings = db.settings || {}; return (db.settings.clientLogos = db.settings.clientLogos || {}); };
+  function clientLogo(name) {
+    if (!name) return '';
+    const v = (db.settings && db.settings.clientLogos || {})[name]; if (v) return v;
+    const o = db.projects.find((x) => x.logo && clientKey(x) === name);
     return o ? o.logo : '';
   }
   const AV_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#db2777', '#0891b2', '#4f46e5', '#65a30d'];
@@ -1968,11 +1968,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   }
   function projTile(p) {
     const st = byId(PROJECT_STATUS, p.status);
-    const logo = projLogo(p);
     const tip = [p.name, p.client, st ? st.label : ''].filter(Boolean).join(' · ');
     return `<div class="ptile s-${esc(p.status || 'none')}" data-id="${esc(p.id)}" title="${esc(tip)}">
-      <div class="ptile-pic">${logo ? `<img data-photo="${esc(logo)}" alt="">` : avatarHtml(p.client || p.name, 'ptile-av')}
-        <span class="ptile-acts">${p.logo ? `<button type="button" class="ptile-act" data-logo-del title="הסרת התמונה">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${logo ? 'החלפת תמונה' : 'הוספת תמונה / לוגו לקוח'}">🖼</button></span></div>
       <div class="ptile-name">${esc(p.name)}</div>
       <div class="ptile-meta"><span class="pdot ${st ? st.color : 'gray'}"></span>${esc(st ? st.label : 'ללא סטטוס')}</div></div>`;
   }
@@ -1998,18 +1995,19 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     // Each client / status is a row that opens to show its projects (closed by default; a search opens every row).
     const rows = groups.map((g) => {
       const open = !!q || !!ui.projOpen[g.key];
-      let label, sum;
+      let label, sum, acts = '';
       if (byClientView) {
-        const lg = g.name !== 'ללא לקוח' && projLogo(g.items[0]);
+        const real = g.name !== 'ללא לקוח', lg = real && clientLogo(g.name);
         label = (lg ? `<img class="pg-logo" data-photo="${esc(lg)}" alt="">` : avatarHtml(g.name, 'pg-logo')) + `<span class="pg-name">${esc(g.name)}</span>`;
         sum = statusSum(g.items);
+        if (real) acts = `<span class="pg-acts">${lg ? `<button type="button" class="ptile-act" data-logo-del title="הסרת הלוגו">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${lg ? 'החלפת הלוגו של הלקוח' : 'הוספת לוגו ללקוח'}">🖼</button></span>`;
       } else {
         const clients = new Set(g.items.map(clientKey).filter(Boolean)).size;
         label = g.status ? pill(PROJECT_STATUS, g.status) : `<span class="pg-name">${esc(g.name)}</span>`;
         sum = clients ? `<span>${clients} לקוחות</span>` : '';
       }
-      return `<div class="pgroup${open ? ' open' : ''}" data-pg="${esc(g.key)}">
-        <button type="button" class="pgroup-head" aria-expanded="${open}"><span class="pg-chev">◀</span>${label}<span class="count">${g.items.length}</span><span class="pg-sum">${sum}</span></button>
+      return `<div class="pgroup${open ? ' open' : ''}" data-pg="${esc(g.key)}"${byClientView ? ` data-client="${esc(g.name)}"` : ''}>
+        <div class="pgroup-top"><button type="button" class="pgroup-head" aria-expanded="${open}"><span class="pg-chev">◀</span>${label}<span class="count">${g.items.length}</span><span class="pg-sum">${sum}</span></button>${acts}</div>
         <div class="pgroup-body"><div class="pgroup-inner"><div class="ptile-grid">${g.items.map(projTile).join('')}</div></div></div></div>`;
     }).join('');
     el.innerHTML = `
@@ -2033,19 +2031,22 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     if (allA) { syncAll(); allA.addEventListener('click', (e) => { e.preventDefault(); const open = !$$('.pgroup', el).every((g) => g.classList.contains('open')); $$('.pgroup', el).forEach((g) => setOpen(g, open)); syncAll(); }); }
     const di = $('#driveImportBtn', el);
     if (di) di.addEventListener('click', () => importDriveProjects(true));
-    // The picture of a project: picked from the computer or the phone, it shows on every project of the same client that has none of its own.
-    const file = $('#logoFile', el); let logoFor = null;
+    // A client's logo, picked from the computer or the phone, shows on the client's row.
+    const file = $('#logoFile', el); let logoFor = '';
     file.addEventListener('change', async () => {
-      const f = file.files && file.files[0]; const p = logoFor && byId(db.projects, logoFor); file.value = '';
-      if (!f || !p) return;
-      try { p.logo = await makeLogo(f); save(); renderProjects(el); toast('התמונה נשמרה'); } catch (e) { toast('לא ניתן לטעון את התמונה'); }
+      const f = file.files && file.files[0]; const name = logoFor; file.value = '';
+      if (!f || !name) return;
+      try { clientLogos()[name] = await makeLogo(f); save(); renderProjects(el); toast('הלוגו נשמר'); } catch (e) { toast('לא ניתן לטעון את התמונה'); }
     });
-    $$('.ptile', el).forEach((c) => c.addEventListener('click', (e) => {
-      const p = byId(db.projects, c.dataset.id);
-      if (e.target.closest('[data-logo]')) { e.stopPropagation(); logoFor = c.dataset.id; file.click(); return; }
-      if (e.target.closest('[data-logo-del]')) { e.stopPropagation(); if (p) { delete p.logo; save(); renderProjects(el); } return; }
-      location.hash = 'project/' + encodeURIComponent(c.dataset.id);
+    $$('.pg-acts', el).forEach((a) => a.addEventListener('click', (e) => {
+      const name = a.closest('.pgroup').dataset.client; if (!name) return;
+      if (e.target.closest('[data-logo]')) { logoFor = name; file.click(); }
+      else if (e.target.closest('[data-logo-del]')) {
+        delete clientLogos()[name]; db.projects.forEach((x) => { if (x.logo && clientKey(x) === name) delete x.logo; });
+        save(); renderProjects(el);
+      }
     }));
+    $$('.ptile', el).forEach((c) => c.addEventListener('click', () => { location.hash = 'project/' + encodeURIComponent(c.dataset.id); }));
     fillPhotos(el);
   }
 
