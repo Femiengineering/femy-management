@@ -367,6 +367,25 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .gt-ms.od { background: var(--red); }
 .gt-sub { padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--gray-soft); border-top: 1px solid var(--border); }
 .pc-legend .gt-ld { background: var(--purple); border-radius: 2px; transform: rotate(45deg); }
+.gt-src { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
+.gt-src-acts { display: inline-flex; gap: 4px; margin-inline-start: auto; }
+.gt-src-n { font-size: 12px; color: var(--muted); font-weight: 600; }
+.gantt.many { max-height: 560px; overflow-y: auto; }
+.gantt.many .gt-head { position: sticky; top: 0; z-index: 4; }
+.gantt.file .gt-row { grid-template-columns: 300px minmax(0, 1fr); min-height: 28px; }
+.gantt.file .gt-lab { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding-top: 3px; padding-bottom: 3px; }
+.gantt.file .gt-lab b { flex: 1; min-width: 0; font-weight: 500; }
+.gantt.file .gt-lab small { flex: none; }
+.gantt.file .gt-head .gt-lab { justify-content: flex-start; }
+.gt-row.gt-fr .gt-lab { padding-inline-start: 20px; }
+.gt-row.gt-fr .gt-bar { top: 7px; bottom: 7px; min-height: 12px; }
+.gt-row.gt-fr .gt-pct { line-height: 14px; font-size: 10px; }
+.gt-row.gt-grp { background: var(--gray-soft); }
+.gt-row.gt-grp .gt-lab b { font-weight: 700; }
+.gt-bar.past { background: #b8c4d3; box-shadow: none; }
+.gt-bar.grp { top: 10px; bottom: 10px; min-height: 8px; background: #475569; box-shadow: none; border-radius: 2px; }
+.gt-bar.grp .gt-fill { background: #1e293b; }
+@media (max-width: 620px) { .gantt.file .gt-row { grid-template-columns: 130px minmax(0, 1fr); } .gantt.file .gt-lab small { display: none; } }
 .gantt-empty { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 620px) { .gt-mon.alt { visibility: hidden; } .gt-row { grid-template-columns: 110px minmax(0, 1fr); } .gt-lab { padding: 4px 6px; font-size: 12px; } }
 /* Project page: five tiles; the photo tile shows the latest photos */
@@ -1361,6 +1380,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   <script src="sheet-sync.js"></script>
   <script src="drive-protocols.js"></script>
   <script src="ledger-xlsx.js"></script>
+  <script src="gantt-file.js"></script>
   <script>
 /* פמי הנדסה - מערכת ניהול ומעקב
  * מצב מקומי: הנתונים נשמרים בדפדפן (localStorage).
@@ -2382,11 +2402,12 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     return out;
   }
   function ganttHtml(p, tasks) {
-    const stages = ganttStages(p).filter((g) => !isNaN(isoMs(g.s)) && !isNaN(isoMs(g.e)));
+    const file = ganttFileRows(p);
+    const stages = (file || ganttStages(p)).filter((g) => !isNaN(isoMs(g.s)) && !isNaN(isoMs(g.e)));
     const miles = tasks.filter((t) => t.status !== 'done' && !isNaN(isoMs(t.due))).sort((a, b) => a.due.localeCompare(b.due));
     const shownMiles = miles.slice(0, 8);
     const T = isoMs(todayStr());
-    const add = `<button type="button" class="btn sm" data-gadd>+ שלב</button>`;
+    const add = file ? `<span class="gt-src-n">${stages.filter((g) => !g.group).length} משימות</span>` : `<button type="button" class="btn sm" data-gadd>+ שלב</button>`;
     if (!stages.length && !shownMiles.length) {
       return `<div class="gantt-empty hint">עוד אין שלבים בגאנט. ${add} או הוסיפו לפרויקט תאריכי התחלה, סיום תכנון וסיום (ב"עריכה"), והשלבים יופיעו כאן.</div>`;
     }
@@ -2403,15 +2424,18 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const lines = months.map((m) => `<i class="gt-ml" style="inset-inline-start:${f2(pos(m))}%"></i>`).join('');
     const today = `<i class="gt-today" style="inset-inline-start:${f2(pos(T))}%"></i>`;
     const head = months.map((m, i) => { const d = new Date(m); const nx = months[i + 1] || t1; return i % every ? '' : `<span class="gt-mon${(i / every) % 2 ? ' alt' : ''}" style="inset-inline-start:${f2(pos(m))}%;width:${f2(pos(Math.min(t1, m + (nx - m) * every)) - pos(m))}%">${d.getUTCMonth() + 1}/${String(d.getUTCFullYear()).slice(2)}</span>`; }).join('');
-    const row = (lab, track, attrs) => `<div class="gt-row" ${attrs || ''}><div class="gt-lab">${lab}</div><div class="gt-track">${lines}${today}${track}</div></div>`;
+    const row = (lab, track, attrs) => { const c = /^class="([^"]*)"/.exec(attrs || ''); return `<div class="gt-row${c ? ' ' + c[1] : ''}" ${(attrs || '').replace(/^class="[^"]*"/, '')}><div class="gt-lab">${lab}</div><div class="gt-track">${lines}${today}${track}</div></div>`; };
     const bars = stages.map((g) => {
-      const S = isoMs(g.s); const E = isoMs(g.e) + dayMs; const pct = Math.max(0, Math.min(100, Number(g.pct) || 0));
+      const S = isoMs(g.s); const E = isoMs(g.e) + dayMs; const known = g.pct != null && g.pct !== '';
+      const pct = Math.max(0, Math.min(100, Number(g.pct) || 0));
       const plan = E > S ? Math.max(0, Math.min(100, Math.round(((T - S) / (E - S)) * 100))) : 0;
-      const cls = pct >= 100 ? 'done' : (T >= E || plan - pct >= 15) ? 'late' : '';
-      const tip = `${g.name}: ${fmtDate(g.s)} עד ${fmtDate(g.e)} · בוצע ${pct}%${pct < 100 && T > S ? ` · מתוכנן להיום ${plan}%` : ''}`;
-      return row(`<b>${esc(g.name)}</b><small>${fmtDate(g.s)} - ${fmtDate(g.e)}</small>`,
-        `<div class="gt-bar ${cls}" style="inset-inline-start:${f2(pos(S))}%;width:${f2(Math.max(0.8, pos(E) - pos(S)))}%" title="${esc(tip)}"><span class="gt-fill" style="width:${pct}%"></span><span class="gt-pct">${pct}%</span></div>`,
-        `data-gst="${esc(g.id)}" title="לחיצה לעריכת השלב"`);
+      // Without progress in the file, a bar only tells whether its time has passed.
+      const cls = (g.group ? 'grp ' : '') + (!known ? (T >= E ? 'past' : '') : pct >= 100 ? 'done' : (T >= E || plan - pct >= 15) ? 'late' : '');
+      const tip = `${g.name}: ${fmtDate(g.s)} עד ${fmtDate(g.e)}${known ? ` · בוצע ${pct}%` : ''}${known && pct < 100 && T > S ? ` · מתוכנן להיום ${plan}%` : ''}`;
+      const dd = g.s === g.e ? fmtDate(g.s) : `${fmtDate(g.s)} - ${fmtDate(g.e)}`;
+      return row(`<b>${esc(g.name)}</b><small>${dd}</small>`,
+        `<div class="gt-bar ${cls}" style="inset-inline-start:${f2(pos(S))}%;width:${f2(Math.max(0.8, pos(E) - pos(S)))}%" title="${esc(tip)}">${known ? `<span class="gt-fill" style="width:${pct}%"></span>${g.group ? '' : `<span class="gt-pct">${pct}%</span>`}` : ''}</div>`,
+        file ? `class="${g.group ? 'gt-grp' : 'gt-fr'}" title="${esc(tip)}"` : `data-gst="${esc(g.id)}" title="לחיצה לעריכת השלב"`);
     }).join('');
     const ms = shownMiles.map((t) => {
       const od = isOverdueTask(t);
@@ -2419,12 +2443,12 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         `<span class="gt-ms${od ? ' od' : ''}" style="inset-inline-start:${f2(pos(isoMs(t.due) + dayMs / 2))}%" title="${esc(t.title + ' · יעד ' + fmtDate(t.due))}"></span>`,
         `data-gtask="${esc(t.id)}" title="לחיצה לפתיחת המשימה"`);
     }).join('');
-    return `<div class="gantt">
+    return `<div class="gantt${stages.length > 14 ? ' many' : ''}${file ? ' file' : ''}">
       <div class="gt-row gt-head"><div class="gt-lab">${add}</div><div class="gt-track">${head}<span class="gt-today-l" style="inset-inline-start:${f2(pos(T))}%">היום</span></div></div>
       ${bars || `<div class="gt-row"><div class="gt-lab hint">אין שלבים</div><div class="gt-track">${lines}${today}</div></div>`}
       ${ms ? `<div class="gt-sub">משימות לפי תאריך יעד${miles.length > shownMiles.length ? ` (${shownMiles.length} הקרובות מתוך ${miles.length})` : ''}</div>${ms}` : ''}
     </div>
-    <div class="pc-legend"><span><i class="l-dot" style="background:var(--primary)"></i>שלב (החלק הכהה: מה שבוצע)</span><span><i class="l-dot" style="background:var(--red)"></i>בפיגור</span><span><i class="l-dot" style="background:var(--green)"></i>הושלם</span>${ms ? '<span><i class="l-dot gt-ld"></i>יעד משימה</span>' : ''}<span><i class="l-dot" style="background:var(--amber)"></i>היום</span></div>`;
+    <div class="pc-legend"><span><i class="l-dot" style="background:var(--primary)"></i>${file ? 'משימה' : 'שלב'} (החלק הכהה: מה שבוצע)</span><span><i class="l-dot" style="background:var(--red)"></i>בפיגור</span><span><i class="l-dot" style="background:var(--green)"></i>הושלם</span>${stages.some((g) => g.pct == null) ? '<span><i class="l-dot" style="background:#b8c4d3"></i>זמן המשימה עבר (אין בקובץ אחוז ביצוע)</span>' : ''}${stages.some((g) => g.group) ? '<span><i class="l-dot" style="background:#475569;border-radius:2px"></i>פרק</span>' : ''}${ms ? '<span><i class="l-dot gt-ld"></i>יעד משימה</span>' : ''}<span><i class="l-dot" style="background:var(--amber)"></i>היום</span></div>`;
   }
   // A stage of the Gantt chart: new, or edited. The first change turns the stand-in phases into the project's own stages.
   function openGanttForm(p, id) {
@@ -2449,6 +2473,106 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     },
     cur ? () => { p.gantt = own().filter((x) => x.id !== cur.id); save(); render(); toast('השלב נמחק'); } : null);
   }
+  // ---------- The Gantt chart from the project's schedule file in Drive ----------
+  // The file: a PDF, Excel or Google Sheet in the project's folder (any depth) whose name has "גאנט" / "לוח זמנים" /
+  // "לו"ז"; the newest one, unless the user picked another (p.ganttFile; { none: true } for stages kept on the site).
+  // What it says is kept with the project (p.ganttSrc: { id, name, mod, at, rows }), so everyone sees it at once.
+  const GANTT_Q = ['גאנט', 'גנט', 'gantt', 'לוח זמנים', 'לוחות זמנים', 'לו"ז', 'לוז'];
+  const GANTT_MIME = (m) => /pdf|spreadsheet|excel|sheet/.test(m || '');
+  const ganttChecked = {};
+  const ganttCanSync = (p) => !!(p && p.driveFolder && GOOGLE && G.valid() && G.drive && G.drive.search && window.FemyGantt) && !(p.ganttFile && p.ganttFile.none);
+  const ganttFileRows = (p) => (p.ganttSrc && p.ganttSrc.rows && p.ganttSrc.rows.length && !(p.ganttFile && p.ganttFile.none) ? p.ganttSrc.rows : null);
+  let pdfjsLoading = null;
+  function loadPdfjs() {
+    const base = new URL('vendor/pdfjs/', location.href).href; // pdf.js 4.10.38 (legacy build), loaded only when needed
+    if (!pdfjsLoading) pdfjsLoading = import(base + 'pdf.min.mjs').then((m) => { m.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs'; return m; }, (e) => { pdfjsLoading = null; throw e; });
+    return pdfjsLoading;
+  }
+  // Every schedule file the user can see, once for all the projects (kept 10 minutes), with each one's folders up
+  // to the top, to tell which project it belongs to.
+  let ganttAll = null;
+  const folderUp = {};
+  async function parentsOf(id) {
+    if (folderUp[id] === undefined) folderUp[id] = G.drive.meta(id, 'id,parents').then((m) => (m.parents || [])[0] || '', () => '');
+    return folderUp[id];
+  }
+  async function ganttFilesIn(p, fresh) {
+    if (fresh || !ganttAll || Date.now() - ganttAll.at > 10 * 60 * 1000) {
+      const q = '(' + GANTT_Q.map((w) => `name contains '${w.replace(/'/g, "\\'")}'`).join(' or ') + ") and trashed=false and mimeType != 'application/vnd.google-apps.folder'";
+      ganttAll = { at: Date.now(), pr: G.drive.search(q, 'id,name,mimeType,parents,modifiedTime', 3) };
+      ganttAll.pr.catch(() => { ganttAll = null; });
+    }
+    const files = (await ganttAll.pr).filter((f) => GANTT_MIME(f.mimeType));
+    const inside = [];
+    for (const f of files) {
+      let at = (f.parents || [])[0] || '';
+      for (let i = 0; at && i < 12; i++) {
+        if (at === p.driveFolder) { inside.push(f); break; }
+        if (folderUp[at] === undefined) { const fn = (dprot.folders || {})[at] || ((dprot.base && dprot.base.folders) || {})[at]; if (fn) folderUp[at] = Promise.resolve(fn[0] || ''); }
+        at = await parentsOf(at);
+      }
+    }
+    // The newest first; a name with "גאנט" before a "לוח זמנים" of the same day.
+    const rank = (f) => (/גאנט|גנט|gantt/i.test(f.name) ? 1 : 0);
+    return inside.sort((a, b) => (b.modifiedTime || '').slice(0, 10).localeCompare((a.modifiedTime || '').slice(0, 10)) || rank(b) - rank(a));
+  }
+  async function readGanttFile(f) {
+    if (/pdf/.test(f.mimeType)) return window.FemyGantt.fromPdf(await G.drive.readBuffer(f.id), await loadPdfjs());
+    const buf = /google-apps\.spreadsheet/.test(f.mimeType)
+      ? await G.drive.exportFile(f.id, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      : await G.drive.readBuffer(f.id);
+    return window.FemyGantt.fromRows(await FemyLedger.readXlsx(buf, await loadJSZip()));
+  }
+  // Reads the project's schedule file again when it changed (or when asked). True when the chart changed.
+  async function syncProjGantt(p, force) {
+    if (!ganttCanSync(p)) return false;
+    const files = await ganttFilesIn(p, force);
+    let f = p.ganttFile && p.ganttFile.id ? files.find((x) => x.id === p.ganttFile.id) : files[0];
+    if (!f && p.ganttFile && p.ganttFile.id) f = await G.drive.meta(p.ganttFile.id, 'id,name,mimeType,modifiedTime');
+    if (!f) return false;
+    if (!force && p.ganttSrc && p.ganttSrc.id === f.id && p.ganttSrc.mod === f.modifiedTime) return false;
+    const rows = await readGanttFile(f);
+    if (!rows.length) { if (force) toast('לא נמצאו בקובץ "' + f.name + '" משימות עם תאריכים'); if (p.ganttSrc && p.ganttSrc.id === f.id) return false; }
+    p.ganttSrc = { id: f.id, name: f.name, mod: f.modifiedTime || '', at: Date.now(), rows: rows.map((r) => ({ name: r.name, s: r.s, e: r.e, pct: r.pct, group: r.group || undefined })) };
+    save();
+    if (force && rows.length) toast(`הגאנט עודכן מהקובץ "${f.name}" (${rows.filter((r) => !r.group).length} משימות)`);
+    return true;
+  }
+  function ganttSrcHtml(p) {
+    const none = p.ganttFile && p.ganttFile.none;
+    const src = !none && p.ganttSrc;
+    const can = !!(p.driveFolder && GOOGLE && G.valid());
+    const url = src ? 'https://drive.google.com/file/d/' + encodeURIComponent(src.id) + '/view' : '';
+    return `<div class="gt-src">${src ? `📄 מתוך <a href="${esc(url)}" target="_blank" rel="noopener">${esc(src.name)}</a>${src.mod ? ` <span class="hint">(הקובץ עודכן ${fmtDate(src.mod.slice(0, 10))})</span>` : ''}${!src.rows || !src.rows.length ? ' <span class="overdue">לא נמצאו בו משימות עם תאריכים</span>' : ''}`
+      : none ? '✏️ שלבים שהוגדרו באתר' : p.driveFolder ? `<span class="hint">${can ? 'מחפש קובץ גאנט בתיקיית הפרויקט...' : 'הגאנט נלקח מקובץ הגאנט שבתיקיית הפרויקט ב-Drive. חברו את Google כדי לקרוא אותו.'}</span>` : ''}
+      ${can ? `<span class="gt-src-acts">${src ? '<button type="button" class="btn sm ghost" data-gfresh title="קריאה מחדש של הקובץ">🔄 רענון</button>' : ''}<button type="button" class="btn sm ghost" data-gpick>${src ? 'החלפת קובץ' : 'בחירת קובץ גאנט'}</button></span>` : ''}</div>`;
+  }
+  // Choosing the schedule file: those found in the project, every PDF / Excel file of the project, or none.
+  function openGanttFilePicker(p) {
+    openModal('קובץ הגאנט של הפרויקט', `<div class="field full hint">האתר בוחר לבד את הקובץ החדש ביותר בתיקיית הפרויקט ששמו כולל "גאנט", "לוח זמנים" או "לו"ז" (PDF, אקסל או Google Sheets). כאן אפשר לבחור קובץ אחר.</div>
+      <div class="field full"><input class="input" type="search" data-gfq placeholder="🔍 חיפוש קובץ בפרויקט"></div>
+      <div class="field full"><div class="afp-list" data-gfl><div class="hint">מחפש קבצים...</div></div></div>`, () => {});
+    $('#modalForm button[type=submit]').style.display = 'none';
+    const list = $('[data-gfl]'); const q = $('[data-gfq]');
+    let found = []; let ix = null;
+    const choose = (v, label) => { p.ganttFile = v; if (v && v.none) delete p.ganttSrc; save(); closeModal(); toast(label); if (v && v.none) render(); else syncProjGantt(p, true).then(() => render(), (e) => { toast('קריאת הקובץ נכשלה: ' + gErr(e)); render(); }); };
+    const draw = () => {
+      if (!document.body.contains(list)) return;
+      const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const all = found.map((f) => ({ f, path: '', hit: true }))
+        .concat(ix ? ix.items.filter((it) => !it.f.folder && GANTT_MIME(it.f.mimeType) && !found.some((x) => x.id === it.f.id)).map((it) => ({ f: it.f, path: it.path.map((c) => c.name).join(' › ') })) : []);
+      const shown = all.filter((x) => words.every((w) => x.f.name.toLowerCase().includes(w))).slice(0, 120);
+      const cur = p.ganttSrc && p.ganttSrc.id;
+      list.innerHTML = `<button type="button" class="afp-it" data-gnone><span>✏️ בלי קובץ: שלבים שמגדירים באתר</span></button>`
+        + shown.map((x, i) => `<button type="button" class="afp-it" data-gfi="${i}"><span>${/pdf/.test(x.f.mimeType) ? '📕' : '📗'} ${esc(x.f.name)}${x.f.id === cur ? ' <b>(הקובץ הנוכחי)</b>' : ''}</span><small>${x.hit ? 'קובץ גאנט / לוח זמנים' : esc(x.path || 'תיקיית הפרויקט')}${x.f.modifiedTime ? ' · עודכן ' + fmtDate(x.f.modifiedTime.slice(0, 10)) : ''}</small></button>`).join('')
+        + (ix && ix.running ? '<div class="hint">סורק את תיקיות הפרויקט...</div>' : '');
+      $('[data-gnone]', list).addEventListener('click', () => choose({ none: true }, 'הגאנט יוצג משלבים שמגדירים באתר'));
+      $$('[data-gfi]', list).forEach((b) => b.addEventListener('click', () => { const f = shown[Number(b.dataset.gfi)].f; choose({ id: f.id, name: f.name }, 'קורא את "' + f.name + '"...'); }));
+    };
+    q.addEventListener('input', draw);
+    ganttFilesIn(p, true).then((r) => { found = r; draw(); }).catch(() => draw());
+    projDriveIndex(p, (x) => { ix = x; draw(); }).then((x) => { ix = x; draw(); }).catch(() => {});
+  }
   function phaseCardHtml(p, tasks) {
     const ph = projPhase(p); const m = phaseModel(p, ph);
     const order = ['planning', 'active', 'done'];
@@ -2466,11 +2590,21 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         </div>
         ${p.status === 'planning' || p.status === 'active' ? `<label class="phase-upd">עדכון: <input type="range" min="0" max="100" step="5" value="${m.cur}" data-pprog><output data-pprogout>${m.cur}%</output></label>` : ''}
       </div>
+      ${ganttSrcHtml(p)}
       ${ganttHtml(p, tasks)}
     </div>`;
   }
   function bindGantt(p, el) {
     $$('[data-gadd]', el).forEach((b) => b.addEventListener('click', () => openGanttForm(p)));
+    const rf = $('[data-gfresh]', el);
+    if (rf) rf.addEventListener('click', () => { rf.disabled = true; rf.textContent = 'קורא את הקובץ...'; syncProjGantt(p, true).then(() => render(), (e) => { toast('קריאת קובץ הגאנט נכשלה: ' + gErr(e)); render(); }); });
+    const pk = $('[data-gpick]', el); if (pk) pk.addEventListener('click', () => openGanttFilePicker(p));
+    // Looks for a newer schedule file in the project's Drive folder (at most every 10 minutes).
+    if (ganttCanSync(p) && !ganttChecked[p.id]) {
+      ganttChecked[p.id] = Date.now();
+      setTimeout(() => ganttChecked[p.id] = 0, 10 * 60 * 1000);
+      syncProjGantt(p, false).then((changed) => { if (changed && document.body.contains(el) && location.hash === projectHref(p)) render(); }).catch((e) => { console.warn('gantt sync', e); });
+    }
     $$('[data-gst]', el).forEach((r) => r.addEventListener('click', () => openGanttForm(p, r.dataset.gst)));
     $$('[data-gtask]', el).forEach((r) => r.addEventListener('click', () => { const t = byId(db.tasks, r.dataset.gtask); if (t) openTaskForm(t); }));
   }
