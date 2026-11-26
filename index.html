@@ -3548,12 +3548,34 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // Projects collected from the company's Drive folder ("פרויקטים פמי"), in projects/drive-projects.json.
   // Added once per version of that file; a project already in the system (same id or name) is left as is,
   // so edits made on the site are never overwritten. manual: the button on the projects page.
+  // Clients and projects taken off the site for good (removeClients / removeProjects in drive-projects.json):
+  // any project of such a client (by client or project name), with its tasks and protocols, and the client's logo.
+  // Invoices stay (they are the company's books), only unlinked from the project. Runs on every load.
+  function purgeRemoved(data) {
+    const norm = (x) => (x || '').replace(/\s+/g, ' ').trim();
+    const names = (data.removeClients || []).map(norm).filter(Boolean);
+    const ids = new Set(data.removeProjects || []);
+    if (!names.length && !ids.size) return;
+    const hit = (txt) => names.some((n) => norm(txt).includes(n));
+    db.projects.forEach((p) => { if (hit(p.client) || hit(p.name)) ids.add(p.id); });
+    const logos = (db.settings && db.settings.clientLogos) || {};
+    const lk = Object.keys(logos).filter(hit);
+    const n = db.projects.filter((p) => ids.has(p.id)).length;
+    if (!n && !lk.length) return;
+    db.projects = db.projects.filter((p) => !ids.has(p.id));
+    db.tasks = db.tasks.filter((t) => !ids.has(t.projectId));
+    db.protocols = db.protocols.filter((x) => !ids.has(x.projectId));
+    (db.invoices || []).forEach((x) => { if (ids.has(x.projectId)) x.projectId = ''; });
+    lk.forEach((k) => delete logos[k]);
+    save(); render();
+  }
   async function importDriveProjects(manual) {
     if (!isAdmin()) return;
     let data;
     try { data = await (await fetch('projects/drive-projects.json', { cache: 'no-cache' })).json(); }
     catch (e) { if (manual) toast('טעינת רשימת הפרויקטים מה-Drive נכשלה'); return; }
     if (!data || !Array.isArray(data.projects)) return;
+    purgeRemoved(data); // on every load, not once per version
     if (!manual && settings().driveImport === data.version) return;
     if (db.demo) db = emptyDb(); // replace the sample data with the real projects
     const norm = (x) => (x || '').replace(/\s+/g, ' ').trim();
@@ -3570,19 +3592,6 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       if (sh) { Object.keys(p).forEach((k) => { if (k !== 'id' && k !== 'name') sh[k] = p[k]; }); return; }
       db.projects.push(Object.assign({}, p)); added[p.id] = 1; n++;
     });
-    // Clients and projects taken off the site for good: the projects, with their tasks and protocols, and the
-    // client's logo. Invoices stay (they are the company's books), only unlinked from the project.
-    const goneClients = new Set((data.removeClients || []).map(norm));
-    const goneIds = new Set(data.removeProjects || []);
-    db.projects.forEach((p) => { if (goneClients.has(norm(p.client))) goneIds.add(p.id); });
-    if (goneIds.size) {
-      db.projects = db.projects.filter((p) => !goneIds.has(p.id));
-      db.tasks = db.tasks.filter((t) => !goneIds.has(t.projectId));
-      db.protocols = db.protocols.filter((x) => !goneIds.has(x.projectId));
-      (db.invoices || []).forEach((x) => { if (goneIds.has(x.projectId)) x.projectId = ''; });
-    }
-    const logos = settings().clientLogos || {};
-    Object.keys(logos).forEach((k) => { if (goneClients.has(norm(k))) delete logos[k]; });
     // One-time changes to projects already in the system. With "from", a field changes only while it still
     // holds the old value, so what was edited on the site stays.
     let nu = 0;
