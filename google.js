@@ -489,6 +489,18 @@
       lastId: last.id,
     };
   }
+  // How many conversations match a search (up to max), counted from the ids only.
+  async function countThreads(q, max) {
+    let n = 0, pageToken = '';
+    for (let i = 0; i < 10; i++) {
+      const p = new URLSearchParams({ maxResults: '500', q, fields: 'threads/id,nextPageToken' });
+      if (pageToken) p.set('pageToken', pageToken);
+      const r = await json(GM + '/threads?' + p);
+      n += (r.threads || []).length;
+      if (!(pageToken = r.nextPageToken) || n >= (max || 5000)) break;
+    }
+    return n;
+  }
   // Adds / removes labels on conversations (archive, read, star, spam, a label...).
   async function modify(ids, add, remove) {
     await pool([].concat(ids), 6, (id) => json(GM + '/threads/' + encodeURIComponent(id) + '/modify', { method: 'POST', headers: JH, body: JSON.stringify({ addLabelIds: add || [], removeLabelIds: remove || [] }) }));
@@ -668,7 +680,7 @@
     enabled, init, status, valid, silent, onChange, token, connect, direct, disconnect, forget,
     calendar: { events, create: createEvent },
     gmail: { inbox, list, unreadCount, conversation, attachment, markRead, send, draft, link: mailLink, findThread, findSent, thread, searchLink,
-      labels, createLabel, updateLabel, deleteLabel, threads, modify, modifyMessage, trashThreads, untrashThreads, drafts, getDraft, saveDraft, sendDraft, deleteDraft, canModify },
+      labels, createLabel, updateLabel, deleteLabel, threads, modify, modifyMessage, trashThreads, untrashThreads, drafts, getDraft, saveDraft, sendDraft, deleteDraft, canModify, countThreads },
     drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer, readBlob, docRoot, docUpload, docPhotos, docName: DOC_NAME },
   };
 })();
