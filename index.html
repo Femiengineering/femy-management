@@ -5773,7 +5773,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const MB_AV = ['#1a73e8', '#e8710a', '#188038', '#d93025', '#a142f4', '#12b5cb', '#e52592', '#f9ab00', '#5f6368', '#9334e6', '#c5221f', '#007b83'];
   const M = { view: 'inbox', arg: '', open: '', page: 0, tokens: [''], cache: {}, labels: null, labelsAt: 0, sel: new Set(), more: false, catsOpen: false, collapsed: {}, side: '', drawer: false, convs: {}, scroll: 0, inline: null, focus: -1, sideQ: '' };
   try { Object.assign(M, JSON.parse(localStorage.getItem('femy-mailbox') || '{}')); M.sel = new Set(); M.cache = {}; M.convs = {}; M.inline = null; } catch (e) { /* ignore */ }
-  const mbKeep = () => { try { localStorage.setItem('femy-mailbox', JSON.stringify({ more: M.more, catsOpen: M.catsOpen, collapsed: M.collapsed, side: M.side, noTabs: M.noTabs })); } catch (e) { /* ignore */ } };
+  const mbKeep = () => { try { localStorage.setItem('femy-mailbox', JSON.stringify({ more: M.more, catsOpen: M.catsOpen, collapsed: M.collapsed, side: M.side, tabs: M.tabs })); } catch (e) { /* ignore */ } };
   const ms = (name, cls) => `<span class="ms${cls ? ' ' + cls : ''}" aria-hidden="true">${name}</span>`;
   const mbEnc = (s) => encodeURIComponent(s).replace(/~/g, '%7E');
   const mbHash = (view, arg, tid) => '#mail/' + view + (arg ? '/' + mbEnc(arg) : '') + (tid ? '~' + tid : '');
@@ -5789,7 +5789,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const mbLabel = (id) => (M.labels || []).find((l) => l.id === id);
   // What a view lists: Gmail labels and / or a search.
   function mbSpec(view, arg) {
-    if (view === 'inbox') return M.noTabs ? { labelIds: ['INBOX'] } : { labelIds: ['INBOX', MB_CATS[arg || 'primary'] || 'CATEGORY_PERSONAL'] };
+    if (view === 'inbox') return !M.tabs ? { labelIds: ['INBOX'] } : { labelIds: ['INBOX', MB_CATS[arg || 'primary'] || 'CATEGORY_PERSONAL'] };
     if (view === 'category') return { labelIds: [MB_CATS[arg]] };
     if (view === 'label') return { labelIds: [arg] };
     if (view === 'search') return { q: arg };
@@ -6111,7 +6111,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   function mbDrawList(panel) {
     const key = mbKey();
     const L = M.cache[key];
-    const inboxTabs = M.view === 'inbox' && !M.noTabs;
+    const inboxTabs = M.view === 'inbox' && !!M.tabs;
     const sel = M.sel;
     const threads = L ? L.threads : [];
     const selected = threads.filter((t) => sel.has(t.id));
@@ -6197,7 +6197,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       if (a && a.matches('[data-refresh]')) { delete M.cache[mbKey()]; mbLoadLabels(true); refreshMailBadge(true); redraw(); return; }
       if (a && a.matches('[data-listmore]')) {
         mbMenu(a, [{ icon: 'drafts', label: 'סימון של הכל כנקרא', fn: () => { const ids = threads.filter((t) => t.unread).map((t) => t.id); if (ids.length) mbAct('read', ids); else toast('אין הודעות שלא נקראו בעמוד'); } },
-          { icon: 'inbox', label: M.noTabs ? 'הצגת כרטיסיות בדואר הנכנס (ראשי, קידומי מכירות...)' : 'דואר נכנס בלי כרטיסיות', fn: () => { M.noTabs = !M.noTabs; mbKeep(); M.cache = {}; mbGo('inbox'); } }]);
+          { icon: 'inbox', label: !M.tabs ? 'הצגת כרטיסיות בדואר הנכנס (ראשי, קידומי מכירות...)' : 'דואר נכנס בלי כרטיסיות (כל הדואר הנכנס)', fn: () => { M.tabs = !M.tabs; mbKeep(); M.cache = {}; mbGo('inbox'); } }]);
         return;
       }
       if (a && a.matches('[data-newer]')) { if (M.page) { M.page--; M.scroll = 0; M.sel.clear(); redraw(); } return; }
