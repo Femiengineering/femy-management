@@ -637,11 +637,11 @@
     return Object.assign(f, { day: date, folderId: day });
   }
   // The project's latest photos: from the newest date folders of "תיעוד" (and photos put there directly).
-  async function docPhotos(projectFolder, max) {
+  async function docPhotos(projectFolder, max, maxDays) {
     const root = await docRoot(projectFolder, false);
     if (!root) return { root: '', files: [] };
     const days = (await browse(root, { foldersOnly: true })).files.filter((f) => /^\d{4}-\d{2}-\d{2}/.test(f.name))
-      .sort((a, b) => b.name.localeCompare(a.name)).slice(0, 12);
+      .sort((a, b) => b.name.localeCompare(a.name)).slice(0, maxDays || 12);
     const dayName = {}; days.forEach((d) => { dayName[d.id] = d.name.slice(0, 10); });
     const parents = [root].concat(days.map((d) => d.id)).map((id) => `'${qs(id)}' in parents`).join(' or ');
     const q = `(${parents}) and mimeType contains 'image/' and trashed=false`;
