@@ -3458,6 +3458,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   }
   // f: a Drive file ({ id, name, mimeType, ... }); parts: its path under the projects folder, for the local copy
   // (a promise or an array, or null when unknown); row: the list row to highlight.
+  // A phone or tablet: no programs to open files in and no inline PDF viewer, but a share sheet with WhatsApp.
+  const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ''));
   function openFilePreview(f, parts, row) {
     const el = filePreviewEl();
     if (fpv.row) fpv.row.classList.remove('fp-on');
@@ -3467,24 +3469,24 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     if (row) row.classList.add('fp-on');
     const mime = fileMime(f); const kind = gKind(f);
     const meta = [f.modifiedTime ? 'עודכן ' + new Date(f.modifiedTime).toLocaleDateString('he-IL') : '', f.size ? fmtSize(Number(f.size)) : ''].filter(Boolean).join(' · ');
-    const local = openHelper();
+    const local = openHelper() && !IS_MOBILE;
     el.innerHTML = `<div class="fpv-head">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="fpv-title">${esc(f.name)}</div><button type="button" class="fpv-x" data-fpclose title="סגירה (Esc)" aria-label="סגירה">×</button></div>
       <div class="fpv-acts">
-        <button type="button" class="btn primary" data-fpopen title="${local ? 'פותח את הקובץ מ-Google Drive למחשב, בתוכנה שלו (Word, Excel, Acrobat, AutoCAD...)' : 'פותח את הקובץ בתוכנה שלו במחשב (Acrobat, Word, Excel...). בפעם הראשונה צריך התקנה חד-פעמית קטנה'}">🖥 פתיחה${local ? '' : ' במחשב'}</button>
+        ${IS_MOBILE ? `<a class="btn primary" href="${esc(driveFileUrl(f))}" target="_blank" rel="noopener">📄 פתיחה</a>` : `<button type="button" class="btn primary" data-fpopen title="${local ? 'פותח את הקובץ מ-Google Drive למחשב, בתוכנה שלו (Word, Excel, Acrobat, AutoCAD...)' : 'פותח את הקובץ בתוכנה שלו במחשב (Acrobat, Word, Excel...). בפעם הראשונה צריך התקנה חד-פעמית קטנה'}">🖥 פתיחה${local ? '' : ' במחשב'}</button>`}
         ${local ? '<button type="button" class="btn" data-fpdir title="פותח בסייר הקבצים את התיקייה שבה הקובץ נמצא">📂 התיקייה במחשב</button>' : ''}
         <button type="button" class="btn" data-fpdown title="הורדת עותק של הקובץ">⬇ הורדה</button>
         <button type="button" class="btn" data-fpmail title="שליחת הקובץ במייל מה-Gmail שלך, כקובץ מצורף">✉ מייל</button>
         <button type="button" class="btn" data-fpwa title="שליחת הקובץ בוואטסאפ">🟢 וואטסאפ</button>
-        <a class="btn" href="${esc(driveFileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive בלשונית חדשה">Drive ↗</a>
-        ${fpvPartsKnown() ? '<button type="button" class="g-copy" data-fpcopy title="העתקת הנתיב במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋 נתיב</button>' : ''}
+        ${IS_MOBILE ? '' : `<a class="btn" href="${esc(driveFileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive בלשונית חדשה">Drive ↗</a>`}
+        ${fpvPartsKnown() && !IS_MOBILE ? '<button type="button" class="g-copy" data-fpcopy title="העתקת הנתיב במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋 נתיב</button>' : ''}
       </div>
       ${meta ? `<div class="fpv-meta">${esc(meta)}</div>` : ''}
       <div class="fpv-body"><div class="hint">טוען תצוגה מקדימה...</div></div>
-      <details class="fpv-setup"><summary>${!local ? '⚙ פתיחה ישירה בתוכנה ושליחה בוואטסאפ (התקנה חד-פעמית)' : helperVer() < OPEN_HELPER_VER ? '⚙ עדכון חד-פעמי: שליחת הקובץ המקורי בוואטסאפ' : '✓ פתיחה ישירה מהמחשב פעילה'}</summary>${openHelperHelp(local)}</details>`;
+      ${IS_MOBILE ? '' : `<details class="fpv-setup"><summary>${!local ? '⚙ פתיחה ישירה בתוכנה ושליחה בוואטסאפ (התקנה חד-פעמית)' : helperVer() < OPEN_HELPER_VER ? '⚙ עדכון חד-פעמי: שליחת הקובץ המקורי בוואטסאפ' : '✓ פתיחה ישירה מהמחשב פעילה'}</summary>${openHelperHelp(local)}</details>`}`;
     requestAnimationFrame(() => el.classList.add('show'));
     $('[data-fpclose]', el).addEventListener('click', closeFilePreview);
     const doc = el.ownerDocument;
-    $('[data-fpopen]', el).addEventListener('click', () => openFileLocal(f, false, undefined, doc));
+    const ob = $('[data-fpopen]', el); if (ob) ob.addEventListener('click', () => openFileLocal(f, false, undefined, doc));
     $('[data-fpdown]', el).addEventListener('click', () => downloadDriveFile(f));
     $('[data-fpmail]', el).addEventListener('click', () => shareFileMail(f));
     $('[data-fpwa]', el).addEventListener('click', () => shareFileWhatsApp(f, doc.defaultView));
@@ -3498,7 +3500,10 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     // Images and PDFs are read with the user's own Google connection and shown by the browser itself;
     // everything else (Office files, Google Docs, video, drawings) through Google Drive's viewer.
     const small = !f.size || Number(f.size) < 40 * 1024 * 1024;
-    if (GOOGLE && G.valid() && small && (mime.startsWith('image/') || mime === 'application/pdf')) {
+    // On a phone the file is read ahead, so that WhatsApp's share sheet can open right on the tap.
+    if (IS_MOBILE && GOOGLE && G.valid() && small && !(kind && !GEXPORT[kind])) driveFileBlob(f).catch(() => {});
+    // Phones have no PDF viewer inside a page: PDFs go through Google Drive's viewer there.
+    if (GOOGLE && G.valid() && small && (mime.startsWith('image/') || (mime === 'application/pdf' && !IS_MOBILE))) {
       G.drive.readBlob(f.id).then((b) => {
         if (!alive()) return;
         fpv.blob = mime === 'application/pdf' ? new Blob([b], { type: 'application/pdf' }) : b;
@@ -3519,6 +3524,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     tap = { id: f.id, t: setTimeout(() => { tap = null; openFilePreview(f, parts, row); }, 280) };
   }
   async function openFileLocal(f, folder, partsIn, doc) {
+    if (IS_MOBILE) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // the Drive app opens it
     if (gKind(f) && !folder) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // Google Docs/Sheets open in the browser
     if (!openHelper()) { if (fpv.f !== f) openFilePreview(f, partsIn, null); askOpenHelper(); return; }
     const parts = await (partsIn !== undefined ? Promise.resolve(partsIn) : fpv.parts);
@@ -3566,6 +3572,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // where the browser cannot share files, WhatsApp opens with a link to the file in Drive.
   async function shareFileWhatsApp(f, w) {
     w = w || window;
+    if (IS_MOBILE) { shareFileMobile(f); return; }
     if (helperVer() >= 3 && !gKind(f)) {
       const parts = await fpv.parts;
       if (parts && parts.length) {
@@ -3593,6 +3600,27 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       } catch (e) { if (e && e.name === 'AbortError') return; }
     }
     w.open('https://wa.me/?text=' + encodeURIComponent(f.name + '\n' + driveFileUrl(f)), '_blank', 'noopener');
+  }
+  // On a phone: the phone's share sheet with the file itself (WhatsApp is in it). The file was read ahead when the
+  // preview opened, so the sheet opens on the tap; when it is not ready yet, the person taps again.
+  async function shareFileMobile(f) {
+    const nav = navigator;
+    const ex = GEXPORT[gKind(f)];
+    const name = ex && !new RegExp('\\.' + ex[1] + '$', 'i').test(f.name) ? f.name + '.' + ex[1] : f.name;
+    if (fpv.f === f && fpv.blob && nav.share && nav.canShare) {
+      const file = new File([fpv.blob], name, { type: fpv.blob.type || 'application/octet-stream' });
+      if (nav.canShare({ files: [file] })) {
+        try { await nav.share({ files: [file] }); } catch (e) { if (!e || e.name !== 'AbortError') fpvToast('השיתוף נכשל: ' + ((e && e.message) || '')); }
+        return;
+      }
+    }
+    if (fpv.f === f && !fpv.blob && GOOGLE && G.valid() && nav.share) {
+      fpvToast('מכין את הקובץ... לחצו שוב על וואטסאפ בעוד רגע');
+      driveFileBlob(f).then(() => fpvToast('הקובץ מוכן: לחצו על וואטסאפ')).catch(() => {});
+      return;
+    }
+    // No file sharing in this browser: WhatsApp with a link to the file in Drive.
+    location.href = 'https://wa.me/?text=' + encodeURIComponent(f.name + '\n' + driveFileUrl(f));
   }
   async function downloadDriveFile(f, toOpen) {
     const kind = gKind(f); const ex = GEXPORT[kind];
