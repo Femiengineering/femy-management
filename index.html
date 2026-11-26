@@ -6592,7 +6592,16 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const timeOf = (d) => d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
   function eventsHtml(evs) {
     let day = '';
-    return evs.map((e) => {
+    // Only what has not ended yet: a meeting disappears once it is over (its end time; without one, an hour
+    // after it starts). An all-day event stays until the end of its day.
+    const now = Date.now();
+    const endMs = (e) => {
+      if (e.end && e.end.dateTime) return new Date(e.end.dateTime).getTime();
+      if (e.end && e.end.date) return new Date(e.end.date + 'T00:00:00').getTime();
+      if (e.start.dateTime) return new Date(e.start.dateTime).getTime() + 3600000;
+      return new Date(e.start.date + 'T00:00:00').getTime() + 86400000;
+    };
+    return evs.filter((e) => e.start && endMs(e) > now).map((e) => {
       const allDay = !!e.start.date;
       const st = new Date(allDay ? e.start.date + 'T00:00:00' : e.start.dateTime);
       const k = toISO(st);
