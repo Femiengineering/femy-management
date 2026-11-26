@@ -10,6 +10,10 @@
   const STATUS = { 'פתוח': 'todo', 'בטיפול': 'doing', 'ממתין לאחרים': 'waiting', 'ממתין': 'waiting', 'בוצע': 'done', 'הושלם': 'done' };
 
   const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  // A cell that is empty, or holds only a formula error (#REF!, #N/A ...), counts as empty when finding project headings.
+  const blank = (x) => { const c = clean(x); return !c || /^#(REF!|N\/A|VALUE!|NAME\?|DIV\/0!|NUM!|NULL!|ERROR!)$/.test(c); };
+  // Headings that gather a client's general tasks, not a project ("כללי – עיריית נתיבות", "משימות משרד").
+  const GENERAL_GROUP = /^(כללי|משימות משרד|משימות כלליות)/;
   const pad = (n) => String(n).padStart(2, '0');
   // Short stable hash, for ids of rows that have no number.
   function hash(s) {
@@ -95,7 +99,11 @@
         const r = rows[i]; if (!r) continue;
         const get = (k) => (C[k] >= 0 ? r[C[k]] : '');
         const a = clean(r[0]), title = clean(get('title'));
-        if (a && !title && !/^[\d.]+$/.test(a) && r.slice(1).every((x) => !clean(x))) { group = a; groups.push({ client, name: group }); continue; }
+        if (a && !title && !/^[\d.]+$/.test(a) && r.slice(1).every(blank)) {
+          group = GENERAL_GROUP.test(a) ? '' : a;
+          if (group) groups.push({ client, name: group });
+          continue;
+        }
         if (!title) continue;
         const contact = clean(get('contact')), phone = clean(get('phone'));
         const notes = [clean(get('detail')), contact ? `איש קשר: ${contact}${phone ? ' ' + phone : ''}` : '', clean(get('source')) ? 'מקור: ' + clean(get('source')) : ''].filter(Boolean).join('\n');
@@ -144,12 +152,14 @@
     const g = words(group).filter((w) => !cw.some((c) => same(w, c)));
     let best = null, bestScore = 0;
     projects.forEach((p) => {
-      const nw = words(p.name), pw = words(p.name + ' ' + (p.location || ''));
-      const hit = g.filter((w) => pw.some((x) => same(w, x))).length;
-      let score = hit ? hit / Math.max(Math.min(g.length, nw.length), 1) : 0;
-      if (hit && cw.some((w) => words(p.client || '').some((x) => same(w, x)))) score += 0.2;
-
-      if (score > bestScore) { bestScore = score; best = p; }
+      // A project's other names (p.aliases, e.g. its heading in the sheet) count like its name.
+      [p.name].concat(p.aliases || []).forEach((name) => {
+        const nw = words(name), pw = words(name + ' ' + (p.location || ''));
+        const hit = g.filter((w) => pw.some((x) => same(w, x))).length;
+        let score = hit ? hit / Math.max(Math.min(g.length, nw.length), 1) : 0;
+        if (hit && cw.some((w) => words(p.client || '').some((x) => same(w, x)))) score += 0.2;
+        if (score > bestScore) { bestScore = score; best = p; }
+      });
     });
     if (bestScore >= 0.6) return best;
     // A tab that is itself one project ("שמידמן 3").
