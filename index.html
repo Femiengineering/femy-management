@@ -2736,7 +2736,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const doc = el.ownerDocument;
     $('[data-fpopen]', el).addEventListener('click', () => openFileLocal(f, false, undefined, doc));
     $('[data-fpdown]', el).addEventListener('click', () => downloadDriveFile(f));
-    $('[data-fpmail]', el).addEventListener('click', () => shareFileMail(f, doc.defaultView));
+    $('[data-fpmail]', el).addEventListener('click', () => shareFileMail(f));
     $('[data-fpwa]', el).addEventListener('click', () => shareFileWhatsApp(f, doc.defaultView));
     const dir = $('[data-fpdir]', el); if (dir) dir.addEventListener('click', () => openFileLocal(f, true, undefined, doc));
     const cp = $('[data-fpcopy]', el); if (cp) cp.addEventListener('click', async () => { const p = await fpv.parts; if (p) copyPath(p); });
@@ -2801,26 +2801,16 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   }
   // By mail: a new message from the user's Gmail (the site's mail window) with the file attached;
   // a file too big for Gmail goes as a Drive link.
-  async function shareFileMail(f, w) {
-    w = w || window;
-    if (!GOOGLE || !G.valid()) { w.open('mailto:?subject=' + encodeURIComponent(f.name) + '&body=' + encodeURIComponent(driveFileUrl(f)), '_blank'); return; }
-    // The new Gmail window is opened right away (from the click), and filled when the draft is ready.
-    const gw = w.open('', '_blank');
-    if (gw) try { gw.document.write('<p dir="rtl" style="font:16px sans-serif;padding:24px">מכין מייל חדש עם הקובץ מצורף...</p>'); } catch (e) {}
-    fpvToast('מכין את הקובץ למייל...');
+  async function shareFileMail(f) {
+    if (!GOOGLE || !G.valid()) { toast('כדי לשלוח במייל, חברו קודם את חשבון ה-Google (בלשונית מיילים)'); return; }
+    // A new message in the site's mail tab, with the file attached (a file too big for Gmail goes as a Drive link).
+    toast('מכין מייל חדש עם הקובץ מצורף...');
     let x = null; try { x = await driveFileBlob(f); } catch (e) { x = null; }
-    if (x && x.blob.size < 24 * 1024 * 1024 && gw) {
-      try {
-        const r = await G.gmail.draft({ to: '', subject: x.name, text: '', attachments: [{ name: x.name, blob: x.blob }] });
-        const mid = r && r.message && r.message.id;
-        if (mid) { gw.location = 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(G.status().email || '') + '#drafts?compose=' + encodeURIComponent(mid); return; }
-      } catch (e) { /* no permission for drafts: the site's own mail window below */ }
-    }
-    if (gw) try { gw.close(); } catch (e) {}
-    if (x && x.blob.size < 24 * 1024 * 1024) mbCompose({ subject: x.name, fwdFiles: [{ name: x.name, blob: x.blob, size: x.blob.size }] });
-    else mbCompose({ subject: f.name, html: `<a href="${esc(driveFileUrl(f))}">${esc(f.name)}</a>` });
-    try { window.focus(); } catch (e) {}
-    fpvToast('המייל מוכן בחלון האתר: הוסיפו נמען ושלחו');
+    if (currentView() !== 'mail') location.hash = 'mail';
+    setTimeout(() => {
+      if (x && x.blob.size < 24 * 1024 * 1024) mbCompose({ subject: x.name, fwdFiles: [{ name: x.name, blob: x.blob, size: x.blob.size }] });
+      else mbCompose({ subject: f.name, html: `<a href="${esc(driveFileUrl(f))}">${esc(f.name)}</a>` });
+    }, 400);
   }
   // By WhatsApp: the computer's share window with the file itself (WhatsApp is in it when installed);
   // where the browser cannot share files, WhatsApp opens with a link to the file in Drive.
