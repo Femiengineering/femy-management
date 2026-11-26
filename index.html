@@ -240,10 +240,26 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .pcol { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-width: 0; }
 .pcol-title { font-size: 15px; margin: 0 0 8px; color: var(--muted); }
-.pgroup { margin-bottom: 12px; }
+.pcol-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pcol-head .pcol-title { margin: 0; flex: 1; }
+.pcol-head .hint { font-size: 12px; }
+.pgroup { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); margin-bottom: 6px; overflow: hidden; }
 .pgroup:last-child { margin-bottom: 0; }
-.pgroup-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; }
-.pgroup-head .count { color: var(--muted); font-size: 12px; }
+.pgroup-head { display: flex; align-items: center; gap: 8px; width: 100%; font: inherit; font-size: 13px; color: inherit; text-align: start; padding: 9px 10px; background: none; border: 0; cursor: pointer; min-height: 40px; }
+.pgroup-head:hover { background: var(--surface-2); }
+.pgroup-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.pgroup-head .count { color: var(--muted); font-size: 12px; font-weight: 600; background: var(--surface-2); border-radius: 10px; padding: 1px 7px; }
+.pgroup-head .pg-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pgroup-head .pg-sum { display: flex; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; color: var(--muted); font-size: 12px; justify-content: flex-end; }
+.pgroup-head .pg-sum span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.pg-chev { flex: none; width: 16px; text-align: center; color: var(--muted); font-size: 11px; transition: transform .25s ease; }
+.pgroup.open .pg-chev { transform: rotate(-90deg); }
+.pgroup-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; }
+.pgroup.open .pgroup-body { grid-template-rows: 1fr; }
+.pgroup-inner { min-height: 0; overflow: hidden; }
+.pgroup-inner .ptile-grid { padding: 2px 10px 10px; }
+@media (prefers-reduced-motion: reduce) { .pgroup-body, .pg-chev { transition: none; } }
+@media (max-width: 520px) { .pgroup-head { flex-wrap: wrap; } .pgroup-head .pg-sum { flex-basis: 100%; justify-content: flex-start; padding-inline-start: 24px; } }
 .ptile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr)); gap: 5px; }
 .ptile { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); cursor: pointer; font-size: 12px; line-height: 1.3; min-width: 0; }
 .ptile:hover { border-color: var(--primary); background: var(--primary-soft); }
@@ -958,7 +974,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     mail: { title: 'מיילים', render: (el) => { ui.gTab = 'gmail'; renderGoogle(el); } },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projShowDone: false, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projOpen: {}, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1547,17 +1563,24 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     all.forEach((p) => { const k = (p.client || '').trim() || 'ללא לקוח'; if (!map.has(k)) map.set(k, []); map.get(k).push(p); });
     const byClient = Array.from(map, ([name, items]) => ({ name, items, active: items.filter((p) => p.status !== 'done').length }))
       .sort((a, b) => (a.name === 'ללא לקוח') - (b.name === 'ללא לקוח') || b.active - a.active || b.items.length - a.items.length || a.name.localeCompare(b.name, 'he'));
-    const byStatus = STATUS_ORDER.map((s) => ({ status: s, name: byId(PROJECT_STATUS, s).label, items: all.filter((p) => p.status === s) }))
+    const byStatus = ['planning', 'active', 'done', 'paused'].map((s) => ({ status: s, name: byId(PROJECT_STATUS, s).label, items: all.filter((p) => p.status === s) }))
       .concat([{ name: 'ללא סטטוס', items: all.filter((p) => STATUS_ORDER.indexOf(p.status) < 0) }])
       .filter((g) => g.items.length);
-    const clientCol = byClient.map((g) => `<div class="pgroup"><div class="pgroup-head"><strong>${esc(g.name)}</strong><span class="count">${g.items.length}</span></div>
-        <div class="ptile-grid">${g.items.map(projTile).join('')}</div></div>`).join('');
+    // Each client / status is a row that opens to show its projects (closed by default; a search opens every row).
+    const grp = (key, label, items, sum) => {
+      const open = !!q || !!ui.projOpen[key];
+      return `<div class="pgroup${open ? ' open' : ''}" data-pg="${esc(key)}">
+        <button type="button" class="pgroup-head" aria-expanded="${open}"><span class="pg-chev">◀</span>${label}<span class="count">${items.length}</span><span class="pg-sum">${sum}</span></button>
+        <div class="pgroup-body"><div class="pgroup-inner"><div class="ptile-grid">${items.map(projTile).join('')}</div></div></div></div>`;
+    };
+    const statusSum = (items) => STATUS_ORDER.map((s) => { const n = items.filter((p) => p.status === s).length; const st = byId(PROJECT_STATUS, s);
+      return n ? `<span title="${esc(st.label)}"><span class="pdot ${st.color}"></span>${n} ${esc(st.label)}</span>` : ''; }).join('');
+    const clientCol = byClient.map((g) => grp('c:' + g.name, `<span class="pg-name">${esc(g.name)}</span>`, g.items, statusSum(g.items))).join('');
     const statusCol = byStatus.map((g) => {
-      const fold = g.status === 'done' && !ui.projShowDone && !q;
-      return `<div class="pgroup"><div class="pgroup-head">${g.status ? pill(PROJECT_STATUS, g.status) : `<strong>${esc(g.name)}</strong>`}<span class="count">${g.items.length}</span>
-          ${g.status === 'done' && !q ? `<a href="#" class="hint" data-done-toggle>${ui.projShowDone ? 'הסתרה' : 'הצגה'}</a>` : ''}</div>
-        ${fold ? '' : `<div class="ptile-grid">${g.items.map(projTile).join('')}</div>`}</div>`;
+      const clients = new Set(g.items.map((p) => (p.client || '').trim()).filter(Boolean)).size;
+      return grp('s:' + (g.status || 'none'), g.status ? pill(PROJECT_STATUS, g.status) : `<span class="pg-name">${esc(g.name)}</span>`, g.items, clients ? `<span>${clients} לקוחות</span>` : '');
     }).join('');
+    const allBtn = (col) => q ? '' : `<a href="#" class="hint" data-pg-all="${col}">פתיחת הכל</a>`;
     el.innerHTML = `
       <div class="toolbar">
         <input class="input search" id="prq" placeholder="חיפוש פרויקט או לקוח..." value="${esc(ui.projQ)}">
@@ -1566,12 +1589,16 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
         ${isAdmin() ? '<button class="btn" id="driveImportBtn" title="מוסיף פרויקטים מתיקיית פרויקטים פמי שעדיין אינם במערכת">📁 ייבוא פרויקטים מה-Drive</button>' : ''}
       </div>
       ${all.length ? `<div class="pcols">
-        <section class="pcol"><h2 class="pcol-title">לפי לקוח</h2>${clientCol}</section>
-        <section class="pcol"><h2 class="pcol-title">לפי סטטוס</h2>${statusCol}</section>
+        <section class="pcol"><div class="pcol-head"><h2 class="pcol-title">לפי לקוח</h2>${allBtn('c')}</div>${clientCol}</section>
+        <section class="pcol"><div class="pcol-head"><h2 class="pcol-title">לפי סטטוס</h2>${allBtn('s')}</div>${statusCol}</section>
       </div>` : `<div class="card empty">${q ? 'לא נמצאו פרויקטים' : 'אין פרויקטים עדיין. לחצו על "פרויקט חדש" כדי להוסיף.'}</div>`}`;
     $('#prq', el).addEventListener('input', (e) => { ui.projQ = e.target.value; renderProjects(el); const i = $('#prq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
-    const dt = $('[data-done-toggle]', el);
-    if (dt) dt.addEventListener('click', (e) => { e.preventDefault(); ui.projShowDone = !ui.projShowDone; renderProjects(el); });
+    // Open / close a row in place (no re-render) so it animates.
+    const setOpen = (g, open) => { g.classList.toggle('open', open); $('.pgroup-head', g).setAttribute('aria-expanded', open); if (!q) ui.projOpen[g.dataset.pg] = open; };
+    const syncAll = (sec) => { const a = $('[data-pg-all]', sec); if (a) a.textContent = $$('.pgroup', sec).every((g) => g.classList.contains('open')) ? 'סגירת הכל' : 'פתיחת הכל'; };
+    $$('.pgroup', el).forEach((g) => $('.pgroup-head', g).addEventListener('click', () => { setOpen(g, !g.classList.contains('open')); syncAll(g.closest('.pcol')); }));
+    $$('[data-pg-all]', el).forEach((a) => { const sec = a.closest('.pcol'); syncAll(sec);
+      a.addEventListener('click', (e) => { e.preventDefault(); const open = !$$('.pgroup', sec).every((g) => g.classList.contains('open')); $$('.pgroup', sec).forEach((g) => setOpen(g, open)); syncAll(sec); }); });
     const di = $('#driveImportBtn', el);
     if (di) di.addEventListener('click', () => importDriveProjects(true));
     $$('.ptile', el).forEach((c) => c.addEventListener('click', () => { location.hash = 'project/' + encodeURIComponent(c.dataset.id); }));
