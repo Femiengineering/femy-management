@@ -406,16 +406,24 @@
     return btoa(bin);
   }
   // threadId / inReplyTo / references: sent as a reply in that thread.
-  async function rawMail({ to, cc, subject, text, attachment, inReplyTo, references }) {
+  // html: sent with the text as an alternative. attachments: [{ name, blob }] (attachment: one, as before).
+  async function rawMail({ to, cc, bcc, subject, text, html, attachment, attachments, inReplyTo, references }) {
     const bd = 'femy' + Math.random().toString(36).slice(2);
-    let m = `To: ${to}\r\n` + (cc ? `Cc: ${cc}\r\n` : '') + `Subject: ${encWord(subject || '')}\r\nMIME-Version: 1.0\r\n`
+    const files = (attachments || []).concat(attachment ? [attachment] : []);
+    let m = `To: ${to || ''}\r\n` + (cc ? `Cc: ${cc}\r\n` : '') + (bcc ? `Bcc: ${bcc}\r\n` : '') + `Subject: ${encWord(subject || '')}\r\nMIME-Version: 1.0\r\n`
       + (inReplyTo ? `In-Reply-To: ${inReplyTo}\r\nReferences: ${references || inReplyTo}\r\n` : '')
-      + `Content-Type: multipart/mixed; boundary="${bd}"\r\n\r\n`
-      + `--${bd}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(b64utf8(text || ''))}`;
-    if (attachment) {
-      const fn = encWord(attachment.name);
-      m += `--${bd}\r\nContent-Type: ${attachment.blob.type || 'application/octet-stream'}; name="${fn}"\r\n`
-        + `Content-Disposition: attachment; filename="${fn}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(await blobB64(attachment.blob))}`;
+      + `Content-Type: multipart/mixed; boundary="${bd}"\r\n\r\n`;
+    if (html) {
+      const ab = bd + 'a';
+      m += `--${bd}\r\nContent-Type: multipart/alternative; boundary="${ab}"\r\n\r\n`
+        + `--${ab}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(b64utf8(text || ''))}`
+        + `--${ab}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(b64utf8(html))}`
+        + `--${ab}--\r\n`;
+    } else m += `--${bd}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(b64utf8(text || ''))}`;
+    for (const f of files) {
+      const fn = encWord(f.name);
+      m += `--${bd}\r\nContent-Type: ${f.blob.type || 'application/octet-stream'}; name="${fn}"\r\n`
+        + `Content-Disposition: attachment; filename="${fn}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(await blobB64(f.blob))}`;
     }
     m += `--${bd}--\r\n`;
     return btoa(m).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -429,6 +437,84 @@
     const tok = await token(); const raw = await rawMail(o);
     return (await api(tok, GM + '/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: o.threadId ? { raw, threadId: o.threadId } : { raw } }) })).json();
   }
+
+  // ---------- Gmail mailbox: labels, conversations, actions, drafts (the mail page) ----------
+  const JH = { 'Content-Type': 'application/json' };
+  // Runs fn over items, a few at a time, retrying when Google asks to slow down (429).
+  async function pool(items, n, fn) {
+    const out = new Array(items.length); let i = 0;
+    const one = async (k) => { for (let t = 0; ; t++) { try { return await fn(items[k]); } catch (e) { if (e.status !== 429 || t > 3) throw e; await new Promise((r) => setTimeout(r, 600 * (t + 1))); } } };
+    await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await one(k).catch(() => null); } }));
+    return out;
+  }
+  // Every label with its counts: [{ id, name, type: 'system'|'user', threadsUnread, threadsTotal, messagesTotal, color }].
+  async function labels() {
+    const all = (await json(GM + '/labels')).labels || [];
+    const full = await pool(all, 8, (l) => json(GM + '/labels/' + encodeURIComponent(l.id)));
+    return all.map((l, k) => Object.assign({}, l, full[k] || {}));
+  }
+  async function createLabel(o) { return json(GM + '/labels', { method: 'POST', headers: JH, body: JSON.stringify(Object.assign({ labelListVisibility: 'labelShow', messageListVisibility: 'show' }, o)) }); }
+  async function updateLabel(id, o) { return json(GM + '/labels/' + encodeURIComponent(id), { method: 'PATCH', headers: JH, body: JSON.stringify(o) }); }
+  async function deleteLabel(id) { await api(await token(), GM + '/labels/' + encodeURIComponent(id), { method: 'DELETE' }); }
+  // A page of conversations, as in Gmail's list: { threads, next, estimate }.
+  async function threads({ q, labelIds, n, pageToken, spamTrash }) {
+    const p = new URLSearchParams({ maxResults: String(n || 50) });
+    if (q) p.set('q', q);
+    if (spamTrash) p.set('includeSpamTrash', 'true');
+    (labelIds || []).forEach((l) => p.append('labelIds', l));
+    if (pageToken) p.set('pageToken', pageToken);
+    const r = await json(GM + '/threads?' + p);
+    const ids = r.threads || [];
+    const meta = '?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date';
+    const full = await pool(ids, 10, (t) => json(GM + '/threads/' + t.id + meta));
+    return {
+      next: r.nextPageToken || '', estimate: r.resultSizeEstimate || 0,
+      threads: full.filter(Boolean).map((t) => threadRow(t, labelIds)),
+    };
+  }
+  function threadRow(t, inLabels) {
+    const msgs = t.messages || [];
+    // The date and snippet are of the newest mail in the view (in Sent: the newest mail sent).
+    const inView = inLabels && inLabels.length ? msgs.filter((m) => inLabels.every((l) => (m.labelIds || []).includes(l))) : msgs;
+    const last = (inView.length ? inView : msgs)[(inView.length ? inView : msgs).length - 1] || {};
+    const labelSet = new Set(); msgs.forEach((m) => (m.labelIds || []).forEach((l) => labelSet.add(l)));
+    const people = [];
+    msgs.forEach((m) => { const f = hdr(m, 'From'); const k = f.toLowerCase(); if (f && !people.some((x) => x.k === k)) people.push({ k, from: f, unread: (m.labelIds || []).includes('UNREAD'), sent: (m.labelIds || []).includes('SENT'), draft: (m.labelIds || []).includes('DRAFT') }); else if (f) { const x = people.find((y) => y.k === k); if ((m.labelIds || []).includes('UNREAD')) x.unread = true; } });
+    const attach = msgs.some((m) => /multipart\/mixed/i.test((m.payload && m.payload.mimeType) || ''));
+    return {
+      id: t.id, count: msgs.length, subject: hdr(msgs[0], 'Subject') || '', snippet: decode(last.snippet || t.snippet || ''),
+      date: Number(last.internalDate) || 0, labels: Array.from(labelSet), people, to: hdr(last, 'To'),
+      unread: labelSet.has('UNREAD'), starred: labelSet.has('STARRED'), important: labelSet.has('IMPORTANT'),
+      drafts: msgs.filter((m) => (m.labelIds || []).includes('DRAFT')).length, attach,
+      lastId: last.id,
+    };
+  }
+  // Adds / removes labels on conversations (archive, read, star, spam, a label...).
+  async function modify(ids, add, remove) {
+    await pool([].concat(ids), 6, (id) => json(GM + '/threads/' + encodeURIComponent(id) + '/modify', { method: 'POST', headers: JH, body: JSON.stringify({ addLabelIds: add || [], removeLabelIds: remove || [] }) }));
+  }
+  async function modifyMessage(id, add, remove) { return json(GM + '/messages/' + encodeURIComponent(id) + '/modify', { method: 'POST', headers: JH, body: JSON.stringify({ addLabelIds: add || [], removeLabelIds: remove || [] }) }); }
+  async function trashThreads(ids) { await pool([].concat(ids), 6, (id) => json(GM + '/threads/' + encodeURIComponent(id) + '/trash', { method: 'POST' })); }
+  async function untrashThreads(ids) { await pool([].concat(ids), 6, (id) => json(GM + '/threads/' + encodeURIComponent(id) + '/untrash', { method: 'POST' })); }
+  // Drafts: [{ id, message: { id, threadId } }].
+  async function drafts() { return (await json(GM + '/drafts?maxResults=200')).drafts || []; }
+  async function getDraft(id) {
+    const d = await json(GM + '/drafts/' + encodeURIComponent(id) + '?format=full');
+    const m = d.message || {};
+    const b = walk(m.payload, { html: '', text: '', files: [], inline: [] });
+    return { id: d.id, threadId: m.threadId, messageId: m.id, to: hdr(m, 'To'), cc: hdr(m, 'Cc'), bcc: hdr(m, 'Bcc'), subject: hdr(m, 'Subject'),
+      inReplyTo: hdr(m, 'In-Reply-To'), references: hdr(m, 'References'), html: b.html, text: b.text, files: b.files };
+  }
+  // Creates the draft, or updates it when draftId is given: { id, message }.
+  async function saveDraft(o, draftId) {
+    const raw = await rawMail(o);
+    const message = o.threadId ? { raw, threadId: o.threadId } : { raw };
+    if (draftId) return json(GM + '/drafts/' + encodeURIComponent(draftId), { method: 'PUT', headers: JH, body: JSON.stringify({ id: draftId, message }) });
+    return json(GM + '/drafts', { method: 'POST', headers: JH, body: JSON.stringify({ message }) });
+  }
+  async function sendDraft(draftId) { return json(GM + '/drafts/send', { method: 'POST', headers: JH, body: JSON.stringify({ id: draftId }) }); }
+  async function deleteDraft(id) { await api(await token(), GM + '/drafts/' + encodeURIComponent(id), { method: 'DELETE' }); }
+  const canModify = () => !!(rec && rec.scope && /auth\/gmail\.modify( |$)/.test(rec.scope));
 
   // ---------- Drive ----------
   const DAPI = 'https://www.googleapis.com/drive/v3/files';
@@ -581,7 +667,8 @@
   window.FemyGoogle = {
     enabled, init, status, valid, silent, onChange, token, connect, direct, disconnect, forget,
     calendar: { events, create: createEvent },
-    gmail: { inbox, list, unreadCount, conversation, attachment, markRead, send, draft, link: mailLink, findThread, findSent, thread, searchLink },
+    gmail: { inbox, list, unreadCount, conversation, attachment, markRead, send, draft, link: mailLink, findThread, findSent, thread, searchLink,
+      labels, createLabel, updateLabel, deleteLabel, threads, modify, modifyMessage, trashThreads, untrashThreads, drafts, getDraft, saveDraft, sendDraft, deleteDraft, canModify },
     drive: { exportFile, files, search, meta, browse, projectsRoot, folderName, projectsName: PROJECTS_NAME, appFiles, save, remove, trash, read: readFile, readBuffer, readBlob, docRoot, docUpload, docPhotos, docName: DOC_NAME },
   };
 })();

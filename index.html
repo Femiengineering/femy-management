@@ -16,6 +16,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0..1,0&icon_names=account_circle,add,add_task,archive,arrow_back,arrow_drop_down,arrow_left,attach_file,calendar_month,chat,check,check_box,check_box_outline_blank,chevron_left,chevron_right,close,close_fullscreen,code,contacts,delete,description,download,draft,drafts,drive_file_move,edit,expand_less,expand_more,folder_zip,format_align_center,format_align_left,format_align_right,format_bold,format_clear,format_color_text,format_italic,format_list_bulleted,format_list_numbered,format_underlined,forum,forward,group,help,image,inbox,indeterminate_check_box,info,label,label_important,link,mail,mark_email_unread,menu,minimize,mood,more_horiz,more_vert,move_to_inbox,open_in_full,open_in_new,palette,picture_as_pdf,print,redo,refresh,reply,reply_all,report,schedule,schedule_send,search,sell,send,settings,stacks,star,sync,table_chart,task_alt,text_format,tune,undo&display=block" rel="stylesheet">
   <style>
 :root {
   --bg: #f4f6f9;
@@ -724,6 +726,377 @@ span.pg-logo { border: 0; }
 .g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
 .g-search .input { flex: 1; }
+
+/* Mail page: laid out like Gmail */
+body.mail-mode { background: #f6f8fc; }
+.mb [hidden], .mb-cw [hidden], .mb-menu [hidden], .mb-dlg [hidden] { display: none !important; }
+body.mail-mode .content { padding: 0; max-width: none; }
+body.mail-mode .topbar { background: #f6f8fc; border-bottom: 0; }
+@media (min-width: 801px) { body.mail-mode .topbar { display: none; } }
+.ms { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-smoothing: antialiased; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; user-select: none; flex-shrink: 0; }
+.ms.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.ms.flip { transform: scaleX(-1); }
+.ms.big { font-size: 64px; color: #c4c7c5; }
+.mb, .mb-cw, .mb-menu, .mb-dlg, .mb-snack { font-family: 'Google Sans', Roboto, Arial, 'Segoe UI', sans-serif; color: #1f1f1f; font-size: 14px; line-height: 20px; }
+.mb { display: flex; flex-direction: column; background: #f6f8fc; overflow: hidden; }
+.mb button { font-family: inherit; }
+.mb a { color: inherit; text-decoration: none; }
+.mb .b { font-weight: 700; }
+.mb-sub { color: #444746; font-size: 12px; }
+.mb-sp, .mb-topsp { flex: 1; }
+.mb-ic { width: 40px; height: 40px; border-radius: 50%; border: 0; background: none; display: inline-flex; align-items: center; justify-content: center; color: #444746; cursor: pointer; flex-shrink: 0; padding: 0; }
+.mb-ic:hover { background: rgba(68, 71, 70, .08); color: #1f1f1f; }
+.mb-ic:disabled { opacity: .38; cursor: default; background: none; }
+.mb-ic.sm { width: 32px; height: 32px; }
+.mb-ic.xs { width: 28px; height: 28px; }
+.mb-ic.xs .ms { font-size: 18px; }
+.mb-ic.on { background: #d3e3fd; color: #041e49; }
+.mb-btn { height: 36px; padding: 0 24px; border-radius: 18px; border: 1px solid #747775; background: #fff; color: #0b57d0; font-weight: 500; font-size: 14px; cursor: pointer; }
+.mb-btn:hover { background: #f3f6fc; }
+.mb-btn.primary { background: #0b57d0; color: #fff; border-color: #0b57d0; }
+.mb-btn.primary:hover { background: #0a4fbf; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); }
+.mb-btn.sm { height: 32px; padding: 0 14px; margin: 0 4px; }
+.mb-vsep { width: 1px; height: 20px; background: #c4c7c5; margin: 0 8px; display: inline-block; flex-shrink: 0; }
+.mb-av { width: 32px; height: 32px; border-radius: 50%; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 500; font-size: 14px; flex-shrink: 0; line-height: 1; }
+
+/* Top row: menu, search, account */
+.mb-top { height: 64px; display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 16px; flex-shrink: 0; }
+.mb-burger { margin-inline-start: 4px; }
+.mb-brand { display: flex; align-items: center; gap: 8px; width: 186px; padding-inline-start: 6px; font-size: 22px; color: #444746; }
+.mb-brand .ms { font-size: 30px; color: #c5221f; }
+.mb-search { position: relative; flex: 0 1 720px; height: 48px; background: #eaf1fb; border-radius: 24px; display: flex; align-items: center; padding: 0 4px; transition: background .1s, box-shadow .1s; }
+.mb-search:focus-within { background: #fff; box-shadow: 0 1px 1px 0 rgba(65,69,73,.3), 0 1px 3px 1px rgba(65,69,73,.15); }
+.mb-search input { flex: 1; border: 0; background: none; outline: none; font-size: 16px; height: 46px; padding: 0 8px; min-width: 0; color: #1f1f1f; }
+.mb-search input::placeholder { color: #444746; }
+.mb-adv { position: absolute; top: 0; inset-inline: 0; background: #fff; border-radius: 8px; box-shadow: 0 4px 8px 3px rgba(60,64,67,.15), 0 1px 3px rgba(60,64,67,.3); z-index: 30; padding: 20px 24px 16px; }
+.mb-advg { display: grid; grid-template-columns: 130px 1fr; gap: 6px 16px; align-items: center; }
+.mb-advg label { color: #444746; }
+.mb-advg input, .mb-advg select { border: 0; border-bottom: 1px solid #c4c7c5; height: 32px; outline: none; background: none; font-size: 14px; width: 100%; }
+.mb-advg input:focus { border-bottom: 2px solid #0b57d0; }
+.mb-advfoot { display: flex; justify-content: flex-end; margin-top: 16px; }
+.mb-chk { display: flex; align-items: center; gap: 8px; color: #1f1f1f !important; cursor: pointer; }
+.mb-chk input { width: 18px !important; height: 18px !important; accent-color: #0b57d0; }
+.mb-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #c4c7c5; display: inline-block; margin: 0 8px; }
+.mb-status .dot.on { background: #1e8e3e; } .mb-status .dot.warn { background: #f9ab00; }
+.mb-acct { width: 40px; height: 40px; border-radius: 50%; border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-inline-start: 4px; }
+.mb-acct:hover { background: rgba(68,71,70,.08); }
+.mb-acctcard { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 24px 12px; min-width: 260px; }
+
+/* Body: labels, the panel, the side apps */
+.mb-body { flex: 1; display: flex; min-height: 0; position: relative; }
+.mb-side { width: 256px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; padding-inline-end: 0; }
+.mb.mini .mb-side { width: 72px; }
+.mb.mini .mb-nav-t, .mb.mini .mb-nav-n, .mb.mini .mb-lhead, .mb.mini .mb-compose span, .mb.mini .mb-tw, .mb.mini .mb-nav-more, .mb.mini .mb-lnone { display: none; }
+.mb.mini .mb-compose { width: 56px; padding: 0; justify-content: center; margin-inline-start: 8px; }
+.mb.mini .mb-nav { margin-inline-start: 12px; width: 48px; padding: 0 !important; justify-content: center; border-radius: 16px; }
+.mb-compose { display: inline-flex; align-items: center; gap: 12px; height: 56px; min-width: 96px; align-self: flex-start; padding: 0 20px 0 16px; padding-inline: 16px 24px; margin: 8px 8px 16px; border: 0; border-radius: 16px; background: #c2e7ff; color: #001d35; font-size: 14px; font-weight: 500; cursor: pointer; transition: box-shadow .08s; }
+.mb-compose:hover { box-shadow: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15); }
+.mb-compose .ms { font-size: 24px; }
+.mb-navs { flex: 1; overflow-y: auto; padding-bottom: 16px; scrollbar-width: thin; }
+.mb-nav { position: relative; display: flex; align-items: center; height: 32px; padding: 0 12px 0 26px; padding-inline: 26px 12px; margin-inline-end: 16px; border-start-end-radius: 16px; border-end-end-radius: 16px; color: #1f1f1f; font-size: 14px; cursor: pointer; gap: 18px; }
+.mb-nav:hover { background: rgba(32,33,36,.059); }
+.mb-nav.on { background: #d3e3fd; color: #001d35; font-weight: 700; }
+.mb-nav.b { font-weight: 700; }
+.mb-nav.dragover { background: #d3e3fd; outline: 2px dashed #0b57d0; outline-offset: -2px; }
+.mb-nav .ms { color: #444746; }
+.mb-nav.on .ms { color: #001d35; }
+.mb-nav-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-nav-n { font-size: 12px; letter-spacing: .3px; }
+.mb-nav-more { display: none; width: 28px; height: 28px; border: 0; background: none; border-radius: 50%; cursor: pointer; color: #444746; align-items: center; justify-content: center; margin-inline-start: -8px; }
+.mb-nav:hover .mb-nav-more { display: inline-flex; }
+.mb-nav:hover .mb-nav-more + * { display: none; }
+.mb-nav:hover .mb-nav-n:has(+ .mb-nav-more) { display: none; }
+.mb-nav-more:hover { background: rgba(68,71,70,.12); }
+.mb-tw { position: absolute; inset-inline-start: 4px; width: 20px; height: 20px; border: 0; background: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #444746; }
+.mb-tw .ms { font-size: 20px; }
+[dir=rtl] .mb-tw .ms { transform: scaleX(-1); }
+.mb-lhead { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 4px 26px; padding-inline: 26px 16px; font-size: 16px; font-weight: 500; color: #1f1f1f; }
+.mb-lnone { padding: 4px 26px; color: #5f6368; font-size: 13px; }
+.mb-panel { flex: 1; min-width: 0; background: #fff; border-radius: 16px; margin-bottom: 16px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.mb-apps { width: 56px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+.mb-app { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #444746; border: 0; background: none; cursor: pointer; margin-top: 8px; }
+.mb-app:hover { background: rgba(68,71,70,.08); }
+.mb-app.on { background: #d3e3fd; color: #0b57d0; }
+.mb-app .ms { font-size: 22px; }
+.mb-sidepanel { display: none; width: 300px; flex-shrink: 0; background: #fff; border-radius: 16px; margin: 0 8px 16px; margin-inline-end: 0; flex-direction: column; overflow: hidden; }
+.mb.side-open .mb-sidepanel { display: flex; }
+.mb-sph { display: flex; align-items: center; justify-content: space-between; padding: 12px 8px 4px 16px; padding-inline: 16px 8px; font-size: 16px; }
+.mb-sph b { font-weight: 500; }
+.mb-spq { display: flex; align-items: center; gap: 8px; margin: 4px 12px 8px; padding: 0 12px; height: 40px; background: #f1f4f9; border-radius: 20px; color: #444746; }
+.mb-spq input { border: 0; background: none; outline: none; flex: 1; font-size: 14px; min-width: 0; }
+.mb-spl { flex: 1; overflow-y: auto; padding-bottom: 12px; }
+.mb-spgh { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-weight: 500; cursor: pointer; color: #1f1f1f; }
+.mb-spgh:hover { background: #f1f4f9; }
+.mb-spgh .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-spgh .tw { transition: transform .15s; color: #444746; }
+.mb-spg.shut .tw { transform: rotate(90deg); }
+.mb-spg.shut .mb-spp { display: none; }
+.mb-spp { display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 8px; padding-inline: 28px 8px; }
+.mb-spp:hover { background: #f1f4f9; }
+.mb-spp .grow { flex: 1; min-width: 0; }
+.mb-spp .grow > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-spp .mb-ic { display: none; }
+.mb-spp:hover .mb-ic { display: inline-flex; }
+.mb-scrim { display: none; }
+.mb-rav, .mb-fab { display: none; }
+.mb-connect { margin: auto; text-align: center; max-width: 440px; padding: 40px 24px; color: #444746; }
+.mb-connect h2 { font-size: 22px; font-weight: 400; color: #1f1f1f; margin: 12px 0 8px; }
+
+/* Toolbar above the list / conversation */
+.mb-bar { height: 48px; display: flex; align-items: center; padding: 0 16px 0 8px; padding-inline: 8px 16px; flex-shrink: 0; gap: 2px; }
+.mb-selwrap { display: inline-flex; align-items: center; border-radius: 4px; margin-inline-end: 6px; }
+.mb-selwrap .mb-ic:first-child { width: 32px; height: 32px; border-radius: 4px; }
+.mb-caret { width: 16px !important; height: 32px !important; border-radius: 4px !important; margin-inline-start: -4px; }
+.mb-caret .ms { font-size: 18px; }
+.mb-range { color: #444746; font-size: 12px; padding: 0 8px; white-space: nowrap; }
+.mb-tabs { display: flex; border-bottom: 1px solid #f1f3f4; flex-shrink: 0; }
+.mb-tab { position: relative; flex: 0 1 252px; height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 16px; color: #444746 !important; font-weight: 500; font-size: 14px; min-width: 0; }
+.mb-tab:hover { background: rgba(32,33,36,.059); }
+.mb-tab.on::after { content: ''; position: absolute; bottom: 0; inset-inline: 8px; height: 3px; border-radius: 3px 3px 0 0; background: #0b57d0; }
+.mb-tab.on { color: #0b57d0 !important; }
+.mb-tab.on.t-promotions { color: #146c2e !important; } .mb-tab.on.t-promotions::after { background: #146c2e; }
+.mb-tab.on.t-updates { color: #b06000 !important; } .mb-tab.on.t-updates::after { background: #b06000; }
+.mb-tab span:not(.ms):not(.mb-new) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-new { font-size: 11px; font-weight: 500; color: #fff; background: #0b57d0; border-radius: 8px; padding: 0 6px; line-height: 16px; white-space: nowrap; }
+.t-promotions .mb-new { background: #146c2e; } .t-updates .mb-new { background: #b06000; }
+.mb-sinfo, .mb-note { padding: 8px 24px; color: #444746; font-size: 13px; border-bottom: 1px solid #f1f3f4; }
+.mb-note { background: #f8f9fa; text-align: center; }
+.mb-perm { padding: 8px 16px; background: #fef7e0; color: #3c4043; font-size: 13px; border-top: 1px solid #f1f3f4; }
+.mb-perm a { color: #0b57d0 !important; font-weight: 500; }
+
+/* Conversation rows */
+.mb-list { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.mb-row { position: relative; display: flex; align-items: center; height: 40px; padding: 0 16px 0 8px; padding-inline: 8px 16px; border-bottom: 1px solid rgba(100,121,143,.122); background: rgba(242,245,245,.8); cursor: pointer; color: #1f1f1f; font-size: 14px; }
+.mb-row.unread { background: #fff; }
+.mb-row:hover { box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0, 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); z-index: 2; }
+.mb-row.sel { background: #c2dbff; }
+.mb-row.focus::before { content: ''; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 3px; background: #4d90fe; }
+.mb-row .mb-ic { color: rgba(68,71,70,.6); }
+.mb-row .mb-ic:hover { color: #1f1f1f; }
+.mb-star.on, .mb-star.on:hover { color: #f4b400 !important; }
+.mb-imp.on, .mb-imp.on:hover { color: #f2b600 !important; }
+.mb-from { flex: 0 0 168px; width: 168px; padding-inline: 10px 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f1f1f; }
+.mb-row.unread .mb-from .b, .mb-row.unread .mb-subj, .mb-row.unread .mb-date { font-weight: 700; color: #1f1f1f; }
+.mb-cnt { color: #444746; font-size: 12px; font-weight: 400; margin-inline-start: 4px; }
+.mb-draft { color: #c5221f; }
+.mb-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-subj { color: #1f1f1f; }
+.mb-snip { color: #5f6368; }
+.mb-end { display: flex; align-items: center; gap: 8px; padding-inline-start: 16px; }
+.mb-att { font-size: 18px; color: #5f6368; transform: rotate(45deg); }
+.mb-date { font-size: 12px; color: #5f6368; min-width: 52px; text-align: end; white-space: nowrap; }
+.mb-hover { display: none; position: absolute; inset-inline-end: 8px; top: 4px; align-items: center; gap: 0; background: inherit; }
+.mb-row:hover .mb-hover { display: flex; background: #fff; }
+.mb-row.sel:hover .mb-hover { background: #c2dbff; }
+.mb-row:not(.unread):hover .mb-hover { background: #f2f6fc; }
+.mb-row:hover .mb-end { visibility: hidden; }
+.mb-chip { display: inline-flex; align-items: center; font-size: 12px; line-height: 18px; padding: 0 4px; border-radius: 4px; margin-inline-end: 6px; font-weight: 400; vertical-align: 1px; }
+.mb-chip-x { border: 0; background: none; padding: 0; margin-inline-start: 2px; color: inherit; cursor: pointer; display: inline-flex; opacity: .7; }
+.mb-chip-x .ms { font-size: 14px; }
+.mb-chip-x:hover { opacity: 1; }
+.mb-empty { padding: 56px 24px; text-align: center; color: #444746; }
+.mb-empty a { color: #0b57d0 !important; }
+.mb-loading { display: flex; justify-content: center; padding-top: 12px; }
+.mb-loading span { background: #feefc3; color: #202124; font-size: 13px; font-weight: 500; padding: 4px 16px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.mb-dragghost { position: fixed; top: -100px; background: #0b57d0; color: #fff; padding: 6px 12px; border-radius: 4px; font: 500 14px Roboto, Arial, sans-serif; }
+
+/* Reading a conversation */
+.mb-read { flex: 1; overflow-y: auto; padding: 0 16px 24px 0; padding-inline: 0 16px; }
+.mb-rh { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 16px 0 8px; padding-inline: 16px 0; }
+.mb-rh .mb-imp { margin-inline-start: 12px; }
+.mb-rsubj { font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 22px; line-height: 28px; font-weight: 400; color: #1f1f1f; margin: 0 8px 0 4px; margin-inline: 4px 8px; }
+.mb-rh .mb-chip { font-size: 12px; padding: 0 4px; }
+.mb-msgs { padding-inline-start: 16px; }
+.mb-msg { display: flex; gap: 16px; padding: 12px 0 12px 0; padding-inline-start: 16px; border-top: 1px solid #f1f3f4; }
+.mb-msg:first-child { border-top: 0; }
+.mb-mm { flex: 1; min-width: 0; }
+.mb-mhead { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; min-height: 40px; }
+.mb-mwho { flex: 1; min-width: 0; }
+.mb-mwho b { font-weight: 700; font-size: 14px; color: #1f1f1f; }
+.mb-addr { color: #5f6368; font-size: 12px; }
+.mb-msg:not(.open) .mb-addr { display: none; }
+.mb-mto { color: #5f6368; font-size: 12px; display: flex; align-items: center; gap: 2px; min-height: 20px; }
+.mb-msnip { color: #5f6368; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.mb-mright { display: flex; align-items: center; gap: 0; color: #5f6368; font-size: 12px; white-space: nowrap; }
+.mb-mdate { padding-inline-end: 6px; }
+.mb-detail { margin: 4px 0 8px; padding: 8px 12px; border: 1px solid #dadce0; border-radius: 8px; box-shadow: 0 1px 3px rgba(60,64,67,.15); font-size: 12px; color: #5f6368; display: inline-block; max-width: 100%; }
+.mb-detail[hidden] { display: none; }
+.mb-detail td:first-child { padding-inline-end: 12px; text-align: end; vertical-align: top; }
+.mb-detail td:last-child { color: #1f1f1f; overflow-wrap: anywhere; }
+.mb-mbody { display: none; padding-top: 8px; }
+.mb-msg.open .mb-mbody { display: block; }
+.mb-msg:not(.open) .mb-files { display: none; }
+.mb-mbody .mr-frame { width: 100%; border: 0; display: block; min-height: 40px; }
+.mb-fold { position: relative; height: 26px; margin: 4px 0; cursor: pointer; border-top: 1px solid #dadce0; border-bottom: 1px solid #dadce0; background: repeating-linear-gradient(#fff 0 3px, #dadce0 3px 4px); }
+.mb-foldn { position: absolute; top: 50%; inset-inline-start: 24px; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 1px solid #dadce0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #444746; font-weight: 500; }
+.mb-fold:hover .mb-foldn { background: #f1f3f4; }
+.mb-files { border-top: 1px solid #f1f3f4; margin-top: 16px; padding-top: 12px; }
+.mb-fh { font-size: 14px; color: #1f1f1f; font-weight: 500; margin-bottom: 12px; }
+.mb-fl { display: flex; flex-wrap: wrap; gap: 12px; }
+.mb-file { position: relative; width: 180px; height: 120px; border: 1px solid #dadce0; border-radius: 8px; background: #f8fafd; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; padding: 0; overflow: hidden; cursor: pointer; text-align: start; }
+.mb-file:hover { box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15); }
+.mb-fic { position: absolute; top: 22px; inset-inline-start: 0; inset-inline-end: 0; display: flex; justify-content: center; }
+.mb-fic .ms { font-size: 44px; }
+.mb-fic.pdf .ms { color: #ea4335; } .mb-fic.img .ms { color: #d93025; } .mb-fic.xls .ms { color: #188038; } .mb-fic.doc .ms { color: #4285f4; } .mb-fic.zip .ms { color: #5f6368; } .mb-fic.gen .ms { color: #5f6368; }
+.mb-fn { background: #fff; border-top: 1px solid #dadce0; padding: 6px 10px 0; font-size: 13px; color: #1f1f1f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.mb-fs { background: #fff; padding: 0 10px 6px; font-size: 11px; color: #5f6368; }
+.mb-fdl { position: absolute; top: 8px; inset-inline-end: 8px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center; }
+.mb-fdl .ms { font-size: 18px; }
+.mb-file:hover .mb-fdl { display: flex; }
+.mb-replyhost { padding: 16px 0 8px; padding-inline-start: 72px; }
+.mb-rbtns { display: flex; gap: 12px; flex-wrap: wrap; }
+.mb-pill { height: 36px; padding: 0 16px; padding-inline: 12px 16px; border: 1px solid #747775; border-radius: 18px; background: #fff; color: #444746; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.mb-pill:hover { background: #f1f3f4; color: #1f1f1f; }
+
+/* Compose */
+.mb-dock { position: fixed; bottom: 0; inset-inline-end: 16px; display: flex; flex-direction: row-reverse; align-items: flex-end; gap: 16px; z-index: 900; pointer-events: none; }
+[dir=rtl] .mb-dock { flex-direction: row-reverse; }
+.mb-cw { pointer-events: auto; width: 540px; max-width: calc(100vw - 32px); height: min(560px, calc(100vh - 80px)); background: #fff; border-radius: 8px 8px 0 0; box-shadow: 0 8px 10px 1px rgba(0,0,0,.14), 0 3px 14px 2px rgba(0,0,0,.12), 0 5px 5px -3px rgba(0,0,0,.2); display: flex; flex-direction: column; overflow: hidden; }
+.mb-cw.min { height: 40px; width: 260px; }
+.mb-cw.min .mb-cwb { display: none; }
+.mb-cw.full { position: fixed; inset: 5vh 8vw; width: auto; height: auto; max-width: none; border-radius: 8px; z-index: 950; }
+body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 899; }
+.mb-cw.dropping { outline: 3px dashed #0b57d0; outline-offset: -6px; }
+.mb-cwh { height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 0; padding: 0 8px 0 16px; padding-inline: 16px 8px; background: #f2f6fc; color: #041e49; cursor: pointer; }
+.mb-cwh .mb-ic { color: #444746; }
+.mb-cwt { flex: 1; font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-cwb { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.mb-crow { display: flex; align-items: center; min-height: 40px; margin: 0 16px; border-bottom: 1px solid #f1f3f4; gap: 8px; }
+.mb-crow label { color: #444746; font-size: 14px; flex-shrink: 0; }
+.mb-ccbtns { display: flex; gap: 8px; flex-shrink: 0; }
+.mb-ccbtns a { color: #1f1f1f !important; font-size: 14px; text-decoration: none; }
+.mb-ccbtns a:hover { text-decoration: underline; }
+.mb-chw { position: relative; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 0; cursor: text; }
+.mb-chs { display: contents; }
+.mb-chin { flex: 1; min-width: 100px; border: 0; outline: none; font-size: 14px; height: 28px; background: none; color: #1f1f1f; }
+.mb-rc { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 0; padding-inline: 0 4px; border: 1px solid #dadce0; border-radius: 12px; font-size: 13px; background: #fff; max-width: 260px; }
+.mb-rc > span:not(.mb-av) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-rc.bad { background: #fce8e6; border-color: #f28b82; color: #c5221f; }
+.mb-rc button { border: 0; background: none; padding: 0; cursor: pointer; display: inline-flex; color: #5f6368; }
+.mb-rc button .ms { font-size: 16px; }
+.mb-sug { position: absolute; top: 100%; inset-inline-start: 0; width: min(420px, 100%); background: #fff; border-radius: 8px; box-shadow: 0 4px 8px 3px rgba(60,64,67,.15), 0 1px 3px rgba(60,64,67,.3); z-index: 20; padding: 8px 0; }
+.mb-sg { width: 100%; display: flex; align-items: center; gap: 12px; padding: 6px 16px; border: 0; background: none; cursor: pointer; text-align: start; font-size: 14px; }
+.mb-sg.on, .mb-sg:hover { background: #e8f0fe; }
+.mb-sg .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mb-sg .grow b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-sgp { font-size: 11px; color: #444746; background: #f1f3f4; border-radius: 4px; padding: 0 6px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-csubj { flex: 1; border: 0; outline: none; font-size: 14px; height: 38px; color: #1f1f1f; background: none; }
+.mb-ced { flex: 1; overflow-y: auto; padding: 12px 16px; outline: none; font-family: Arial, sans-serif; font-size: small; font-size: 13.33px; line-height: 1.5; min-height: 120px; color: #222; }
+.mb-ced blockquote { margin: 0 .8ex; border-inline-start: 1px solid #ccc; padding-inline-start: 1ex; }
+.mb-quotebtn { align-self: flex-start; margin: 0 16px 8px; border: 0; background: #e8eaed; border-radius: 6px; height: 12px; width: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.mb-quotebtn .ms { font-size: 18px; color: #5f6368; }
+.mb-catt { padding: 0 16px; display: flex; flex-direction: column; gap: 4px; }
+.mb-catt:empty { display: none; }
+.mb-ca { display: flex; align-items: center; gap: 6px; background: #f5f5f5; padding: 2px 4px 2px 8px; padding-inline: 8px 4px; font-size: 13px; font-weight: 500; color: #15c; max-width: 420px; }
+.mb-can { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.mb-fmt { display: flex; align-items: center; flex-wrap: wrap; margin: 0 16px; padding: 2px 4px; border-radius: 8px; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); }
+.mb-fmt select { border: 0; background: none; font-size: 13px; height: 28px; cursor: pointer; }
+.mb-fmt label.mb-ic { position: relative; }
+.mb-cfoot { display: flex; align-items: center; gap: 2px; padding: 12px 16px 14px; padding-inline: 16px 8px; flex-shrink: 0; }
+.mb-send { height: 36px; padding: 0 24px; border-radius: 18px; border: 0; background: #0b57d0; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; margin-inline-end: 8px; letter-spacing: .25px; }
+.mb-send:hover { background: #0a4fbf; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); }
+.mb-csaved { font-size: 12px; color: #5f6368; padding: 0 8px; white-space: nowrap; }
+.mb-cw.inline { width: auto; max-width: none; height: auto; border-radius: 0; box-shadow: none; background: none; overflow: visible; }
+.mb-cwinl { display: flex; gap: 16px; margin-inline-start: -56px; }
+.mb-cwcard { flex: 1; min-width: 0; border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15); background: #fff; display: flex; flex-direction: column; }
+.mb-cw.inline .mb-ced { min-height: 140px; max-height: 50vh; }
+.mb-cw.inline .mb-crow { margin: 0 8px 0 12px; margin-inline: 12px 8px; }
+
+/* Menus, dialogs, snackbar */
+.mb-menu { position: fixed; z-index: 1000; background: #fff; border-radius: 4px; box-shadow: 0 2px 2px 0 rgba(0,0,0,.14), 0 3px 1px -2px rgba(0,0,0,.12), 0 1px 5px 0 rgba(0,0,0,.2); padding: 6px 0; min-width: 200px; max-width: 320px; max-height: 70vh; display: flex; flex-direction: column; }
+.mb-mitems { overflow-y: auto; }
+.mb-mtitle { padding: 6px 16px 4px; font-size: 14px; color: #1f1f1f; }
+.mb-msearch { padding: 4px 16px 8px; }
+.mb-msearch input { width: 100%; border: 0; border-bottom: 1px solid #c4c7c5; outline: none; height: 28px; font-size: 14px; }
+.mb-msearch input:focus { border-bottom: 2px solid #0b57d0; }
+.mb-mi { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 4px 16px; border: 0; background: none; cursor: pointer; font-size: 14px; color: #1f1f1f; text-align: start; }
+.mb-mi:hover { background: #f1f3f4; }
+.mb-mi.dis { color: #5f6368; cursor: default; background: none; font-size: 12px; min-height: 24px; }
+.mb-mi.b { font-weight: 500; color: #0b57d0; }
+.mb-mi .ms { color: #444746; }
+.mb-mi .ms.fill { color: #1f1f1f; }
+.mb-mdot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.mb-msep { border-top: 1px solid #e0e0e0; margin: 6px 0; }
+.mb-colors { display: grid; grid-template-columns: repeat(8, 24px); gap: 4px; padding: 4px 16px 8px; }
+.mb-color { width: 24px; height: 24px; border-radius: 4px; border: 1px solid rgba(0,0,0,.12); cursor: pointer; font-size: 12px; padding: 0; }
+.mb-color:hover { transform: scale(1.15); }
+.mb-emojis { display: grid; grid-template-columns: repeat(8, 32px); padding: 4px 8px; }
+.mb-emo { width: 32px; height: 32px; border: 0; background: none; font-size: 20px; cursor: pointer; border-radius: 4px; }
+.mb-emo:hover { background: #f1f3f4; }
+.mb-dlgbg { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.mb-dlg { background: #fff; border-radius: 8px; box-shadow: 0 24px 38px 3px rgba(0,0,0,.14), 0 9px 46px 8px rgba(0,0,0,.12), 0 11px 15px -7px rgba(0,0,0,.2); width: 100%; max-width: 440px; max-height: 90vh; display: flex; flex-direction: column; }
+.mb-dlgh { display: flex; align-items: center; justify-content: space-between; padding: 16px 12px 4px 24px; padding-inline: 24px 12px; }
+.mb-dlgh h3 { margin: 0; font-size: 18px; font-weight: 400; color: #1f1f1f; }
+.mb-dlgb { padding: 8px 24px 16px; overflow-y: auto; }
+.mb-dlgb p { margin: 0 0 8px; }
+.mb-dlgf { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 24px 20px; }
+.mb-dl { display: block; font-size: 13px; color: #444746; margin-bottom: 6px; }
+.mb-in { width: 100%; height: 36px; border: 1px solid #c4c7c5; border-radius: 4px; padding: 0 10px; font-size: 14px; outline: none; background: #fff; margin-top: 4px; }
+.mb-in:focus { border: 2px solid #0b57d0; padding: 0 9px; }
+.mb-in:disabled { background: #f1f3f4; color: #80868b; }
+.mb-keys td { padding: 4px 8px; }
+.mb-keys kbd { background: #f1f3f4; border-radius: 4px; padding: 2px 6px; font-family: Roboto Mono, monospace; font-size: 12px; }
+.mb-mtab { width: 100%; border-collapse: collapse; }
+.mb-mtab th { text-align: start; font-weight: 500; padding: 14px 0 6px; border-bottom: 1px solid #e0e0e0; }
+.mb-mtab td { padding: 6px 0; border-bottom: 1px solid #f1f3f4; }
+.mb-mtab a { color: #0b57d0; }
+.mb-dlg:has(.mb-mtab) { max-width: 620px; }
+.mb-snack { position: fixed; bottom: 24px; inset-inline-start: 24px; z-index: 1200; background: #1f1f1f; color: #f2f2f2; border-radius: 4px; min-height: 48px; padding: 6px 8px 6px 24px; padding-inline: 24px 8px; display: flex; align-items: center; gap: 16px; box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14), 0 1px 18px 0 rgba(0,0,0,.12); transform: translateY(120px); transition: transform .2s; max-width: calc(100vw - 48px); }
+.mb-snack.show { transform: none; }
+.mb-snack button { border: 0; background: none; color: #a8c7fa; font-weight: 500; font-size: 14px; cursor: pointer; padding: 8px; border-radius: 4px; font-family: inherit; }
+.mb-snack button:hover { background: rgba(255,255,255,.08); }
+.mb-snack .mb-snx { color: #c4c7c5; display: flex; padding: 6px; }
+
+/* Narrow screens: labels in a drawer, two-line rows */
+@media (max-width: 1100px) { .mb-brand { width: auto; } .mb-brand span { display: none; } .mb.side-open .mb-sidepanel { position: absolute; inset-inline-end: 56px; top: 0; bottom: 0; z-index: 20; box-shadow: 0 4px 8px 3px rgba(60,64,67,.15); } }
+@media (max-width: 760px) {
+  .mb-top { padding: 8px; height: 60px; }
+  .mb-brand, .mb-status, .mb-help, [data-help] { display: none; }
+  .mb-search { flex: 1; height: 44px; }
+  .mb-side { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; z-index: 40; background: #fff; box-shadow: 0 8px 10px 1px rgba(0,0,0,.14); transform: translateX(110%); transition: transform .2s; padding-top: 8px; }
+  [dir=ltr] .mb-side { transform: translateX(-110%); }
+  .mb.drawer .mb-side { transform: none; }
+  .mb.drawer .mb-scrim { display: block; position: absolute; inset: 0; background: rgba(0,0,0,.32); z-index: 39; }
+  .mb-panel { border-radius: 0; margin: 0; }
+  .mb-apps { display: none; }
+  .mb.side-open .mb-sidepanel { position: absolute; inset: 0; margin: 0; width: auto; border-radius: 0; z-index: 45; }
+  .mb-compose { display: none; }
+  .mb-fab { display: inline-flex; position: absolute; bottom: 16px; inset-inline-start: 16px; z-index: 30; align-items: center; gap: 12px; height: 56px; padding: 0 20px 0 16px; padding-inline: 16px 20px; border: 0; border-radius: 16px; background: #c2e7ff; color: #001d35; font-weight: 500; font-size: 14px; box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15); }
+  .mb-fab .ms { font-size: 24px; }
+  .mb.drawer .mb-fab, .mb-panel:has(.mb-read) ~ .mb-fab { display: none; }
+  .mb-rav { display: block; position: absolute; inset-inline-start: 12px; top: 12px; border: 0; background: none; padding: 0; cursor: pointer; }
+  .mb-avsel { width: 40px; height: 40px; background: #0b57d0 !important; }
+  .mb-dash { display: none; }
+  .mb-row.sel { background: #d3e3fd; }
+  .mb-row { height: auto; min-height: 72px; flex-wrap: wrap; align-items: flex-start; padding: 10px 12px; padding-inline-start: 64px; background: #fff; border-bottom: 0; }
+  .mb-row:hover { box-shadow: none; }
+  .mb-row .mb-ic[data-cb] { display: none; }
+  .mb-row [data-imp] { display: none; }
+  .mb-row [data-star] { position: absolute; inset-inline-end: 6px; top: 34px; }
+  .mb-from { order: 1; flex: 1; width: auto; padding: 0; font-size: 16px; }
+  .mb-end { order: 2; padding: 0; }
+  .mb-main { order: 3; flex: 0 0 100%; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-inline-end: 32px; }
+  .mb-subj { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mb-snip::before { content: ''; }
+  .mb-hover { display: none !important; }
+  .mb-row:hover .mb-end { visibility: visible; }
+  .mb-tab { flex: 1; gap: 6px; padding: 0 8px; justify-content: center; }
+  .mb-tab span:not(.ms) { display: none; }
+  .mb-tab.on span:not(.ms):not(.mb-new) { display: inline; }
+  .mb-bar { overflow-x: auto; }
+  .mb-range { display: none; }
+  .mb-read { padding: 0; }
+  .mb-msgs { padding: 0; }
+  .mb-msg { padding-inline: 12px; gap: 10px; }
+  .mb-msg .mb-av { width: 32px !important; height: 32px !important; }
+  .mb-mdate { display: none; }
+  .mb-replyhost { padding-inline: 12px; }
+  .mb-cwinl { margin: 0; } .mb-cwinl > .mb-av { display: none; }
+  .mb-cw:not(.inline) { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; border-radius: 0; z-index: 950; }
+  .mb-cw.min { inset: auto 0 0 0; height: 40px; }
+  .mb-dock { inset-inline-end: 0; }
+  .mb-snack { inset-inline: 8px; bottom: 8px; }
+}
 </style>
 </head>
 <body>
@@ -983,7 +1356,7 @@ span.pg-logo { border: 0; }
     protocols: { title: 'פרוטוקולים', render: renderProtocols },
     contacts: { title: 'אנשי קשר', render: renderContacts },
     google: { title: 'יומן, מייל ו-Drive', render: renderGoogle },
-    mail: { title: 'מיילים', render: (el) => { ui.gTab = 'gmail'; renderGoogle(el); } },
+    mail: { title: 'מיילים', render: renderMailbox },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
   const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'client', projQ: '', projOpen: {}, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
@@ -994,6 +1367,7 @@ span.pg-logo { border: 0; }
 
   function currentView() {
     const h = location.hash.replace('#', '');
+    if (h.indexOf('mail/') === 0) return 'mail';
     if (h.indexOf('project/') === 0) { ui.projectId = decodeURIComponent(h.slice(8)); return 'project'; }
     return VIEWS[h] && h !== 'project' ? h : 'dashboard';
   }
@@ -1011,6 +1385,7 @@ span.pg-logo { border: 0; }
     const addMap = { tasks: 'משימה חדשה', projects: 'פרויקט חדש', project: 'משימה חדשה', accounts: 'חשבון חדש', protocols: 'פרוטוקול חדש', dashboard: 'משימה חדשה' };
     if (addMap[v]) { addBtn.style.display = ''; $('.lbl', addBtn).textContent = addMap[v]; }
     else addBtn.style.display = 'none';
+    document.body.classList.toggle('mail-mode', v === 'mail');
     VIEWS[v].render(content());
     closeSidebar();
   }
@@ -5304,7 +5679,7 @@ span.pg-logo { border: 0; }
       </div>
       <div class="card card-pad" id="gArea"></div>`;
     const area = $('#gArea', el);
-    $$('[data-gtab]', el).forEach((b) => b.addEventListener('click', () => { ui.gTab = b.dataset.gtab; renderGoogle(el); }));
+    $$('[data-gtab]', el).forEach((b) => b.addEventListener('click', () => { if (b.dataset.gtab === 'gmail') { location.hash = 'mail'; return; } ui.gTab = b.dataset.gtab; renderGoogle(el); }));
     $$('[data-mfilter]', el).forEach((b) => b.addEventListener('click', () => { ui.gMailF = b.dataset.mfilter; ui.gMailList = null; renderGoogle(el); }));
     const gc = $('[data-gconnect]', el);
     if (gc) gc.addEventListener('click', () => G.connect().catch((e) => toast(gErr(e))));
@@ -5371,6 +5746,1228 @@ span.pg-logo { border: 0; }
       }).catch(fail);
     }
   }
+
+  // ---------- Mail page: a mailbox laid out like Gmail (labels, list, conversation, compose) ----------
+  // The address keeps where you are: #mail/<view>[/<arg>][~<threadId>], so the browser's back button works as in Gmail.
+  const MB_CATS = { primary: 'CATEGORY_PERSONAL', promotions: 'CATEGORY_PROMOTIONS', social: 'CATEGORY_SOCIAL', updates: 'CATEGORY_UPDATES', forums: 'CATEGORY_FORUMS' };
+  const MB_TABS = [['primary', 'ראשי', 'inbox'], ['promotions', 'קידומי מכירות', 'sell'], ['social', 'רשתות חברתיות', 'group'], ['updates', 'עדכונים', 'info']];
+  const MB_SYS = [
+    { id: 'inbox', name: 'דואר נכנס', icon: 'inbox', label: 'INBOX', count: 'threadsUnread' },
+    { id: 'starred', name: 'מסומן בכוכב', icon: 'star', label: 'STARRED' },
+    { id: 'snoozed', name: 'נדחה לזמן מאוחר', icon: 'schedule', q: 'in:snoozed' },
+    { id: 'sent', name: 'נשלח', icon: 'send', label: 'SENT', flip: true },
+    { id: 'drafts', name: 'טיוטות', icon: 'draft', label: 'DRAFT', count: 'messagesTotal' },
+    { id: 'important', name: 'חשוב', icon: 'label_important', label: 'IMPORTANT', more: true, flip: true },
+    { id: 'chats', name: "צ'אטים", icon: 'chat', q: 'in:chats', more: true },
+    { id: 'scheduled', name: 'מתוזמן', icon: 'schedule_send', q: 'in:scheduled', more: true, flip: true },
+    { id: 'all', name: 'כל הדואר', icon: 'stacks', more: true },
+    { id: 'spam', name: 'ספאם', icon: 'report', label: 'SPAM', count: 'threadsUnread', more: true, spamTrash: true },
+    { id: 'trash', name: 'אשפה', icon: 'delete', label: 'TRASH', more: true, spamTrash: true },
+  ];
+  const MB_CATLIST = [['social', 'רשתות חברתיות', 'group'], ['updates', 'עדכונים', 'info'], ['forums', 'פורומים', 'forum'], ['promotions', 'קידומי מכירות', 'sell']];
+  // Colors Gmail accepts for labels.
+  const MB_COLORS = ['#fb4c2f', '#ffad47', '#fad165', '#16a766', '#43d692', '#4a86e8', '#a479e2', '#f691b3',
+    '#f6c5be', '#ffe6c7', '#fef1d1', '#b9e4d0', '#c6f3de', '#c9daf8', '#e4d7f5', '#fcdee8',
+    '#cc3a21', '#eaa041', '#f2c960', '#149e60', '#3dc789', '#3c78d8', '#8e63ce', '#e07798',
+    '#000000', '#434343', '#666666', '#999999', '#cccccc', '#efefef', '#822111', '#1c4587'];
+  const MB_AV = ['#1a73e8', '#e8710a', '#188038', '#d93025', '#a142f4', '#12b5cb', '#e52592', '#f9ab00', '#5f6368', '#9334e6', '#c5221f', '#007b83'];
+  const M = { view: 'inbox', arg: '', open: '', page: 0, tokens: [''], cache: {}, labels: null, labelsAt: 0, sel: new Set(), more: false, catsOpen: false, collapsed: {}, side: '', drawer: false, convs: {}, scroll: 0, inline: null, focus: -1, sideQ: '' };
+  try { Object.assign(M, JSON.parse(localStorage.getItem('femy-mailbox') || '{}')); M.sel = new Set(); M.cache = {}; M.convs = {}; M.inline = null; } catch (e) { /* ignore */ }
+  const mbKeep = () => { try { localStorage.setItem('femy-mailbox', JSON.stringify({ more: M.more, catsOpen: M.catsOpen, collapsed: M.collapsed, side: M.side, noTabs: M.noTabs })); } catch (e) { /* ignore */ } };
+  const ms = (name, cls) => `<span class="ms${cls ? ' ' + cls : ''}" aria-hidden="true">${name}</span>`;
+  const mbEnc = (s) => encodeURIComponent(s).replace(/~/g, '%7E');
+  const mbHash = (view, arg, tid) => '#mail/' + view + (arg ? '/' + mbEnc(arg) : '') + (tid ? '~' + tid : '');
+  function mbParse() {
+    const h = location.hash.replace(/^#/, '');
+    const m = /^mail(?:\/([^/~]+)(?:\/([^~]*))?)?(?:~([\w-]+))?$/.exec(h) || [];
+    let arg = ''; try { arg = decodeURIComponent(m[2] || ''); } catch (e) { arg = m[2] || ''; }
+    return { view: m[1] || 'inbox', arg, open: m[3] || '' };
+  }
+  const mbGo = (view, arg, tid) => { const h = mbHash(view, arg, tid); if (location.hash !== h) location.hash = h; else render(); };
+  const mbCanAct = () => G.gmail.canModify();
+  const mbUserLabels = () => ((M.labels || []).filter((l) => l.type === 'user')).sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  const mbLabel = (id) => (M.labels || []).find((l) => l.id === id);
+  // What a view lists: Gmail labels and / or a search.
+  function mbSpec(view, arg) {
+    if (view === 'inbox') return M.noTabs ? { labelIds: ['INBOX'] } : { labelIds: ['INBOX', MB_CATS[arg || 'primary'] || 'CATEGORY_PERSONAL'] };
+    if (view === 'category') return { labelIds: [MB_CATS[arg]] };
+    if (view === 'label') return { labelIds: [arg] };
+    if (view === 'search') return { q: arg };
+    const s = MB_SYS.find((x) => x.id === view) || MB_SYS[0];
+    if (s.id === 'all') return {};
+    return s.spamTrash ? { q: 'in:' + s.id, spamTrash: true, labelIds: [s.label] } : s.label ? { labelIds: [s.label] } : { q: s.q };
+  }
+  function mbTitle(view, arg) {
+    if (view === 'search') return 'תוצאות חיפוש';
+    if (view === 'label') { const l = mbLabel(arg); return l ? l.name.split('/').pop() : 'תווית'; }
+    if (view === 'category') return (MB_CATLIST.find((c) => c[0] === arg) || [])[1] || '';
+    return (MB_SYS.find((x) => x.id === view) || MB_SYS[0]).name;
+  }
+  const mbKey = () => JSON.stringify([M.view, M.arg, M.page]);
+  // People and dates as Gmail shows them.
+  const mbShort = (s) => { const n = mailName(s); return (/@/.test(n) ? n.split('@')[0] : n.split(/\s+/)[0]) || n; };
+  const mbAvColor = (s) => { let h = 0; for (const c of String(s || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return MB_AV[h % MB_AV.length]; };
+  const mbAv = (from, size) => { const n = (mailName(from) || mailAddr(from) || '?').replace(/^["'\s]+/, ''); return `<span class="mb-av" style="background:${mbAvColor(mailAddr(from) || n)}${size ? `;width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px` : ''}">${esc(n.charAt(0).toUpperCase())}</span>`; };
+  function mbDate(ms0) {
+    const d = new Date(ms0), now = new Date();
+    if (toISO(d) === todayStr()) return timeOf(d);
+    if (d.getFullYear() === now.getFullYear()) return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' });
+  }
+  function mbAgo(ms0) {
+    const s = Math.round((Date.now() - ms0) / 1000);
+    if (s < 60) return 'לפני רגע';
+    if (s < 3600) return `לפני ${Math.round(s / 60)} דקות`;
+    if (s < 86400) { const h = Math.round(s / 3600); return h === 1 ? 'לפני שעה' : h === 2 ? 'לפני שעתיים' : `לפני ${h} שעות`; }
+    const dd = Math.round(s / 86400); return dd === 1 ? 'אתמול' : dd === 2 ? 'לפני יומיים' : `לפני ${dd} ימים`;
+  }
+  const mbMe = () => (G.status().email || '').toLowerCase();
+  function mbWho(t) {
+    if (M.view === 'sent' || M.view === 'scheduled') return 'אל: ' + (mailAddrs(t.to).map((a) => mbShort(a)).join(', ') || '(אין נמענים)');
+    const me = mbMe();
+    const names = t.people.filter((p) => !p.draft || t.people.length === 1).map((p) => {
+      const mine = p.sent || mailAddr(p.from).toLowerCase() === me;
+      const n = mine ? 'אני' : t.people.length > 1 ? mbShort(p.from) : mailName(p.from);
+      return `<span class="${p.unread ? 'b' : ''}">${esc(n)}</span>`;
+    });
+    const shown = names.length > 3 ? [names[0], '..', names[names.length - 2], names[names.length - 1]] : names;
+    return shown.join(', ') + (t.count > 1 ? ` <span class="mb-cnt">${t.count}</span>` : '') + (t.drafts ? ', <span class="mb-draft">טיוטה</span>' : '');
+  }
+  const mbTextColor = (bg) => { const n = parseInt((bg || '#cccccc').slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150 ? '#000000' : '#ffffff'; };
+  function mbChip(l, removable) {
+    const bg = (l.color && l.color.backgroundColor) || '#dde3ea', fg = (l.color && l.color.textColor) || '#444746';
+    return `<span class="mb-chip" style="background:${esc(bg)};color:${esc(fg)}" data-chip="${esc(l.id)}">${esc(l.name)}${removable ? `<button class="mb-chip-x" data-unlabel="${esc(l.id)}" title="הסרת התווית">${ms('close')}</button>` : ''}</span>`;
+  }
+  // The labels of a conversation worth showing in the list (the user's labels, and Inbox in searches).
+  function mbRowChips(t) {
+    const out = [];
+    if ((M.view === 'search' || M.view === 'all' || M.view === 'label' || M.view === 'starred' || M.view === 'important') && t.labels.includes('INBOX')) out.push(mbChip({ id: 'INBOX', name: 'דואר נכנס' }));
+    t.labels.forEach((id) => { const l = mbLabel(id); if (l && l.type === 'user' && !(M.view === 'label' && M.arg === id)) out.push(mbChip(l)); });
+    return out.join('');
+  }
+
+  // ---------- Labels: counts in the side panel ----------
+  let mbLabelsLoading = null;
+  function mbLoadLabels(force) {
+    if (!force && M.labels && Date.now() - M.labelsAt < 60000) return Promise.resolve(M.labels);
+    if (mbLabelsLoading) return mbLabelsLoading;
+    mbLabelsLoading = G.gmail.labels().then((ls) => { M.labels = ls; M.labelsAt = Date.now(); mbDrawNav(); return ls; })
+      .catch(() => M.labels || []).finally(() => { mbLabelsLoading = null; });
+    return mbLabelsLoading;
+  }
+  let mbCountsT = 0;
+  const mbRefreshCounts = () => { clearTimeout(mbCountsT); mbCountsT = setTimeout(() => { mbLoadLabels(true); refreshMailBadge(true); }, 900); };
+  function mbCount(s) {
+    const l = mbLabel(s.label); if (!l || !s.count) return 0;
+    return Number(l[s.count]) || 0;
+  }
+  function mbNavItem(id, name, icon, opts) {
+    const o = opts || {};
+    const on = o.on;
+    const n = o.n ? (o.n > 9999 ? '9,999+' : o.n.toLocaleString('he-IL')) : '';
+    return `<a class="mb-nav ${on ? 'on' : ''} ${o.bold || (n && o.boldN) ? 'b' : ''}" href="${o.href}" style="${o.indent ? `padding-inline-start:${16 + o.indent * 14}px` : ''}" data-navid="${esc(id)}" ${o.drop ? `data-drop="${esc(o.drop)}"` : ''}>
+      ${o.toggle !== undefined ? `<button class="mb-tw" data-tw="${esc(id)}">${ms(o.toggle ? 'arrow_drop_down' : 'arrow_left')}</button>` : ''}
+      ${ms(icon, (o.fill ? 'fill ' : '') + (o.flip ? 'flip' : '')).replace('class="ms', o.color ? `style="color:${esc(o.color)}" class="ms` : 'class="ms')}<span class="mb-nav-t">${esc(name)}</span><span class="mb-nav-n">${n}</span>
+      ${o.menu ? `<button class="mb-nav-more" data-lmenu="${esc(id)}" title="אפשרויות">${ms('more_vert')}</button>` : ''}</a>`;
+  }
+  function mbNavHtml() {
+    const cur = (id) => M.view === id;
+    const sys = MB_SYS.filter((s) => !s.more || M.more);
+    let h = sys.map((s) => mbNavItem(s.id, s.name, s.icon, { href: mbHash(s.id), on: cur(s.id), n: mbCount(s), boldN: s.id === 'inbox' || s.id === 'spam', flip: s.flip, fill: cur(s.id) && s.id !== 'all', drop: s.label && ['INBOX', 'SPAM', 'TRASH', 'STARRED', 'IMPORTANT'].includes(s.label) ? s.label : '' })).join('');
+    if (M.more) {
+      h += mbNavItem('cats', 'קטגוריות', 'label', { href: '#', toggle: M.catsOpen });
+      if (M.catsOpen) h += MB_CATLIST.map(([k, n, ic]) => mbNavItem('cat:' + k, n, ic, { href: mbHash('category', k), on: M.view === 'category' && M.arg === k, indent: 1, n: Number((mbLabel(MB_CATS[k]) || {}).threadsUnread) || 0, boldN: true })).join('');
+      h += `<a class="mb-nav" href="#" data-managel>${ms('settings')}<span class="mb-nav-t">ניהול תוויות</span></a>
+        <a class="mb-nav" href="#" data-newlabel>${ms('add')}<span class="mb-nav-t">יצירת תווית חדשה</span></a>`;
+    }
+    h += `<a class="mb-nav mb-morebtn" href="#" data-navmore>${ms(M.more ? 'expand_less' : 'expand_more')}<span class="mb-nav-t">${M.more ? 'פחות' : 'עוד'}</span></a>`;
+    // The user's labels, nested by "/" like Gmail.
+    const ul = mbUserLabels().filter((l) => M.more || l.labelListVisibility !== 'labelHide' || (M.view === 'label' && M.arg === l.id));
+    const names = new Set(ul.map((l) => l.name));
+    const rows = [];
+    const walk = (prefix, depth) => ul.filter((l) => { const p = l.name.lastIndexOf('/'); return (p < 0 ? '' : l.name.slice(0, p)) === prefix || (prefix === '' && p >= 0 && !names.has(l.name.slice(0, p))); })
+      .forEach((l) => {
+        const kids = ul.some((k) => k.name.startsWith(l.name + '/'));
+        const open = !M.collapsed[l.id];
+        const bg = l.color && l.color.backgroundColor;
+        rows.push(mbNavItem(l.id, l.name.slice(prefix ? prefix.length + 1 : 0), 'label', { href: mbHash('label', l.id), on: M.view === 'label' && M.arg === l.id, indent: depth, n: Number(l.threadsUnread) || 0, boldN: true, fill: !!bg, color: bg, toggle: kids ? open : undefined, menu: true, drop: l.id }));
+        if (kids && open) walk(l.name, depth + 1);
+      });
+    walk('', 0);
+    h += `<div class="mb-lhead"><span>תוויות</span><button class="mb-ic" data-newlabel title="יצירת תווית חדשה">${ms('add')}</button></div>` + (rows.join('') || '<div class="mb-lnone">אין עדיין תוויות משלך</div>');
+    return h;
+  }
+  function mbDrawNav() {
+    const nav = $('#mbNav'); if (!nav) return;
+    nav.innerHTML = mbNavHtml();
+    const t = $('#mbTitleCount'); if (t) t.textContent = '';
+  }
+
+  // ---------- The page ----------
+  function renderMailbox(el) {
+    document.body.classList.add('mail-mode');
+    if (!GOOGLE) { renderGoogle(el); return; }
+    const p = mbParse();
+    if (ui.gMailQ) { p.view = 'search'; p.arg = ui.gMailQ; p.open = ''; ui.gMailQ = ''; history.replaceState(null, '', mbHash('search', p.arg)); }
+    if (p.view !== M.view || p.arg !== M.arg) { M.page = 0; M.tokens = ['']; M.sel.clear(); M.scroll = 0; M.focus = -1; }
+    M.view = p.view; M.arg = p.arg; M.open = p.open;
+    const s = G.status();
+    const me = s.email || '';
+    el.innerHTML = `<div class="mb ${M.side ? 'side-open' : ''} ${M.drawer ? 'drawer' : ''}" id="mb">
+      <header class="mb-top">
+        <button class="mb-ic mb-burger" data-burger title="תפריט ראשי">${ms('menu')}</button>
+        <div class="mb-brand">${ms('mail', 'fill')}<span>דואר</span></div>
+        <form class="mb-search" id="mbSearch" autocomplete="off">
+          <button class="mb-ic" title="חיפוש">${ms('search')}</button>
+          <input id="mbQ" placeholder="חיפוש באימייל" value="${esc(M.view === 'search' ? M.arg : '')}">
+          ${M.view === 'search' ? `<button type="button" class="mb-ic" data-qclear title="ניקוי החיפוש">${ms('close')}</button>` : ''}
+          <button type="button" class="mb-ic" data-adv title="הצגת אפשרויות חיפוש">${ms('tune')}</button>
+          <div class="mb-adv" id="mbAdv" hidden></div>
+        </form>
+        <span class="mb-topsp"></span>
+        <span class="mb-status" title="${s.valid ? 'מחובר' : 'החיבור פג'}"><span class="dot ${s.valid ? 'on' : s.connected ? 'warn' : ''}"></span></span>
+        <button class="mb-ic" data-help title="קיצורי מקלדת">${ms('help')}</button>
+        <button class="mb-acct" data-acct title="${esc(me)}">${me ? mbAv(me, 32) : ms('account_circle')}</button>
+      </header>
+      <div class="mb-body">
+        <aside class="mb-side">
+          <button class="mb-compose" data-compose>${ms('edit')}<span>כתיבה</span></button>
+          <nav id="mbNav" class="mb-navs"></nav>
+        </aside>
+        <div class="mb-scrim" data-scrim></div>
+        <section class="mb-panel" id="mbPanel"></section>
+        <button class="mb-fab" data-compose title="כתיבה">${ms('edit')}<span>כתיבה</span></button>
+        <aside class="mb-sidepanel" id="mbSidePanel"></aside>
+        <div class="mb-apps">
+          <a class="mb-app" href="#google" title="יומן">${ms('calendar_month')}</a>
+          <a class="mb-app" href="#tasks" title="משימות">${ms('task_alt')}</a>
+          <button class="mb-app ${M.side === 'contacts' ? 'on' : ''}" data-side="contacts" title="אנשי קשר לפי פרויקט">${ms('contacts')}</button>
+        </div>
+      </div>
+    </div>`;
+    const root = $('#mb', el);
+    const fit = () => { const r = root.getBoundingClientRect(); root.style.height = Math.max(420, window.innerHeight - r.top) + 'px'; };
+    fit(); window.removeEventListener('resize', mbFit); mbFit = () => { if (document.body.contains(root)) fit(); }; window.addEventListener('resize', mbFit);
+    mbDrawNav();
+    mbBindShell(root);
+    mbDrawSide();
+    const panel = $('#mbPanel', root);
+    if (!s.valid) {
+      panel.innerHTML = `<div class="mb-connect">${ms('mail', 'big')}<h2>${s.connected ? 'החיבור לחשבון Google פג' : 'חיבור תיבת הדואר'}</h2>
+        <p>${s.connected ? `החשבון <b dir="ltr">${esc(s.email)}</b>. לחצו לחידוש החיבור.` : 'אחרי החיבור תראו כאן את תיבת ה-Gmail שלכם, עם כל התוויות. רק אתם תראו אותה.'}</p>
+        <button class="mb-btn primary" data-gconnect>${s.connected ? 'חידוש החיבור' : 'חיבור לחשבון Google'}</button></div>`;
+      $('[data-gconnect]', panel).addEventListener('click', () => G.connect().catch((e) => toast(gErr(e))));
+      return;
+    }
+    mbLoadLabels();
+    if (M.open) mbDrawReader(panel); else mbDrawList(panel);
+  }
+  let mbFit = () => {};
+
+  // ---------- Header, side panel, search ----------
+  function mbBindShell(root) {
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('a,button'); if (!a) return;
+      if (a.matches('[data-burger]')) { if (window.innerWidth <= 760) { M.drawer = !M.drawer; root.classList.toggle('drawer', M.drawer); } else { root.classList.toggle('mini'); } return; }
+      if (a.matches('[data-scrim]')) return;
+      if (a.matches('[data-compose]')) { mbCompose({}); return; }
+      if (a.matches('[data-tw]')) {
+        e.preventDefault(); e.stopPropagation();
+        const id = a.dataset.tw;
+        if (id === 'cats') M.catsOpen = !M.catsOpen; else M.collapsed[id] = !M.collapsed[id];
+        mbKeep(); mbDrawNav(); return;
+      }
+      if (a.matches('[data-navid="cats"]')) { e.preventDefault(); M.catsOpen = !M.catsOpen; mbKeep(); mbDrawNav(); return; }
+      if (a.matches('[data-lmenu]')) { e.preventDefault(); e.stopPropagation(); mbLabelMenu(a, mbLabel(a.dataset.lmenu)); return; }
+      if (a.matches('[data-navmore]')) { e.preventDefault(); M.more = !M.more; mbKeep(); mbDrawNav(); return; }
+      if (a.matches('[data-newlabel]')) { e.preventDefault(); mbLabelDialog(); return; }
+      if (a.matches('[data-managel]')) { e.preventDefault(); mbManageLabels(); return; }
+      if (a.matches('[data-side]')) { M.side = M.side === a.dataset.side ? '' : a.dataset.side; mbKeep(); root.classList.toggle('side-open', !!M.side); a.classList.toggle('on', !!M.side); mbDrawSide(); return; }
+      if (a.matches('[data-acct]')) { mbAcctMenu(a); return; }
+      if (a.matches('[data-help]')) { mbShortcuts(); return; }
+      if (a.matches('[data-qclear]')) { mbGo('inbox'); return; }
+      if (a.matches('[data-adv]')) { mbAdvanced(root); return; }
+      if (a.classList.contains('mb-nav') && window.innerWidth <= 760) { M.drawer = false; root.classList.remove('drawer'); }
+    });
+    $('[data-scrim]', root).addEventListener('click', () => { M.drawer = false; root.classList.remove('drawer'); });
+    $('#mbSearch', root).addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = $('#mbQ', root).value.trim();
+      if (q) mbGo('search', q); else mbGo('inbox');
+    });
+    // Drag conversations onto a label in the side panel.
+    const nav = $('#mbNav', root);
+    nav.addEventListener('dragover', (e) => { const a = e.target.closest('[data-drop]'); if (a && M.drag) { e.preventDefault(); $$('.mb-nav.dragover', nav).forEach((x) => x.classList.remove('dragover')); a.classList.add('dragover'); } });
+    nav.addEventListener('dragleave', (e) => { const a = e.target.closest('[data-drop]'); if (a) a.classList.remove('dragover'); });
+    nav.addEventListener('drop', (e) => {
+      const a = e.target.closest('[data-drop]'); if (!a || !M.drag) return;
+      e.preventDefault(); a.classList.remove('dragover');
+      const ids = M.drag; M.drag = null; const lab = a.dataset.drop;
+      if (lab === 'TRASH') mbAct('trash', ids);
+      else if (lab === 'SPAM') mbAct('spam', ids);
+      else if (lab === 'INBOX') mbAct('inbox', ids);
+      else if (lab === 'STARRED') mbAct('star', ids);
+      else if (lab === 'IMPORTANT') mbAct('important', ids);
+      else mbAct('move', ids, lab);
+    });
+  }
+  function mbAdvanced(root) {
+    const box = $('#mbAdv', root);
+    if (!box.hidden) { box.hidden = true; return; }
+    const ops = [['in:anywhere', 'כל הדואר'], ['in:inbox', 'דואר נכנס'], ['is:starred', 'מסומן בכוכב'], ['in:sent', 'נשלח'], ['in:drafts', 'טיוטות'], ['in:spam', 'ספאם'], ['in:trash', 'אשפה']]
+      .concat(mbUserLabels().map((l) => ['label:' + JSON.stringify(l.name.replace(/\s+/g, '-')), l.name]));
+    box.innerHTML = `<div class="mb-advg">
+      <label>מאת</label><input name="from" dir="auto">
+      <label>אל</label><input name="to" dir="auto">
+      <label>נושא</label><input name="subject">
+      <label>כולל את המילים</label><input name="has">
+      <label>לא כולל</label><input name="not">
+      <label>תאריך: בתוך</label><div class="mb-advrow"><select name="within"><option value="">כל זמן</option><option value="1d">יום</option><option value="7d">שבוע</option><option value="1m">חודש</option><option value="6m">חצי שנה</option><option value="1y">שנה</option></select></div>
+      <label>חיפוש ב</label><select name="in">${ops.map(([v, n]) => `<option value="${esc(v)}">${esc(n)}</option>`).join('')}</select>
+      <span></span><label class="mb-chk"><input type="checkbox" name="att"> עם קובץ מצורף</label>
+      </div><div class="mb-advfoot"><button type="button" class="mb-btn primary" data-advgo>חיפוש</button></div>`;
+    box.hidden = false;
+    $('[name="from"]', box).focus();
+    const close = (e) => { if (!box.contains(e.target) && !e.target.closest('[data-adv]')) { box.hidden = true; document.removeEventListener('mousedown', close, true); } };
+    document.addEventListener('mousedown', close, true);
+    const go = () => {
+      const v = (n) => $(`[name="${n}"]`, box).value.trim();
+      const w = (s) => (/\s/.test(s) ? `(${s})` : s);
+      const parts = [];
+      if (v('from')) parts.push('from:' + w(v('from')));
+      if (v('to')) parts.push('to:' + w(v('to')));
+      if (v('subject')) parts.push('subject:' + w(v('subject')));
+      if (v('has')) parts.push(v('has'));
+      if (v('not')) parts.push('-' + w(v('not')).replace(/^\((.*)\)$/, '{$1}'));
+      if (v('within')) parts.push('newer_than:' + v('within'));
+      if (v('in') && v('in') !== 'in:anywhere') parts.push(v('in'));
+      if ($('[name="att"]', box).checked) parts.push('has:attachment');
+      box.hidden = true;
+      if (parts.length) mbGo('search', parts.join(' '));
+    };
+    $('[data-advgo]', box).addEventListener('click', go);
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } if (e.key === 'Escape') box.hidden = true; });
+  }
+  function mbAcctMenu(a) {
+    const s = G.status();
+    mbMenu(a, [
+      { html: `<div class="mb-acctcard">${mbAv(s.email || '?', 64)}<div class="b" dir="ltr">${esc(s.email || '')}</div><div class="mb-sub">${s.valid ? 'מחובר' : 'החיבור פג'}</div></div>` },
+      { sep: true },
+      { icon: 'sync', label: 'רענון התיבה', fn: () => { M.cache = {}; M.convs = {}; mbLoadLabels(true); render(); } },
+      { icon: 'link', label: 'חידוש החיבור / הרשאות', fn: () => G.connect().catch((e) => toast(gErr(e))) },
+      { icon: 'open_in_new', label: 'פתיחת Gmail', fn: () => window.open('https://mail.google.com/mail/u/?authuser=' + encodeURIComponent(s.email || ''), '_blank', 'noopener') },
+    ], { align: 'end' });
+  }
+  function mbShortcuts() {
+    const rows = [['c', 'כתיבת הודעה'], ['/', 'חיפוש'], ['j / k', 'שרשור ישן יותר / חדש יותר'], ['o או Enter', 'פתיחת שרשור'], ['u', 'חזרה לרשימה'], ['x', 'בחירת שרשור'], ['s', 'כוכב'],
+      ['e', 'העברה לארכיון'], ['#', 'מחיקה'], ['!', 'דיווח כספאם'], ['r / a / f', 'תשובה / תשובה לכולם / העברה'], ['Shift+i / Shift+u', 'סימון כנקרא / כלא נקרא'], ['l / v', 'תוויות / העברה אל']];
+    mbDialog('קיצורי מקלדת', `<table class="mb-keys">${rows.map(([k, d]) => `<tr><td><kbd dir="ltr">${esc(k)}</kbd></td><td>${esc(d)}</td></tr>`).join('')}</table>`, null);
+  }
+
+  // ---------- Contacts by project (the panel at the edge, like Gmail's side apps) ----------
+  function mbContactGroups() {
+    const seen = new Set();
+    const person = (name, role, phone, email) => {
+      const c = !email ? contactFor(name) : null;
+      return { name: String(name || '').trim(), role: role || (c && (c.role || c.category)) || '', phone: phone || (c && c.phone) || '', email: email || (c && c.email) || '' };
+    };
+    const groups = (db.projects || []).slice().sort(projSort).map((p) => {
+      const pn = normName(p.name);
+      const list = []; const have = new Set();
+      const add = (x) => { const k = normName(x.name); if (!k || have.has(k)) return; have.add(k); seen.add(k); list.push(x); };
+      (p.team || []).forEach((m) => add(person(m.name, m.role, m.phone)));
+      if (pn) (db.contacts || []).filter((c) => c.projects && normName(c.projects).includes(pn)).forEach((c) => add(person(c.name, c.role || c.category, c.phone, c.email)));
+      return { p, list };
+    }).filter((g) => g.list.length);
+    const rest = (db.contacts || []).filter((c) => c.email && !seen.has(normName(c.name))).map((c) => person(c.name, c.role || c.category, c.phone, c.email));
+    if (rest.length) groups.push({ p: null, list: rest });
+    return groups;
+  }
+  function mbDrawSide() {
+    const box = $('#mbSidePanel'); if (!box) return;
+    if (M.side !== 'contacts') { box.innerHTML = ''; return; }
+    const q = normName(M.sideQ).toLowerCase();
+    const groups = mbContactGroups().map((g) => ({ p: g.p, list: g.list.filter((x) => !q || [x.name, x.role, x.email, g.p ? g.p.name : ''].join(' ').toLowerCase().includes(q)) })).filter((g) => g.list.length);
+    box.innerHTML = `<div class="mb-sph"><b>אנשי קשר לפי פרויקט</b><button class="mb-ic" data-sideclose title="סגירה">${ms('close')}</button></div>
+      <div class="mb-spq">${ms('search')}<input id="mbSideQ" placeholder="חיפוש איש קשר או פרויקט" value="${esc(M.sideQ)}"></div>
+      <div class="mb-spl">${groups.map((g, i) => `<div class="mb-spg ${M.collapsed['p:' + (g.p ? g.p.id : '-')] ? 'shut' : ''}">
+        <div class="mb-spgh" data-pg="${esc(g.p ? g.p.id : '-')}">${ms('expand_more', 'tw')}<span class="grow">${esc(g.p ? g.p.name : 'אנשי קשר נוספים')}</span><span class="mb-sub">${g.list.length}</span>
+          ${g.p ? `<button class="mb-ic sm" data-psearch="${i}" title="המיילים של הפרויקט">${ms('search')}</button>` : ''}</div>
+        ${g.list.map((x, j) => `<div class="mb-spp">${mbAv(x.email || x.name, 32)}<div class="grow"><div class="b">${esc(x.name)}</div><div class="mb-sub">${esc([x.role, x.email].filter(Boolean).join(' · ') || 'אין כתובת מייל')}</div></div>
+          ${x.email ? `<button class="mb-ic sm" data-cmail="${i}:${j}" title="כתיבת מייל">${ms('edit')}</button><button class="mb-ic sm" data-cfind="${i}:${j}" title="המיילים עם ${esc(x.name)}">${ms('forum')}</button>` : ''}</div>`).join('')}
+      </div>`).join('') || `<div class="mb-lnone">${(db.contacts || []).length || (db.projects || []).some((p) => (p.team || []).length) ? 'לא נמצאו אנשי קשר' : 'אנשי הקשר יופיעו כאן אחרי הסנכרון מהגיליון, או כשמוסיפים אנשים לצוות הפרויקט'}</div>`}</div>`;
+    const pick = (v) => { const [i, j] = v.split(':').map(Number); return groups[i].list[j]; };
+    $('[data-sideclose]', box).addEventListener('click', () => { M.side = ''; mbKeep(); $('#mb').classList.remove('side-open'); $$('[data-side]').forEach((b) => b.classList.remove('on')); mbDrawSide(); });
+    const inp = $('#mbSideQ', box);
+    inp.addEventListener('input', () => { M.sideQ = inp.value; mbDrawSide(); const n = $('#mbSideQ'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
+    $$('[data-pg]', box).forEach((h) => h.addEventListener('click', (e) => { if (e.target.closest('button:not(.mb-spgh)')) return; const k = 'p:' + h.dataset.pg; M.collapsed[k] = !M.collapsed[k]; mbKeep(); h.parentNode.classList.toggle('shut'); }));
+    $$('[data-psearch]', box).forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const p = groups[Number(b.dataset.psearch)].p; mbGo('search', projMailQuery(p)); }));
+    $$('[data-cmail]', box).forEach((b) => b.addEventListener('click', () => { const x = pick(b.dataset.cmail); mbCompose({ to: `${x.name} <${x.email}>` }); }));
+    $$('[data-cfind]', box).forEach((b) => b.addEventListener('click', () => { const x = pick(b.dataset.cfind); mbGo('search', `{from:${x.email} to:${x.email} cc:${x.email}}`); }));
+  }
+
+  // ---------- The list ----------
+  function mbVisibleList() { const L = M.cache[mbKey()]; return L ? L.threads : []; }
+  function mbDrawList(panel) {
+    const key = mbKey();
+    const L = M.cache[key];
+    const inboxTabs = M.view === 'inbox' && !M.noTabs;
+    const sel = M.sel;
+    const threads = L ? L.threads : [];
+    const selected = threads.filter((t) => sel.has(t.id));
+    const all = threads.length && selected.length === threads.length;
+    const from = M.page * 50 + 1, to = M.page * 50 + threads.length;
+    const lab = M.view === 'label' ? mbLabel(M.arg) : null;
+    const total = !L ? 0 : M.view === 'search' || M.view === 'all' || (M.view === 'inbox') ? L.estimate : lab ? Number(lab.threadsTotal) || L.estimate : (mbLabel((mbSpec(M.view, M.arg).labelIds || [])[0] || '') || {}).threadsTotal || L.estimate;
+    panel.innerHTML = `<div class="mb-bar">
+        <div class="mb-selwrap"><button class="mb-ic" data-selall title="בחירה">${ms(all ? 'check_box' : selected.length ? 'indeterminate_check_box' : 'check_box_outline_blank', all || selected.length ? 'fill' : '')}</button><button class="mb-ic mb-caret" data-selmenu>${ms('arrow_drop_down')}</button></div>
+        ${selected.length ? mbBulkButtons(selected) : `<button class="mb-ic" data-refresh title="רענון">${ms('refresh')}</button><button class="mb-ic" data-listmore title="עוד">${ms('more_vert')}</button>`}
+        <span class="mb-sp"></span>
+        ${threads.length ? `<span class="mb-range">${from.toLocaleString('he-IL')}–${to.toLocaleString('he-IL')} מתוך ${total > to ? (L.next && M.view === 'search' ? 'כמה' : total.toLocaleString('he-IL')) : to.toLocaleString('he-IL')}</span>` : ''}
+        <button class="mb-ic" data-newer ${M.page ? '' : 'disabled'} title="חדשות יותר">${ms('chevron_right')}</button>
+        <button class="mb-ic" data-older ${L && L.next ? '' : 'disabled'} title="ישנות יותר">${ms('chevron_left')}</button>
+      </div>
+      ${inboxTabs ? `<div class="mb-tabs">${MB_TABS.map(([k, n, ic]) => { const un = k === 'primary' ? 0 : Number((mbLabel(MB_CATS[k]) || {}).threadsUnread) || 0; const on = (M.arg || 'primary') === k; return `<a class="mb-tab ${on ? 'on' : ''} t-${k}" href="${mbHash('inbox', k === 'primary' ? '' : k)}">${ms(ic, on ? 'fill' : '')}<span>${n}</span>${un && !on ? `<span class="mb-new">${un} חדשות</span>` : ''}</a>`; }).join('')}</div>` : ''}
+      ${M.view === 'search' ? `<div class="mb-sinfo">חיפוש: <b dir="auto">${esc(M.arg)}</b></div>` : ''}
+      ${M.view === 'trash' ? '<div class="mb-note">הודעות שנמצאות באשפה יותר מ-30 יום יימחקו באופן אוטומטי.</div>' : ''}
+      ${M.view === 'spam' ? '<div class="mb-note">הודעות שנמצאות בספאם יותר מ-30 יום יימחקו באופן אוטומטי.</div>' : ''}
+      <div class="mb-list" id="mbList">${L ? (threads.map(mbRowHtml).join('') || mbEmpty()) : '<div class="mb-loading"><span>טוען...</span></div>'}</div>
+      ${!mbCanAct() ? '<div class="mb-perm">כדי לסמן, להעביר לארכיון, למחוק ולתייג מכאן צריך לאשר הרשאה נוספת ל-Gmail. <a href="#" data-gperm>אישור עכשיו</a></div>' : ''}`;
+    mbBindList(panel);
+    const list = $('#mbList', panel);
+    if (L) { list.scrollTop = M.scroll; list.addEventListener('scroll', () => { M.scroll = list.scrollTop; }); return; }
+    const spec = mbSpec(M.view, M.arg);
+    G.gmail.threads({ q: spec.q, labelIds: spec.labelIds, n: 50, pageToken: M.tokens[M.page] || '', spamTrash: spec.spamTrash }).then((r) => {
+      M.cache[key] = r;
+      if (r.next) M.tokens[M.page + 1] = r.next;
+      if (mbKey() === key && !M.open && document.body.contains(panel)) mbDrawList(panel);
+    }).catch((e) => { if (document.body.contains(list)) list.innerHTML = `<div class="mb-empty">הטעינה נכשלה: ${esc(gErr(e))}<br><button class="mb-btn" data-retry>ניסיון חוזר</button></div>`; const b = $('[data-retry]', list); if (b) b.addEventListener('click', () => mbDrawList(panel)); });
+  }
+  function mbEmpty() {
+    const m = { inbox: (M.arg || 'primary') === 'primary' ? 'אין שיחות בכרטיסייה ראשי.' : 'הכרטיסייה ריקה.', starred: 'אין הודעות מסומנות בכוכב. הכוכבים מאפשרים לתת להודעות סטטוס מיוחד כדי שיהיה קל יותר למצוא אותן.', snoozed: 'אין הודעות שנדחו לזמן מאוחר.', sent: 'אין הודעות שנשלחו! <a href="#" data-compose>לשלוח הודעה עכשיו?</a>', drafts: 'אין לך טיוטות שמורות.', spam: 'אין הודעות ספאם, הידד!', trash: 'אין שיחות באשפה.', search: 'אין הודעות שתואמות לחיפוש שלך.', scheduled: 'אין הודעות מתוזמנות.' };
+    return `<div class="mb-empty">${m[M.view] || 'אין שיחות עם התווית הזו.'}</div>`;
+  }
+  function mbRowHtml(t, i) {
+    const on = M.sel.has(t.id);
+    return `<div class="mb-row ${t.unread ? 'unread' : ''} ${on ? 'sel' : ''} ${M.focus === i ? 'focus' : ''}" data-t="${esc(t.id)}" data-i="${i}" draggable="true">
+      <button class="mb-ic sm" data-cb title="בחירה">${ms(on ? 'check_box' : 'check_box_outline_blank', on ? 'fill' : '')}</button>
+      <button class="mb-rav" data-cb title="בחירה">${on ? `<span class="mb-av mb-avsel">${ms('check')}</span>` : mbAv((t.people[t.people.length - 1] || {}).from || t.to, 40)}</button>
+      <button class="mb-ic sm mb-star ${t.starred ? 'on' : ''}" data-star title="${t.starred ? 'מסומן בכוכב' : 'לא מסומן בכוכב'}">${ms('star', t.starred ? 'fill' : '')}</button>
+      <button class="mb-ic sm mb-imp ${t.important ? 'on' : ''}" data-imp title="${t.important ? 'חשוב' : 'לא חשוב'}">${ms('label_important', (t.important ? 'fill ' : '') + 'flip')}</button>
+      <div class="mb-from">${mbWho(t)}</div>
+      <div class="mb-main">${mbRowChips(t)}<span class="mb-subj">${esc(t.subject || '(ללא נושא)')}</span><span class="mb-snip">${t.snippet ? '<span class="mb-dash"> - </span>' + esc(t.snippet) : ''}</span></div>
+      <div class="mb-end">${t.attach ? ms('attach_file', 'mb-att') : ''}<span class="mb-date" title="${esc(mailFullWhen(t.date))}">${esc(mbDate(t.date))}</span></div>
+      <div class="mb-hover">${M.view === 'trash' || M.view === 'spam' ? '' : `<button class="mb-ic sm" data-ra="archive" title="העברה לארכיון">${ms('archive')}</button>`}
+        ${M.view === 'trash' ? `<button class="mb-ic sm" data-ra="untrash" title="העברה לדואר הנכנס">${ms('move_to_inbox')}</button>` : `<button class="mb-ic sm" data-ra="trash" title="מחיקה">${ms('delete')}</button>`}
+        <button class="mb-ic sm" data-ra="${t.unread ? 'read' : 'unread'}" title="${t.unread ? 'סימון כנקראה' : 'סימון כלא נקראה'}">${ms(t.unread ? 'drafts' : 'mark_email_unread')}</button>
+        <button class="mb-ic sm" data-ra="task" title="הוספה למשימות">${ms('add_task')}</button></div>
+    </div>`;
+  }
+  function mbBulkButtons(sel) {
+    const v = M.view;
+    const b = (act, icon, title, flip) => `<button class="mb-ic" data-bulk="${act}" title="${title}">${ms(icon, flip ? 'flip' : '')}</button>`;
+    const anyUnread = sel.some((t) => t.unread);
+    let h = '';
+    if (v === 'trash') h += b('untrash', 'move_to_inbox', 'העברה לדואר הנכנס');
+    else if (v === 'spam') h += `<button class="mb-btn sm" data-bulk="notspam">לא ספאם</button>` + b('trash', 'delete', 'מחיקה');
+    else if (v === 'drafts') h += `<button class="mb-btn sm" data-bulk="discard">מחיקת טיוטות</button>`;
+    else {
+      h += b('archive', 'archive', 'העברה לארכיון') + b('spam', 'report', 'דיווח כספאם') + b('trash', 'delete', 'מחיקה');
+      if (v !== 'inbox' && sel.some((t) => !t.labels.includes('INBOX'))) h += b('inbox', 'move_to_inbox', 'העברה לדואר הנכנס');
+    }
+    h += '<span class="mb-vsep"></span>' + b(anyUnread ? 'read' : 'unread', anyUnread ? 'drafts' : 'mark_email_unread', anyUnread ? 'סימון כנקראה' : 'סימון כלא נקראה') + b('task', 'add_task', 'הוספה למשימות');
+    h += '<span class="mb-vsep"></span>' + b('moveto', 'drive_file_move', 'העברה אל', true) + b('labels', 'label', 'תוויות') + b('more', 'more_vert', 'עוד');
+    return h;
+  }
+  function mbBindList(panel) {
+    const L = M.cache[mbKey()];
+    const threads = L ? L.threads : [];
+    const sel = () => threads.filter((t) => M.sel.has(t.id));
+    const redraw = () => mbDrawList(panel);
+    panel.onclick = (e) => {
+      const a = e.target.closest('button,a'); const row = e.target.closest('.mb-row');
+      if (a && a.matches('[data-gperm]')) { e.preventDefault(); G.connect().then(() => render()).catch((x) => toast(gErr(x))); return; }
+      if (a && a.matches('[data-compose]')) { e.preventDefault(); mbCompose({}); return; }
+      if (a && a.matches('[data-selall]')) { if (M.sel.size) M.sel.clear(); else threads.forEach((t) => M.sel.add(t.id)); redraw(); return; }
+      if (a && a.matches('[data-selmenu]')) {
+        const pickBy = (f) => () => { M.sel = new Set(threads.filter(f).map((t) => t.id)); redraw(); };
+        mbMenu(a, [{ label: 'הכל', fn: pickBy(() => true) }, { label: 'ללא', fn: pickBy(() => false) }, { label: 'נקראו', fn: pickBy((t) => !t.unread) }, { label: 'לא נקראו', fn: pickBy((t) => t.unread) }, { label: 'מסומנים בכוכב', fn: pickBy((t) => t.starred) }, { label: 'לא מסומנים בכוכב', fn: pickBy((t) => !t.starred) }]);
+        return;
+      }
+      if (a && a.matches('[data-refresh]')) { delete M.cache[mbKey()]; mbLoadLabels(true); refreshMailBadge(true); redraw(); return; }
+      if (a && a.matches('[data-listmore]')) {
+        mbMenu(a, [{ icon: 'drafts', label: 'סימון של הכל כנקרא', fn: () => { const ids = threads.filter((t) => t.unread).map((t) => t.id); if (ids.length) mbAct('read', ids); else toast('אין הודעות שלא נקראו בעמוד'); } },
+          { icon: 'inbox', label: M.noTabs ? 'הצגת כרטיסיות בדואר הנכנס (ראשי, קידומי מכירות...)' : 'דואר נכנס בלי כרטיסיות', fn: () => { M.noTabs = !M.noTabs; mbKeep(); M.cache = {}; mbGo('inbox'); } }]);
+        return;
+      }
+      if (a && a.matches('[data-newer]')) { if (M.page) { M.page--; M.scroll = 0; M.sel.clear(); redraw(); } return; }
+      if (a && a.matches('[data-older]')) { if (L && L.next) { M.tokens[M.page + 1] = L.next; M.page++; M.scroll = 0; M.sel.clear(); redraw(); } return; }
+      if (a && a.dataset.bulk) {
+        const s = sel(); const ids = s.map((t) => t.id); const k = a.dataset.bulk;
+        if (k === 'moveto') { mbMoveMenu(a, ids); return; }
+        if (k === 'labels') { mbLabelsMenu(a, s); return; }
+        if (k === 'more') { mbMoreMenu(a, s); return; }
+        if (k === 'task') { mbToTask(s[0]); return; }
+        if (k === 'discard') { mbDiscardDrafts(ids); return; }
+        mbAct(k, ids); return;
+      }
+      if (!row) return;
+      const t = threads.find((x) => x.id === row.dataset.t); if (!t) return;
+      if (a && a.matches('[data-cb]')) { if (M.sel.has(t.id)) M.sel.delete(t.id); else M.sel.add(t.id); redraw(); return; }
+      if (a && a.matches('[data-star]')) { mbAct(t.starred ? 'unstar' : 'star', [t.id], null, true); return; }
+      if (a && a.matches('[data-imp]')) { mbAct(t.important ? 'unimportant' : 'important', [t.id], null, true); return; }
+      if (a && a.dataset.ra) { if (a.dataset.ra === 'task') mbToTask(t); else mbAct(a.dataset.ra, [t.id]); return; }
+      if (e.target.closest('[data-chip]')) { const id = e.target.closest('[data-chip]').dataset.chip; if (id === 'INBOX') mbGo('inbox'); else mbGo('label', id); return; }
+      mbOpenThread(t);
+    };
+    $$('.mb-row', panel).forEach((row) => row.addEventListener('dragstart', (e) => {
+      const id = row.dataset.t;
+      M.drag = M.sel.has(id) ? Array.from(M.sel) : [id];
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', M.drag.length + ' שיחות'); } catch (x) { /* ignore */ }
+      const g = document.createElement('div'); g.className = 'mb-dragghost'; g.textContent = M.drag.length === 1 ? 'העברת שיחה אחת' : `העברת ${M.drag.length} שיחות`;
+      document.body.appendChild(g); e.dataTransfer.setDragImage(g, 10, 10); setTimeout(() => g.remove(), 0);
+    }));
+  }
+  function mbOpenThread(t) {
+    if (M.view === 'drafts' || (t.count === 1 && t.drafts === 1)) { mbOpenDraft(t); return; }
+    M.scroll = ($('#mbList') || {}).scrollTop || M.scroll;
+    mbGo(M.view, M.arg, t.id);
+  }
+  async function mbOpenDraft(t) {
+    try {
+      const ds = await G.gmail.drafts();
+      const d = ds.find((x) => x.message && x.message.threadId === t.id);
+      if (!d) { mbGo(M.view, M.arg, t.id); return; }
+      const g = await G.gmail.getDraft(d.id);
+      mbCompose({ draftId: g.id, to: g.to, cc: g.cc, bcc: g.bcc, subject: g.subject, html: g.html || esc(g.text || '').replace(/\n/g, '<br>'), threadId: t.count > 1 ? g.threadId : '', inReplyTo: g.inReplyTo, references: g.references });
+    } catch (e) { toast('פתיחת הטיוטה נכשלה: ' + gErr(e)); }
+  }
+  function mbToTask(t) {
+    if (!t) return;
+    const who = t.people && t.people[0] ? t.people[0].from : (t.from || '');
+    openTaskForm(null, { title: t.subject || '(ללא נושא)', notes: 'ממייל של ' + who + ':\n' + (t.snippet || '') + '\n' + G.gmail.link({ threadId: t.threadId || t.id }) });
+  }
+
+  // ---------- Actions on conversations (with "ביטול" like Gmail) ----------
+  const MB_ACTS = {
+    archive: { rm: ['INBOX'], msg: (n) => n > 1 ? `${n} שיחות הועברו לארכיון.` : 'השיחה הועברה לארכיון.', undo: 'inbox' },
+    inbox: { add: ['INBOX'], msg: (n) => n > 1 ? `${n} שיחות הועברו לדואר הנכנס.` : 'השיחה הועברה לדואר הנכנס.', undo: 'archive' },
+    read: { rm: ['UNREAD'], quiet: true },
+    unread: { add: ['UNREAD'], quiet: true },
+    star: { add: ['STARRED'], quiet: true },
+    unstar: { rm: ['STARRED'], quiet: true },
+    important: { add: ['IMPORTANT'], msg: (n) => n > 1 ? `${n} שיחות סומנו כחשובות.` : 'השיחה סומנה כחשובה.' },
+    unimportant: { rm: ['IMPORTANT'], msg: (n) => n > 1 ? `${n} שיחות סומנו כלא חשובות.` : 'השיחה סומנה כלא חשובה.' },
+    spam: { add: ['SPAM'], rm: ['INBOX'], msg: (n) => n > 1 ? `${n} שיחות סומנו כספאם.` : 'השיחה סומנה כספאם.', undo: 'notspam' },
+    notspam: { add: ['INBOX'], rm: ['SPAM'], msg: (n) => n > 1 ? `${n} שיחות הוסרו מהספאם.` : 'השיחה הוסרה מהספאם והועברה לדואר הנכנס.', undo: 'spam' },
+    trash: { msg: (n) => n > 1 ? `${n} שיחות הועברו לאשפה.` : 'השיחה הועברה לאשפה.', undo: 'untrash' },
+    untrash: { msg: (n) => n > 1 ? `${n} שיחות הועברו לדואר הנכנס.` : 'השיחה הועברה לדואר הנכנס.', undo: 'trash' },
+  };
+  // Whether a conversation still belongs in the view after its labels changed.
+  function mbStillIn(t) {
+    const spec = mbSpec(M.view, M.arg);
+    if (t.labels.includes('TRASH') && M.view !== 'trash' && M.view !== 'search') return false;
+    if (t.labels.includes('SPAM') && M.view !== 'spam' && M.view !== 'search') return false;
+    if (M.view === 'trash' && !t.labels.includes('TRASH')) return false;
+    if (M.view === 'spam' && !t.labels.includes('SPAM')) return false;
+    return (spec.labelIds || []).filter((l) => !/^CATEGORY_/.test(l)).every((l) => t.labels.includes(l));
+  }
+  async function mbAct(kind, ids, labelId, quietOverride) {
+    if (!ids.length) return;
+    if (!mbCanAct()) { mbSnack('צריך לאשר הרשאה נוספת ל-Gmail כדי לבצע פעולות מכאן.', 'אישור', () => G.connect().then(() => render()).catch((x) => toast(gErr(x)))); return; }
+    const a = kind === 'move' ? { add: [labelId], rm: M.view === 'label' ? [M.arg] : ['INBOX'], msg: (n) => `${n > 1 ? n + ' שיחות הועברו' : 'השיחה הועברה'} אל "${(mbLabel(labelId) || {}).name || ''}".`, undo: null }
+      : kind === 'label' ? { add: [labelId], quiet: true } : kind === 'unlabel' ? { rm: [labelId], msg: () => `התווית "${(mbLabel(labelId) || {}).name || ''}" הוסרה.` } : MB_ACTS[kind];
+    if (!a) return;
+    // Right away on the screen, then in Gmail.
+    const touched = [];
+    Object.values(M.cache).forEach((L) => L.threads.forEach((t) => {
+      if (!ids.includes(t.id)) return;
+      touched.push(t);
+      const set = new Set(t.labels);
+      (a.add || []).forEach((l) => set.add(l)); (a.rm || []).forEach((l) => set.delete(l));
+      if (kind === 'trash') { set.add('TRASH'); set.delete('INBOX'); }
+      if (kind === 'untrash') { set.delete('TRASH'); set.add('INBOX'); }
+      t.labels = Array.from(set); t.unread = set.has('UNREAD'); t.starred = set.has('STARRED'); t.important = set.has('IMPORTANT');
+    }));
+    Object.values(M.convs).forEach((c) => { if (ids.includes(c.id)) c.msgs.forEach((m) => { const s = new Set(m.labels); (a.add || []).forEach((l) => s.add(l)); (a.rm || []).forEach((l) => s.delete(l)); if (kind === 'trash') s.add('TRASH'); if (kind === 'untrash') s.delete('TRASH'); m.labels = Array.from(s); m.unread = s.has('UNREAD'); }); });
+    const L = M.cache[mbKey()];
+    const leaving = L ? L.threads.filter((t) => ids.includes(t.id) && !mbStillIn(t)).map((t) => t.id) : [];
+    if (L && leaving.length) L.threads = L.threads.filter((t) => !leaving.includes(t.id));
+    ids.forEach((id) => M.sel.delete(id));
+    // Other cached lists may now be wrong: they reload when opened.
+    Object.keys(M.cache).forEach((k) => { if (k !== mbKey()) delete M.cache[k]; });
+    const inReader = M.open && ids.includes(M.open);
+    if (inReader && leaving.includes(M.open)) mbGo(M.view, M.arg);
+    else if (M.open) { const p = $('#mbPanel'); if (p) mbDrawReader(p); } else { const p = $('#mbPanel'); if (p) mbDrawList(p); }
+    try {
+      if (kind === 'trash') await G.gmail.trashThreads(ids);
+      else if (kind === 'untrash') await G.gmail.untrashThreads(ids);
+      else await G.gmail.modify(ids, a.add, a.rm);
+      mbRefreshCounts();
+      if (!a.quiet && !quietOverride && a.msg) mbSnack(a.msg(ids.length), a.undo ? 'ביטול' : '', a.undo ? () => mbAct(a.undo, ids, labelId, true) : null);
+    } catch (e) {
+      delete M.cache[mbKey()];
+      mbSnack('הפעולה נכשלה: ' + gErr(e) + (e.status === 403 ? '. אשרו הרשאה נוספת ל-Gmail.' : ''), e.status === 403 ? 'אישור' : '', e.status === 403 ? () => G.connect().then(() => render()) : null);
+      render();
+    }
+  }
+  async function mbDiscardDrafts(threadIds) {
+    try {
+      const ds = await G.gmail.drafts();
+      const mine = ds.filter((d) => d.message && threadIds.includes(d.message.threadId));
+      await Promise.all(mine.map((d) => G.gmail.deleteDraft(d.id)));
+      const L = M.cache[mbKey()]; if (L) L.threads = L.threads.filter((t) => !threadIds.includes(t.id));
+      M.sel.clear(); mbSnack(mine.length > 1 ? `${mine.length} טיוטות נמחקו.` : 'הטיוטה נמחקה.'); mbRefreshCounts(); render();
+    } catch (e) { mbSnack('המחיקה נכשלה: ' + gErr(e)); }
+  }
+  function mbMoreMenu(a, sel) {
+    const ids = sel.map((t) => t.id);
+    const anyStar = sel.some((t) => t.starred), anyImp = sel.some((t) => t.important), anyUnread = sel.some((t) => t.unread);
+    mbMenu(a, [
+      { icon: anyUnread ? 'drafts' : 'mark_email_unread', label: anyUnread ? 'סימון כנקראה' : 'סימון כלא נקראה', fn: () => mbAct(anyUnread ? 'read' : 'unread', ids) },
+      { icon: 'label_important', label: anyImp ? 'סימון כלא חשוב' : 'סימון כחשוב', fn: () => mbAct(anyImp ? 'unimportant' : 'important', ids) },
+      { icon: 'star', label: anyStar ? 'הסרת כוכב' : 'הוספת כוכב', fn: () => mbAct(anyStar ? 'unstar' : 'star', ids) },
+      { icon: 'add_task', label: 'הוספה למשימות', fn: () => mbToTask(sel[0]) },
+      { sep: true },
+      { icon: 'open_in_new', label: 'פתיחה ב-Gmail', fn: () => window.open(G.gmail.link({ threadId: ids[0] }), '_blank', 'noopener') },
+    ]);
+  }
+  // "העברה אל": a label (taken out of the current place), the inbox, spam or trash.
+  function mbMoveMenu(a, ids) {
+    const items = [];
+    if (M.view !== 'inbox') items.push({ label: 'דואר נכנס', fn: () => mbAct(M.view === 'trash' ? 'untrash' : M.view === 'spam' ? 'notspam' : 'inbox', ids) });
+    mbUserLabels().forEach((l) => { if (!(M.view === 'label' && M.arg === l.id)) items.push({ label: l.name, color: l.color && l.color.backgroundColor, fn: () => mbAct('move', ids, l.id) }); });
+    items.push({ sep: true });
+    if (M.view !== 'spam') items.push({ label: 'ספאם', fn: () => mbAct('spam', ids) });
+    if (M.view !== 'trash') items.push({ label: 'אשפה', fn: () => mbAct('trash', ids) });
+    items.push({ sep: true }, { label: 'יצירת תווית חדשה', fn: () => mbLabelDialog(null, (l) => mbAct('move', ids, l.id)) }, { label: 'ניהול תוויות', fn: mbManageLabels });
+    mbMenu(a, items, { title: 'העברה אל:', search: true });
+  }
+  // "תוויות": checkboxes, applied together.
+  function mbLabelsMenu(a, sel) {
+    const ul = mbUserLabels();
+    const state = {};
+    ul.forEach((l) => { const n = sel.filter((t) => t.labels.includes(l.id)).length; state[l.id] = n === 0 ? 0 : n === sel.length ? 2 : 1; });
+    const start = Object.assign({}, state);
+    const box = mbMenu(a, [], { title: 'תיוג בתור:', search: true, custom: (wrap) => {
+      const draw = (q) => {
+        wrap.innerHTML = ul.filter((l) => !q || l.name.toLowerCase().includes(q)).map((l) => `<button class="mb-mi" data-lc="${esc(l.id)}">${ms(state[l.id] === 2 ? 'check_box' : state[l.id] === 1 ? 'indeterminate_check_box' : 'check_box_outline_blank', state[l.id] ? 'fill' : '')}<span>${esc(l.name)}</span></button>`).join('')
+          + '<div class="mb-msep"></div><button class="mb-mi" data-lnew><span>יצירת תווית חדשה</span></button><button class="mb-mi" data-lman><span>ניהול תוויות</span></button>'
+          + (JSON.stringify(state) !== JSON.stringify(start) ? '<div class="mb-msep"></div><button class="mb-mi b" data-lapply><span>החלה</span></button>' : '');
+      };
+      draw('');
+      return { draw, click: (b) => {
+        if (b.dataset.lc) { const id = b.dataset.lc; state[id] = state[id] === 2 ? 0 : 2; return 'redraw'; }
+        if (b.matches('[data-lnew]')) { mbLabelDialog(null, (l) => mbAct('label', sel.map((t) => t.id), l.id)); return 'close'; }
+        if (b.matches('[data-lman]')) { mbManageLabels(); return 'close'; }
+        if (b.matches('[data-lapply]')) {
+          const ids = sel.map((t) => t.id);
+          const add = Object.keys(state).filter((k) => state[k] === 2 && start[k] !== 2), rm = Object.keys(state).filter((k) => state[k] === 0 && start[k] !== 0);
+          (async () => { for (const l of add) await mbAct('label', ids, l, true); for (const l of rm) await mbAct('unlabel', ids, l, true); mbSnack(ids.length > 1 ? `התוויות עודכנו ב-${ids.length} שיחות.` : 'התוויות של השיחה עודכנו.'); })();
+          return 'close';
+        }
+        return '';
+      } };
+    } });
+    return box;
+  }
+
+  // ---------- Labels: create, color, rename, remove, manage ----------
+  function mbLabelDialog(label, done, parentName) {
+    const ul = mbUserLabels();
+    const cur = label ? label.name : '';
+    const p = label ? cur.slice(0, Math.max(0, cur.lastIndexOf('/'))) : (parentName || '');
+    mbDialog(label ? 'עריכת תווית' : 'תווית חדשה', `<label class="mb-dl">יש להזין שם לתווית החדשה:</label><input class="mb-in" id="mbLn" value="${esc(label ? cur.split('/').pop() : '')}" maxlength="225">
+      <label class="mb-chk" style="margin-top:14px"><input type="checkbox" id="mbLnest" ${p ? 'checked' : ''}> הצבה של התווית מתחת ל:</label>
+      <select class="mb-in" id="mbLp" ${p ? '' : 'disabled'}><option value="">בחירת הורה...</option>${ul.filter((l) => !label || (l.id !== label.id && !l.name.startsWith(cur + '/'))).map((l) => `<option ${l.name === p ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>`,
+    label ? 'שמירה' : 'יצירה', async (box) => {
+      const n = $('#mbLn', box).value.trim().replace(/\//g, '-');
+      if (!n) return false;
+      const parent = $('#mbLnest', box).checked ? $('#mbLp', box).value : '';
+      const name = parent ? parent + '/' + n : n;
+      try {
+        if (label) {
+          await G.gmail.updateLabel(label.id, { name });
+          // Nested labels move with it.
+          for (const k of ul.filter((x) => x.name.startsWith(cur + '/'))) await G.gmail.updateLabel(k.id, { name: name + k.name.slice(cur.length) });
+          mbSnack(`התווית "${name}" עודכנה.`);
+        } else {
+          const l = await G.gmail.createLabel({ name });
+          mbSnack(`התווית "${name}" נוצרה.`);
+          M.labels = (M.labels || []).concat([l]);
+          if (done) done(l);
+        }
+        await mbLoadLabels(true); render();
+      } catch (e) { toast((label ? 'העדכון נכשל: ' : 'יצירת התווית נכשלה: ') + gErr(e)); return false; }
+      return true;
+    });
+    const box = $('.mb-dlg'); const nest = $('#mbLnest', box);
+    nest.addEventListener('change', () => { $('#mbLp', box).disabled = !nest.checked; });
+    setTimeout(() => $('#mbLn', box).focus(), 30);
+  }
+  function mbLabelMenu(a, l) {
+    if (!l) return;
+    mbMenu(a, [
+      { icon: 'palette', label: 'צבע התווית', fn: () => mbColorMenu(a, l), keep: true },
+      { sep: true },
+      { label: 'בתצוגת התוויות', disabled: true },
+      { label: (l.labelListVisibility === 'labelHide' ? '' : '✓ ') + 'הצגה', fn: () => mbLabelUpdate(l, { labelListVisibility: 'labelShow' }) },
+      { label: (l.labelListVisibility === 'labelHide' ? '✓ ' : '') + 'הסתרה', fn: () => mbLabelUpdate(l, { labelListVisibility: 'labelHide' }) },
+      { sep: true },
+      { label: 'עריכה', fn: () => mbLabelDialog(l) },
+      { label: 'הסרת התווית', fn: () => mbRemoveLabel(l) },
+      { label: 'הוספת תווית משנה', fn: () => mbLabelDialog(null, null, l.name) },
+    ], { align: 'start' });
+  }
+  function mbColorMenu(a, l) {
+    mbMenu(a, [], { title: 'צבע התווית', custom: (wrap) => {
+      wrap.innerHTML = `<div class="mb-colors">${MB_COLORS.map((c) => `<button class="mb-color" data-col="${c}" style="background:${c};color:${mbTextColor(c)}">a</button>`).join('')}</div><div class="mb-msep"></div><button class="mb-mi" data-nocol><span>הסרת הצבע</span></button>`;
+      return { click: (b) => {
+        if (b.dataset.col) { mbLabelUpdate(l, { color: { backgroundColor: b.dataset.col, textColor: mbTextColor(b.dataset.col) } }); return 'close'; }
+        if (b.matches('[data-nocol]')) { mbLabelUpdate(l, { color: { backgroundColor: '', textColor: '' } }, true); return 'close'; }
+        return '';
+      } };
+    } });
+  }
+  async function mbLabelUpdate(l, patch, clearColor) {
+    try {
+      if (clearColor) { delete l.color; await G.gmail.updateLabel(l.id, { color: null }); }
+      else { Object.assign(l, patch); await G.gmail.updateLabel(l.id, patch); }
+      mbDrawNav(); if (!M.open) { const p = $('#mbPanel'); if (p) mbDrawList(p); } else { const p = $('#mbPanel'); if (p) mbDrawReader(p); }
+    } catch (e) { toast('העדכון נכשל: ' + gErr(e)); mbLoadLabels(true); }
+  }
+  function mbRemoveLabel(l) {
+    mbDialog('הסרת התווית', `<p>למחוק את התווית "<b>${esc(l.name)}</b>"?</p><p class="mb-sub">ההודעות עם התווית לא יימחקו, רק התווית תוסר מהן.</p>`, 'מחיקה', async () => {
+      try {
+        for (const k of mbUserLabels().filter((x) => x.name.startsWith(l.name + '/'))) await G.gmail.deleteLabel(k.id);
+        await G.gmail.deleteLabel(l.id);
+        mbSnack(`התווית "${l.name}" הוסרה.`);
+        if (M.view === 'label' && M.arg === l.id) { mbGo('inbox'); }
+        await mbLoadLabels(true); render();
+      } catch (e) { toast('המחיקה נכשלה: ' + gErr(e)); return false; }
+      return true;
+    });
+  }
+  function mbManageLabels() {
+    const sys = MB_SYS.filter((s) => s.label);
+    mbDialog('ניהול תוויות', `<table class="mb-mtab"><tr><th>תוויות מערכת</th><th></th></tr>
+      ${sys.map((s) => `<tr><td>${esc(s.name)}</td><td class="mb-sub">${(mbLabel(s.label) || {}).threadsTotal != null ? Number(mbLabel(s.label).threadsTotal).toLocaleString('he-IL') + ' שיחות' : ''}</td></tr>`).join('')}
+      <tr><th>תוויות <button class="mb-btn sm" data-mnew>יצירת תווית חדשה</button></th><th></th></tr>
+      ${mbUserLabels().map((l) => `<tr><td>${mbChip(l)}</td><td class="mb-sub">${Number(l.threadsTotal || 0).toLocaleString('he-IL')} שיחות · <a href="#" data-medit="${esc(l.id)}">עריכה</a> · <a href="#" data-mdel="${esc(l.id)}">הסרה</a></td></tr>`).join('') || '<tr><td class="mb-sub" colspan="2">אין עדיין תוויות משלך</td></tr>'}</table>`, null);
+    const box = $('.mb-dlg');
+    box.addEventListener('click', (e) => {
+      const t = e.target.closest('a,button'); if (!t) return;
+      if (t.matches('[data-mnew]')) { mbCloseDialog(); mbLabelDialog(); }
+      if (t.dataset.medit) { e.preventDefault(); mbCloseDialog(); mbLabelDialog(mbLabel(t.dataset.medit)); }
+      if (t.dataset.mdel) { e.preventDefault(); mbCloseDialog(); mbRemoveLabel(mbLabel(t.dataset.mdel)); }
+    });
+  }
+
+  // ---------- Reading a conversation ----------
+  function mbDrawReader(panel) {
+    const id = M.open;
+    const L = M.cache[mbKey()];
+    const list = L ? L.threads : [];
+    const idx = list.findIndex((t) => t.id === id);
+    const c = M.convs[id];
+    const msgs = c ? c.msgs : null;
+    const labelsOf = msgs ? Array.from(new Set([].concat(...msgs.map((m) => m.labels)))) : (list[idx] ? list[idx].labels : []);
+    const has = (l) => labelsOf.includes(l);
+    const b = (act, icon, title, flip) => `<button class="mb-ic" data-ract="${act}" title="${title}">${ms(icon, flip ? 'flip' : '')}</button>`;
+    panel.innerHTML = `<div class="mb-bar">
+        <button class="mb-ic" data-back title="חזרה אל ${esc(mbTitle(M.view, M.arg))}">${ms('arrow_back', 'flip')}</button>
+        ${has('TRASH') ? b('untrash', 'move_to_inbox', 'העברה לדואר הנכנס') : has('SPAM') ? '<button class="mb-btn sm" data-ract="notspam">לא ספאם</button>' : (has('INBOX') ? b('archive', 'archive', 'העברה לארכיון') : b('inbox', 'move_to_inbox', 'העברה לדואר הנכנס')) + b('spam', 'report', 'דיווח כספאם')}
+        ${has('TRASH') ? '' : b('trash', 'delete', 'מחיקה')}
+        <span class="mb-vsep"></span>${b('unread', 'mark_email_unread', 'סימון כלא נקראה')}${b('task', 'add_task', 'הוספה למשימות')}
+        <span class="mb-vsep"></span>${b('moveto', 'drive_file_move', 'העברה אל', true)}${b('labels', 'label', 'תוויות')}${b('more', 'more_vert', 'עוד')}
+        <span class="mb-sp"></span>
+        ${idx >= 0 ? `<span class="mb-range">${(M.page * 50 + idx + 1).toLocaleString('he-IL')} מתוך ${(M.page * 50 + list.length).toLocaleString('he-IL')}${L.next ? '+' : ''}</span>` : ''}
+        <button class="mb-ic" data-rnav="-1" ${idx > 0 ? '' : 'disabled'} title="חדשה יותר">${ms('chevron_right')}</button>
+        <button class="mb-ic" data-rnav="1" ${idx >= 0 && idx < list.length - 1 ? '' : 'disabled'} title="ישנה יותר">${ms('chevron_left')}</button>
+      </div>
+      <div class="mb-read" id="mbRead">${msgs ? mbConvHtml(msgs, labelsOf) : '<div class="mb-loading"><span>טוען...</span></div>'}</div>`;
+    mbBindReader(panel, msgs, list, idx);
+    if (msgs) return;
+    G.gmail.conversation(id).then((ms0) => {
+      if (!ms0.length) { mbGo(M.view, M.arg); return; }
+      M.convs[id] = { id, msgs: ms0 };
+      if (M.open === id && document.body.contains(panel)) mbDrawReader(panel);
+      if (ms0.some((m) => m.unread) && mbCanAct()) {
+        G.gmail.modify([id], [], ['UNREAD']).then(() => {
+          ms0.forEach((m) => { m.unread = false; m.labels = m.labels.filter((l) => l !== 'UNREAD'); });
+          Object.values(M.cache).forEach((LL) => LL.threads.forEach((t) => { if (t.id === id) { t.unread = false; t.labels = t.labels.filter((l) => l !== 'UNREAD'); t.people.forEach((p) => { p.unread = false; }); } }));
+          mbRefreshCounts();
+        }).catch(() => {});
+      }
+    }).catch((e) => { const r = $('#mbRead', panel); if (r) r.innerHTML = `<div class="mb-empty">פתיחת השיחה נכשלה: ${esc(gErr(e))}</div>`; });
+  }
+  function mbConvHtml(msgs, labelsOf) {
+    const chips = [];
+    if (labelsOf.includes('INBOX')) chips.push(mbChip({ id: 'INBOX', name: 'דואר נכנס' }, true));
+    if (labelsOf.includes('SPAM')) chips.push(mbChip({ id: 'SPAM', name: 'ספאם' }));
+    if (labelsOf.includes('TRASH')) chips.push(mbChip({ id: 'TRASH', name: 'אשפה' }));
+    labelsOf.forEach((l) => { const x = mbLabel(l); if (x && x.type === 'user') chips.push(mbChip(x, true)); });
+    const starred = labelsOf.includes('STARRED');
+    const imp = labelsOf.includes('IMPORTANT');
+    const me = mbMe();
+    // Long conversations fold their middle, as in Gmail.
+    const n = msgs.length;
+    const fold = n > 4 && !M.unfold;
+    const lastOpen = (i) => i === n - 1 || msgs[i].unread;
+    return `<div class="mb-rh"><button class="mb-ic sm mb-imp ${imp ? 'on' : ''}" data-rimp title="${imp ? 'חשוב' : 'לא חשוב'}">${ms('label_important', (imp ? 'fill ' : '') + 'flip')}</button>
+        <h2 class="mb-rsubj" dir="auto">${esc(msgs[0].subject || '(ללא נושא)')}</h2>${chips.join('')}<span class="mb-sp"></span>
+        <button class="mb-ic" data-print title="הדפסת הכל">${ms('print')}</button><a class="mb-ic" href="${esc(G.gmail.link({ threadId: msgs[0].threadId }))}" target="_blank" rel="noopener" title="פתיחה ב-Gmail">${ms('open_in_new')}</a></div>
+      <div class="mb-msgs">${msgs.map((m, i) => {
+        if (fold && i > 0 && i < n - 2) return i === 1 ? `<div class="mb-fold" data-unfold><span class="mb-foldn">${n - 3}</span></div>` : '';
+        const mine = mailAddr(m.from).toLowerCase() === me;
+        const open = lastOpen(i);
+        const toNames = mailAddrs([m.to, m.cc].filter(Boolean).join(',')).map((x) => (x.toLowerCase() === me ? 'אני' : mbShort(x)));
+        return `<div class="mb-msg ${open ? 'open' : ''}" data-i="${i}">
+          ${mbAv(m.from, 40)}
+          <div class="mb-mm">
+            <div class="mb-mhead" data-toggle>
+              <div class="mb-mwho"><b dir="auto">${esc(mine ? mailName(m.from) || 'אני' : mailName(m.from))}</b> <span class="mb-addr" dir="ltr">&lt;${esc(mailAddr(m.from))}&gt;</span>
+                <div class="mb-mto">${open ? `אל ${esc(toNames.join(', ') || 'נמענים לא גלויים')} <button class="mb-ic xs" data-details title="הצגת הפרטים">${ms('arrow_drop_down')}</button>` : `<span class="mb-msnip">${esc(m.snippet)}</span>`}</div></div>
+              <div class="mb-mright">${m.files.length ? ms('attach_file', 'mb-att') : ''}<span class="mb-mdate" title="${esc(mailFullWhen(m.date))}">${esc(open ? mailFullWhen(m.date) + ' (' + mbAgo(m.date) + ')' : mbDate(m.date))}</span>
+                ${open ? `<button class="mb-ic sm mb-star ${m.labels.includes('STARRED') ? 'on' : ''}" data-mstar title="כוכב">${ms('star', m.labels.includes('STARRED') ? 'fill' : '')}</button><button class="mb-ic sm" data-mreply title="השבה">${ms('reply', 'flip')}</button><button class="mb-ic sm" data-mmore title="עוד">${ms('more_vert')}</button>` : ''}</div>
+            </div>
+            <div class="mb-detail" hidden><table>
+              <tr><td>מאת:</td><td dir="ltr"><b>${esc(mailName(m.from))}</b> &lt;${esc(mailAddr(m.from))}&gt;</td></tr>
+              ${m.replyTo ? `<tr><td>השבה אל:</td><td dir="ltr">${esc(m.replyTo)}</td></tr>` : ''}
+              <tr><td>אל:</td><td dir="ltr">${esc(m.to)}</td></tr>${m.cc ? `<tr><td>עותק:</td><td dir="ltr">${esc(m.cc)}</td></tr>` : ''}
+              <tr><td>תאריך:</td><td>${esc(mailFullWhen(m.date))}</td></tr><tr><td>נושא:</td><td dir="auto">${esc(m.subject)}</td></tr></table></div>
+            <div class="mb-mbody"></div>
+            ${m.files.length ? `<div class="mb-files"><div class="mb-fh">${m.files.length === 1 ? 'קובץ מצורף אחד' : m.files.length + ' קבצים מצורפים'}</div><div class="mb-fl">${m.files.map((f, j) => `<button class="mb-file" data-file="${j}" title="הורדת ${esc(f.name)}"><span class="mb-fic ${mbFileKind(f)}">${ms(mbFileIcon(f))}</span><span class="mb-fn">${esc(f.name)}</span><span class="mb-fs">${esc(fileSize(f.size))}</span><span class="mb-fdl">${ms('download')}</span></button>`).join('')}</div></div>` : ''}
+          </div></div>`;
+      }).join('')}</div>
+      <div class="mb-replyhost" id="mbReplyHost"><div class="mb-rbtns">
+        <button class="mb-pill" data-rall="reply">${ms('reply', 'flip')}השבה</button>
+        ${msgs.length && mailAddrs([msgs[n - 1].to, msgs[n - 1].cc].join(',')).length > 1 ? `<button class="mb-pill" data-rall="replyall">${ms('reply_all', 'flip')}השבה לכולם</button>` : ''}
+        <button class="mb-pill" data-rall="fwd">${ms('forward', 'flip')}העברה</button></div></div>`;
+  }
+  const mbFileKind = (f) => (/pdf/i.test(f.mime) ? 'pdf' : /image/i.test(f.mime) ? 'img' : /sheet|excel|csv/i.test(f.mime + f.name) ? 'xls' : /word|document/i.test(f.mime) ? 'doc' : /zip|rar|compressed/i.test(f.mime) ? 'zip' : 'gen');
+  const mbFileIcon = (f) => ({ pdf: 'picture_as_pdf', img: 'image', xls: 'table_chart', doc: 'description', zip: 'folder_zip', gen: 'draft' })[mbFileKind(f)];
+  function mbBindReader(panel, msgs, list, idx) {
+    const id = M.open;
+    const last = msgs && msgs[msgs.length - 1];
+    const tObj = list[idx] || (msgs ? { id, subject: msgs[0].subject, snippet: last.snippet, people: [{ from: last.from }], labels: Array.from(new Set([].concat(...msgs.map((m) => m.labels)))) } : null);
+    panel.onclick = (e) => {
+      const a = e.target.closest('button,a,[data-unfold],[data-toggle]'); if (!a) return;
+      if (a.matches('[data-back]')) { mbGo(M.view, M.arg); return; }
+      if (a.dataset.rnav) { const t = list[idx + Number(a.dataset.rnav)]; if (t) mbGo(M.view, M.arg, t.id); return; }
+      if (a.dataset.ract) {
+        const k = a.dataset.ract;
+        if (k === 'moveto') { mbMoveMenu(a, [id]); return; }
+        if (k === 'labels') { if (tObj) mbLabelsMenu(a, [tObj]); return; }
+        if (k === 'task') { mbToTask(tObj); return; }
+        if (k === 'more') {
+          mbMenu(a, [
+            { icon: 'reply', label: 'השבה', fn: () => mbReply(last, 'reply') }, { icon: 'forward', label: 'העברה', fn: () => mbReply(last, 'fwd') },
+            { sep: true },
+            { icon: 'label_important', label: tObj && tObj.labels.includes('IMPORTANT') ? 'סימון כלא חשוב' : 'סימון כחשוב', fn: () => mbAct(tObj && tObj.labels.includes('IMPORTANT') ? 'unimportant' : 'important', [id]) },
+            { icon: 'star', label: tObj && tObj.labels.includes('STARRED') ? 'הסרת כוכב' : 'הוספת כוכב', fn: () => mbAct(tObj && tObj.labels.includes('STARRED') ? 'unstar' : 'star', [id]) },
+            { icon: 'print', label: 'הדפסת הכל', fn: () => mbPrint(msgs) },
+            { icon: 'open_in_new', label: 'פתיחה ב-Gmail', fn: () => window.open(G.gmail.link({ threadId: id }), '_blank', 'noopener') },
+          ]);
+          return;
+        }
+        if (k === 'unread') { mbAct('unread', [id], null, true); mbGo(M.view, M.arg); return; }
+        mbAct(k, [id]); return;
+      }
+      if (a.matches('[data-rimp]')) { mbAct(tObj && tObj.labels.includes('IMPORTANT') ? 'unimportant' : 'important', [id]); return; }
+      if (a.matches('[data-unlabel]')) { e.stopPropagation(); const l = a.dataset.unlabel; if (l === 'INBOX') mbAct('archive', [id]); else mbAct('unlabel', [id], l); return; }
+      if (a.matches('[data-print]')) { mbPrint(msgs); return; }
+      if (a.matches('[data-unfold]')) { M.unfold = true; mbDrawReader(panel); M.unfold = false; return; }
+      if (a.dataset.rall) { mbReply(last, a.dataset.rall); return; }
+      const box = a.closest('.mb-msg'); if (!box || !msgs) return;
+      const m = msgs[Number(box.dataset.i)];
+      if (a.matches('[data-details]')) { e.stopPropagation(); const d = $('.mb-detail', box); d.hidden = !d.hidden; return; }
+      if (a.matches('[data-mstar]')) { e.stopPropagation(); const on = m.labels.includes('STARRED'); m.labels = on ? m.labels.filter((l) => l !== 'STARRED') : m.labels.concat(['STARRED']); G.gmail.modifyMessage(m.id, on ? [] : ['STARRED'], on ? ['STARRED'] : []).then(() => { Object.values(M.cache).forEach((LL) => LL.threads.forEach((t) => { if (t.id === id) { t.starred = msgs.some((x) => x.labels.includes('STARRED')); t.labels = t.starred ? Array.from(new Set(t.labels.concat(['STARRED']))) : t.labels.filter((l) => l !== 'STARRED'); } })); }).catch((x) => toast(gErr(x))); mbDrawReader(panel); return; }
+      if (a.matches('[data-mreply]')) { e.stopPropagation(); mbReply(m, 'reply'); return; }
+      if (a.matches('[data-mmore]')) {
+        e.stopPropagation();
+        mbMenu(a, [{ icon: 'reply', label: 'השבה', fn: () => mbReply(m, 'reply') }, { icon: 'reply_all', label: 'השבה לכולם', fn: () => mbReply(m, 'replyall') }, { icon: 'forward', label: 'העברה', fn: () => mbReply(m, 'fwd') },
+          { sep: true }, { icon: 'add_task', label: 'הוספה למשימות', fn: () => openTaskForm(null, { title: m.subject, notes: 'ממייל של ' + m.from + ':\n' + m.snippet + '\n' + G.gmail.link({ threadId: id }) }) },
+          { icon: 'mark_email_unread', label: 'סימון כלא נקראה מכאן', fn: () => { G.gmail.modifyMessage(m.id, ['UNREAD'], []).then(() => { delete M.convs[id]; mbRefreshCounts(); mbGo(M.view, M.arg); }).catch((x) => toast(gErr(x))); } },
+          { icon: 'code', label: 'הצגת המקור ב-Gmail', fn: () => window.open(G.gmail.link({ threadId: id }), '_blank', 'noopener') }]);
+        return;
+      }
+      if (a.matches('[data-file]')) { const f = m.files[Number(a.dataset.file)]; a.disabled = true; G.gmail.attachment(m.id, f).then((blob) => downloadBlob(f.name, blob)).catch((x) => toast('ההורדה נכשלה: ' + gErr(x))).finally(() => { a.disabled = false; }); return; }
+      if (a.matches('[data-toggle]') && !e.target.closest('button')) { box.classList.toggle('open'); if (box.classList.contains('open')) mbShowBody(box, m); mbRefreshHead(box, m); }
+    };
+    if (!msgs) return;
+    $$('.mb-msg.open', panel).forEach((box) => mbShowBody(box, msgs[Number(box.dataset.i)]));
+    // A reply that was being written stays when the page is drawn again.
+    if (M.inline && M.inline.threadId === id && document.body.contains(panel)) { const host = $('#mbReplyHost', panel); host.innerHTML = ''; host.appendChild(M.inline.el); }
+    const r = $('#mbRead', panel); if (r && M.inline && M.inline.threadId === id) r.scrollTop = r.scrollHeight;
+  }
+  function mbRefreshHead(box, m) {
+    const open = box.classList.contains('open');
+    const to = $('.mb-mto', box); const me = mbMe();
+    if (to) to.innerHTML = open ? `אל ${esc(mailAddrs([m.to, m.cc].filter(Boolean).join(',')).map((x) => (x.toLowerCase() === me ? 'אני' : mbShort(x))).join(', '))} <button class="mb-ic xs" data-details title="הצגת הפרטים">${ms('arrow_drop_down')}</button>` : `<span class="mb-msnip">${esc(m.snippet)}</span>`;
+    const d = $('.mb-mdate', box); if (d) d.textContent = open ? mailFullWhen(m.date) + ' (' + mbAgo(m.date) + ')' : mbDate(m.date);
+  }
+  function mbShowBody(box, m) {
+    const body = $('.mb-mbody', box);
+    if (!body || body.dataset.done) return;
+    body.dataset.done = '1';
+    mailInline(m).then((cids) => mailFrame(body, m, cids));
+  }
+  function mbPrint(msgs) {
+    if (!msgs) return;
+    const w = window.open('', '_blank'); if (!w) return;
+    w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>${esc(msgs[0].subject)}</title><style>body{font:14px Arial,sans-serif;margin:24px}h1{font-size:20px}hr{border:0;border-top:1px solid #ccc;margin:16px 0}.h{color:#555;font-size:12px}</style></head><body><h1>${esc(msgs[0].subject)}</h1>${msgs.map((m) => `<hr><div><b>${esc(mailName(m.from))}</b> <span dir="ltr">&lt;${esc(mailAddr(m.from))}&gt;</span></div><div class="h">${esc(mailFullWhen(m.date))} · אל: <span dir="ltr">${esc(m.to)}</span></div><div>${m.html ? m.html.replace(/<script[\s\S]*?<\/script>/gi, '') : `<pre style="white-space:pre-wrap;font:inherit">${esc(m.text)}</pre>`}</div>`).join('')}</body></html>`);
+    w.document.close(); setTimeout(() => { try { w.print(); } catch (e) { /* ignore */ } }, 400);
+  }
+  // A reply opens under the conversation (like Gmail); a forward too.
+  function mbReply(m, kind) {
+    if (!m) return;
+    const d = replyDraft(m, kind === 'replyall', kind === 'fwd');
+    const quote = kind === 'fwd' ? '' : `<br><div class="gmail_quote"><div dir="rtl">בתאריך ${esc(mailFullWhen(m.date))} מאת ${esc(m.from)}:</div><blockquote style="margin:0 0 0 .8ex;border-inline-start:1px solid #ccc;padding-inline-start:1ex">${m.html ? m.html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '') : esc(m.text || '').replace(/\n/g, '<br>')}</blockquote></div>`;
+    const fwdHtml = kind === 'fwd' ? `<br><br>---------- הודעה שהועברה ----------<br>מאת: ${esc(m.from)}<br>תאריך: ${esc(mailFullWhen(m.date))}<br>נושא: ${esc(m.subject)}<br>אל: ${esc(m.to)}<br><br>${m.html ? m.html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '') : esc(m.text || '').replace(/\n/g, '<br>')}` : '';
+    const host = $('#mbReplyHost');
+    const opts = { to: d.to, cc: d.cc, subject: d.subject, threadId: kind === 'fwd' ? m.threadId : d.threadId, inReplyTo: kind === 'fwd' ? '' : d.inReplyTo, references: kind === 'fwd' ? '' : d.references, quote: quote, html: fwdHtml, kind, fwdFiles: kind === 'fwd' ? m.files.map((f) => ({ name: f.name, size: f.size, src: { mid: m.id, f } })) : [] };
+    if (host && M.open === m.threadId) { if (M.inline) M.inline.close(true); mbCompose(opts, host); } else mbCompose(opts);
+  }
+
+  // ---------- Compose: floating windows at the bottom, or inline under a conversation ----------
+  const mbWins = [];
+  function mbDock() {
+    let d = $('#mbDock');
+    if (!d) { d = document.createElement('div'); d.id = 'mbDock'; d.className = 'mb-dock'; document.body.appendChild(d); }
+    return d;
+  }
+  function mbSuggest(q) {
+    q = q.toLowerCase();
+    const out = []; const seen = new Set();
+    const add = (name, email, sub) => { const k = (email || '').toLowerCase(); if (!k || seen.has(k)) return; if (q && !(name + ' ' + email + ' ' + (sub || '')).toLowerCase().includes(q)) return; seen.add(k); out.push({ name, email, sub }); };
+    mbContactGroups().forEach((g) => g.list.forEach((x) => x.email && add(x.name, x.email, g.p ? g.p.name : x.role)));
+    Object.values(M.cache).forEach((L) => L.threads.forEach((t) => t.people.forEach((p) => add(mailName(p.from), mailAddr(p.from), ''))));
+    return out.slice(0, 8);
+  }
+  // Recipients as chips, with suggestions from the contacts (by project) and recent mail.
+  function mbChips(wrap, initial, onChange) {
+    const list = mailAddrs(initial || '').map((e) => { const raw = (initial || '').split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).find((x) => x.includes(e)) || e; return { name: mailName(raw) !== e ? mailName(raw) : '', email: e }; });
+    wrap.innerHTML = '<span class="mb-chs"></span><input class="mb-chin" dir="auto"><div class="mb-sug" hidden></div>';
+    const chs = $('.mb-chs', wrap), inp = $('.mb-chin', wrap), sug = $('.mb-sug', wrap);
+    let opts = [], cur = 0, ready = false;
+    const draw = () => {
+      chs.innerHTML = list.map((x, i) => `<span class="mb-rc ${/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email) ? '' : 'bad'}" title="${esc(x.email)}">${mbAv(x.email, 22)}<span>${esc(x.name || x.email)}</span><button type="button" data-rx="${i}">${ms('close')}</button></span>`).join('');
+      if (ready && onChange) onChange();
+    };
+    const commit = (x) => { if (x && x.email) list.push(x); inp.value = ''; sug.hidden = true; draw(); };
+    const parse = (s) => s.split(/[,;\s]+/).filter(Boolean).forEach((e) => commit({ name: '', email: e.replace(/[<>]/g, '') }));
+    const showSug = () => {
+      const q = inp.value.trim(); opts = q ? mbSuggest(q) : []; cur = 0;
+      sug.hidden = !opts.length;
+      sug.innerHTML = opts.map((o, i) => `<button type="button" class="mb-sg ${i === cur ? 'on' : ''}" data-sg="${i}">${mbAv(o.email, 32)}<span class="grow"><b>${esc(o.name || o.email)}</b><span class="mb-sub" dir="ltr">${esc(o.email)}</span></span>${o.sub ? `<span class="mb-sgp">${esc(o.sub)}</span>` : ''}</button>`).join('');
+    };
+    inp.addEventListener('input', () => { if (/[,;]$/.test(inp.value)) { parse(inp.value); return; } showSug(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' && opts.length) { e.preventDefault(); cur = (cur + 1) % opts.length; showSugMark(); }
+      else if (e.key === 'ArrowUp' && opts.length) { e.preventDefault(); cur = (cur - 1 + opts.length) % opts.length; showSugMark(); }
+      else if ((e.key === 'Enter' || e.key === 'Tab') && !sug.hidden && opts[cur]) { e.preventDefault(); commit(opts[cur]); }
+      else if (e.key === 'Enter' && inp.value.trim()) { e.preventDefault(); parse(inp.value); }
+      else if (e.key === 'Backspace' && !inp.value && list.length) { list.pop(); draw(); }
+    });
+    const showSugMark = () => $$('.mb-sg', sug).forEach((b, i) => b.classList.toggle('on', i === cur));
+    inp.addEventListener('blur', () => setTimeout(() => { if (inp.value.trim()) parse(inp.value); sug.hidden = true; }, 150));
+    sug.addEventListener('mousedown', (e) => { const b = e.target.closest('[data-sg]'); if (b) { e.preventDefault(); commit(opts[Number(b.dataset.sg)]); inp.focus(); } });
+    chs.addEventListener('click', (e) => { const b = e.target.closest('[data-rx]'); if (b) { list.splice(Number(b.dataset.rx), 1); draw(); } });
+    wrap.addEventListener('click', (e) => { if (e.target === wrap || e.target === chs) inp.focus(); });
+    draw(); ready = true;
+    return { get: () => { if (inp.value.trim()) parse(inp.value); return list.map((x) => (x.name ? `"${x.name.replace(/"/g, '')}" <${x.email}>` : x.email)).join(', '); }, emails: () => list.map((x) => x.email), focus: () => inp.focus(), count: () => list.length + (inp.value.trim() ? 1 : 0) };
+  }
+  function mbCompose(o, inlineHost) {
+    o = o || {};
+    if (!GOOGLE || !G.valid()) { toast('חברו קודם את חשבון ה-Google'); return; }
+    const inline = !!inlineHost;
+    // Gmail shows up to three windows next to each other.
+    if (!inline && mbWins.length >= 3) mbWins[0].close(true);
+    const el = document.createElement('div');
+    el.className = inline ? 'mb-cw inline' : 'mb-cw';
+    const title = o.subject && !inline ? o.subject : o.kind === 'fwd' ? 'העברה' : 'הודעה חדשה';
+    el.innerHTML = `${inline ? '' : `<div class="mb-cwh" data-min><span class="mb-cwt">${esc(title)}</span><button type="button" class="mb-ic xs" data-cmin title="מזעור">${ms('minimize')}</button><button type="button" class="mb-ic xs" data-cmax title="מסך מלא">${ms('open_in_full')}</button><button type="button" class="mb-ic xs" data-cclose title="שמירה וסגירה">${ms('close')}</button></div>`}
+      <div class="mb-cwb">
+        ${inline ? `<div class="mb-cwinl">${mbAv(G.status().email || '?', 40)}<div class="mb-cwcard">` : ''}
+        <div class="mb-crow mb-crecip">${inline ? `<button type="button" class="mb-ic xs" data-ckind title="סוג התשובה">${ms(o.kind === 'fwd' ? 'forward' : o.kind === 'replyall' ? 'reply_all' : 'reply', 'flip')}</button>` : '<label>אל</label>'}<div class="mb-chw" data-to></div><span class="mb-ccbtns"><a href="#" data-showcc>עותק</a><a href="#" data-showbcc>עותק מוסתר</a></span>${inline ? `<button type="button" class="mb-ic xs" data-popout title="פתיחה בחלון נפרד">${ms('open_in_new')}</button>` : ''}</div>
+        <div class="mb-crow" data-ccrow hidden><label>עותק</label><div class="mb-chw" data-cc></div></div>
+        <div class="mb-crow" data-bccrow hidden><label>עותק מוסתר</label><div class="mb-chw" data-bcc></div></div>
+        ${inline ? '' : `<div class="mb-crow"><input class="mb-csubj" data-subj placeholder="נושא" value="${esc(o.subject || '')}" dir="auto"></div>`}
+        <div class="mb-ced" contenteditable="true" dir="auto" data-ed></div>
+        ${o.quote ? `<button type="button" class="mb-quotebtn" data-showquote title="הצגת התוכן המצוטט">${ms('more_horiz')}</button>` : ''}
+        <div class="mb-catt" data-atts></div>
+        <div class="mb-fmt" data-fmt hidden>
+          <button type="button" class="mb-ic xs" data-cmd="undo" title="ביטול">${ms('undo')}</button><button type="button" class="mb-ic xs" data-cmd="redo" title="ביצוע מחדש">${ms('redo')}</button><span class="mb-vsep"></span>
+          <select data-size title="גודל"><option value="2">קטן</option><option value="3" selected>רגיל</option><option value="5">גדול</option><option value="6">ענק</option></select><span class="mb-vsep"></span>
+          <button type="button" class="mb-ic xs" data-cmd="bold" title="מודגש">${ms('format_bold')}</button><button type="button" class="mb-ic xs" data-cmd="italic" title="נטוי">${ms('format_italic')}</button><button type="button" class="mb-ic xs" data-cmd="underline" title="קו תחתון">${ms('format_underlined')}</button>
+          <label class="mb-ic xs" title="צבע הטקסט">${ms('format_color_text')}<input type="color" data-color hidden></label><span class="mb-vsep"></span>
+          <button type="button" class="mb-ic xs" data-cmd="justifyRight" title="יישור לימין">${ms('format_align_right')}</button><button type="button" class="mb-ic xs" data-cmd="justifyCenter" title="מרכוז">${ms('format_align_center')}</button><button type="button" class="mb-ic xs" data-cmd="justifyLeft" title="יישור לשמאל">${ms('format_align_left')}</button>
+          <button type="button" class="mb-ic xs" data-cmd="insertOrderedList" title="רשימה ממוספרת">${ms('format_list_numbered')}</button><button type="button" class="mb-ic xs" data-cmd="insertUnorderedList" title="רשימת תבליטים">${ms('format_list_bulleted')}</button>
+          <button type="button" class="mb-ic xs" data-cmd="removeFormat" title="הסרת עיצוב">${ms('format_clear')}</button></div>
+        <div class="mb-cfoot">
+          <button type="button" class="mb-send" data-send>שליחה</button>
+          <button type="button" class="mb-ic" data-fmtt title="אפשרויות עיצוב">${ms('text_format')}</button>
+          <label class="mb-ic" title="צירוף קבצים">${ms('attach_file')}<input type="file" multiple hidden data-file></label>
+          <button type="button" class="mb-ic" data-link title="הוספת קישור">${ms('link')}</button>
+          <button type="button" class="mb-ic" data-emoji title="הוספת אמוג'י">${ms('mood')}</button>
+          <span class="mb-csaved" data-saved></span><span class="mb-sp"></span>
+          <button type="button" class="mb-ic" data-discard title="מחיקת הטיוטה">${ms('delete')}</button>
+        </div>
+        ${inline ? '</div></div>' : ''}
+      </div>`;
+    const S = { draftId: o.draftId || '', saving: null, dirty: false, files: (o.fwdFiles || []).slice(), closed: false, noDraft: false };
+    const ed = $('[data-ed]', el);
+    ed.innerHTML = o.html || (o.text ? esc(o.text).replace(/\n/g, '<br>') : '');
+    const to = mbChips($('[data-to]', el), o.to, () => mark());
+    const cc = mbChips($('[data-cc]', el), o.cc, () => mark());
+    const bcc = mbChips($('[data-bcc]', el), o.bcc, () => mark());
+    if (o.cc) $('[data-ccrow]', el).hidden = false;
+    if (o.bcc) $('[data-bccrow]', el).hidden = false;
+    const subjInp = $('[data-subj]', el);
+    let quoteShown = false;
+    const drawAtts = () => {
+      $('[data-atts]', el).innerHTML = S.files.map((f, i) => `<div class="mb-ca"><span class="mb-can">${esc(f.name)}</span><span class="mb-sub">(${esc(fileSize(f.size || (f.blob && f.blob.size) || 0))})</span><button type="button" class="mb-ic xs" data-arm="${i}" title="הסרה">${ms('close')}</button></div>`).join('');
+    };
+    drawAtts();
+    let saveT = 0;
+    function mark() { S.dirty = true; $('[data-saved]', el).textContent = ''; clearTimeout(saveT); saveT = setTimeout(() => save(), 2500); }
+    const empty = () => !to.count() && !cc.count() && !bcc.count() && !(subjInp && subjInp.value.trim() && !o.subject) && !ed.textContent.trim() && !S.files.length;
+    const bodyHtml = () => ed.innerHTML + (o.quote ? o.quote : '');
+    const bodyText = () => { const d = document.createElement('div'); d.innerHTML = bodyHtml().replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|tr|blockquote)>/gi, '\n'); return (d.textContent || '').replace(/\n{3,}/g, '\n\n').trim(); };
+    async function files() {
+      const out = [];
+      for (const f of S.files) {
+        if (f.blob) out.push({ name: f.name, blob: f.blob });
+        else if (f.src) { try { f.blob = await G.gmail.attachment(f.src.mid, f.src.f); out.push({ name: f.name, blob: f.blob }); } catch (e) { /* skipped */ } }
+      }
+      return out;
+    }
+    const mail = async () => ({ to: to.get(), cc: cc.get(), bcc: bcc.get(), subject: subjInp ? subjInp.value : o.subject || '', text: bodyText(), html: `<div dir="auto">${bodyHtml()}</div>`, attachments: await files(), threadId: o.threadId || undefined, inReplyTo: o.inReplyTo, references: o.references });
+    async function save() {
+      if (S.closed && !S.flush) return;
+      if (!S.dirty || S.noDraft || empty()) return;
+      if (S.saving) { await S.saving.catch(() => {}); }
+      S.dirty = false;
+      $('[data-saved]', el).textContent = 'שומר...';
+      S.saving = (async () => { const r = await G.gmail.saveDraft(await mail(), S.draftId); S.draftId = r.id; })();
+      try { await S.saving; $('[data-saved]', el).textContent = 'הטיוטה נשמרה'; mbRefreshCounts(); }
+      catch (e) { $('[data-saved]', el).textContent = ''; if (e.status === 403) S.noDraft = true; }
+      finally { S.saving = null; }
+    }
+    function remove() {
+      S.closed = true; clearTimeout(saveT);
+      const i = mbWins.indexOf(api); if (i >= 0) mbWins.splice(i, 1);
+      if (inline) { M.inline = null; const host = el.parentNode; el.remove(); if (host && host.id === 'mbReplyHost') { const p = $('#mbPanel'); if (p && M.open) mbDrawReader(p); } }
+      else el.remove();
+      document.body.classList.toggle('mb-cfull-open', !!$('.mb-cw.full'));
+    }
+    async function close(silent) {
+      if (!empty() && S.dirty) { S.flush = true; await save(); S.flush = false; }
+      remove();
+      if (!silent && S.draftId && !empty()) mbSnack('ההודעה נשמרה כטיוטה.');
+    }
+    async function discard() {
+      remove();
+      if (S.draftId) { try { await G.gmail.deleteDraft(S.draftId); mbRefreshCounts(); } catch (e) { /* ignore */ } }
+      mbSnack('הטיוטה נמחקה.');
+    }
+    async function send() {
+      const all = to.emails().concat(cc.emails(), bcc.emails());
+      if (!all.length) { mbDialog('שגיאה', '<p>יש לציין לפחות נמען אחד.</p>', null); return; }
+      const bad = all.filter((x) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+      if (bad.length) { mbDialog('שגיאה', `<p>הכתובת "<b dir="ltr">${esc(bad[0])}</b>" בשדה "אל" אינה מזוהה. יש לוודא שכל הכתובות בפורמט תקין.</p>`, null); return; }
+      if (subjInp && !subjInp.value.trim() && !ed.textContent.trim() && !confirm('לשלוח את ההודעה הזו בלי נושא ובלי טקסט בגוף ההודעה?')) return;
+      clearTimeout(saveT);
+      const m = await mail();
+      const draftId = S.draftId;
+      remove();
+      // Like Gmail: a few seconds to take the send back.
+      let undone = false;
+      const t = setTimeout(async () => {
+        if (undone) return;
+        mbSnack('שולח...');
+        try {
+          let r;
+          if (draftId) { if (S.saving) await S.saving.catch(() => {}); await G.gmail.saveDraft(m, draftId); r = await G.gmail.sendDraft(draftId); }
+          else r = await G.gmail.send(m);
+          const tid = (r && (r.threadId || (r.message && r.message.threadId))) || m.threadId;
+          if (tid) delete M.convs[tid];
+          Object.keys(M.cache).forEach((k) => delete M.cache[k]);
+          mbSnack('ההודעה נשלחה.', tid ? 'הצגת ההודעה' : '', tid ? () => mbGo('sent', '', tid) : null);
+          mbRefreshCounts();
+          if (currentView() === 'mail') render();
+        } catch (e) { mbSnack('השליחה נכשלה: ' + gErr(e)); mbCompose(Object.assign({}, o, { to: m.to, cc: m.cc, bcc: m.bcc, subject: m.subject, html: ed.innerHTML, draftId })); }
+      }, 5000);
+      mbSnack('ההודעה בדרך...', 'ביטול', () => { undone = true; clearTimeout(t); mbCompose(Object.assign({}, o, { to: m.to, cc: m.cc, bcc: m.bcc, subject: m.subject, html: ed.innerHTML, draftId }), inline && $('#mbReplyHost') && M.open === o.threadId ? $('#mbReplyHost') : null); }, 5000);
+    }
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button,a'); if (!b) { if (!inline && e.target.closest('[data-min]') && el.classList.contains('min')) { el.classList.remove('min'); } return; }
+      if (b.matches('[data-cmin]')) { e.stopPropagation(); el.classList.toggle('min'); el.classList.remove('full'); document.body.classList.toggle('mb-cfull-open', !!$('.mb-cw.full')); return; }
+      if (b.matches('[data-cmax]')) { e.stopPropagation(); el.classList.toggle('full'); el.classList.remove('min'); $('[data-cmax] .ms', el).textContent = el.classList.contains('full') ? 'close_fullscreen' : 'open_in_full'; document.body.classList.toggle('mb-cfull-open', !!$('.mb-cw.full')); return; }
+      if (b.matches('[data-cclose]')) { e.stopPropagation(); close(); return; }
+      if (b.matches('[data-showcc]')) { e.preventDefault(); $('[data-ccrow]', el).hidden = false; b.remove(); cc.focus(); return; }
+      if (b.matches('[data-showbcc]')) { e.preventDefault(); $('[data-bccrow]', el).hidden = false; b.remove(); bcc.focus(); return; }
+      if (b.matches('[data-popout]')) { const cur = { to: to.get(), cc: cc.get(), bcc: bcc.get(), subject: o.subject, html: ed.innerHTML + (quoteShown ? '' : o.quote || ''), threadId: o.threadId, inReplyTo: o.inReplyTo, references: o.references, draftId: S.draftId, fwdFiles: S.files }; remove(); mbCompose(cur); return; }
+      if (b.matches('[data-ckind]')) {
+        mbMenu(b, [{ icon: 'reply', label: 'השבה', fn: () => {} }, { icon: 'forward', label: 'העברה', fn: () => { const p = (M.convs[M.open] || {}).msgs; if (p) { remove(); mbReply(p[p.length - 1], 'fwd'); } } }, { sep: true }, { icon: 'open_in_new', label: 'פתיחה בחלון נפרד', fn: () => $('[data-popout]', el).click() }]);
+        return;
+      }
+      if (b.matches('[data-showquote]')) { ed.innerHTML += o.quote; o.quote = ''; quoteShown = true; b.remove(); mark(); return; }
+      if (b.matches('[data-arm]')) { S.files.splice(Number(b.dataset.arm), 1); drawAtts(); mark(); return; }
+      if (b.matches('[data-fmtt]')) { $('[data-fmt]', el).hidden = !$('[data-fmt]', el).hidden; b.classList.toggle('on'); return; }
+      if (b.dataset.cmd) { ed.focus(); document.execCommand(b.dataset.cmd, false, null); mark(); return; }
+      if (b.matches('[data-link]')) {
+        const sel = window.getSelection(); const range = sel.rangeCount && ed.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+        const url = prompt('כתובת הקישור:', 'https://'); if (!url || url === 'https://') return;
+        ed.focus(); if (range) { sel.removeAllRanges(); sel.addRange(range); }
+        if (range && !range.collapsed) document.execCommand('createLink', false, url); else document.execCommand('insertHTML', false, `<a href="${esc(url)}">${esc(url)}</a>&nbsp;`);
+        mark(); return;
+      }
+      if (b.matches('[data-emoji]')) {
+        const em = ['😀', '😊', '👍', '🙏', '👌', '🎉', '✅', '❤️', '😉', '🤝', '📎', '📅', '🏗️', '⚠️', '❗', '💪'];
+        const sel = window.getSelection(); const range = sel.rangeCount && ed.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+        mbMenu(b, [], { custom: (wrap) => { wrap.innerHTML = `<div class="mb-emojis">${em.map((x) => `<button type="button" class="mb-emo" data-em="${x}">${x}</button>`).join('')}</div>`; return { click: (x) => { if (!x.dataset.em) return ''; ed.focus(); if (range) { sel.removeAllRanges(); sel.addRange(range); } document.execCommand('insertText', false, x.dataset.em); mark(); return 'close'; } }; } });
+        return;
+      }
+      if (b.matches('[data-discard]')) { discard(); return; }
+      if (b.matches('[data-send]')) { send(); }
+    });
+    $('[data-size]', el).addEventListener('change', (e) => { ed.focus(); document.execCommand('fontSize', false, e.target.value); mark(); });
+    $('[data-color]', el).addEventListener('input', (e) => { ed.focus(); document.execCommand('foreColor', false, e.target.value); mark(); });
+    $('[data-file]', el).addEventListener('change', (e) => { Array.from(e.target.files).forEach((f) => S.files.push({ name: f.name, size: f.size, blob: f })); e.target.value = ''; drawAtts(); mark(); });
+    // Files dropped on the window are attached.
+    el.addEventListener('dragover', (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) { e.preventDefault(); el.classList.add('dropping'); } });
+    el.addEventListener('dragleave', (e) => { if (!el.contains(e.relatedTarget)) el.classList.remove('dropping'); });
+    el.addEventListener('drop', (e) => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); el.classList.remove('dropping'); Array.from(e.dataTransfer.files).forEach((f) => S.files.push({ name: f.name, size: f.size, blob: f })); drawAtts(); mark(); });
+    ed.addEventListener('input', mark);
+    if (subjInp) subjInp.addEventListener('input', () => { mark(); const t = $('.mb-cwt', el); if (t) t.textContent = subjInp.value || 'הודעה חדשה'; });
+    el.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send(); }
+      if (e.key === 'Escape' && !inline) { e.preventDefault(); close(); }
+    });
+    const api = { el, close, threadId: o.threadId, inline };
+    if (inline) {
+      inlineHost.innerHTML = ''; inlineHost.appendChild(el);
+      M.inline = api;
+      const r = $('#mbRead'); if (r) setTimeout(() => { r.scrollTop = r.scrollHeight; }, 30);
+      setTimeout(() => { if (o.kind === 'fwd') to.focus(); else { ed.focus(); } }, 50);
+    } else {
+      mbDock().appendChild(el); mbWins.push(api);
+      setTimeout(() => (o.to ? (subjInp && !subjInp.value ? subjInp : ed) : null) ? (subjInp && !subjInp.value ? subjInp.focus() : ed.focus()) : to.focus(), 50);
+    }
+    if (o.quote && !inline) { ed.innerHTML += o.quote; o.quote = ''; const q = $('[data-showquote]', el); if (q) q.remove(); }
+    return api;
+  }
+
+  // ---------- Small pieces: menus, dialogs, the snackbar ----------
+  let mbMenuEl = null;
+  function mbCloseMenu() { if (mbMenuEl) { mbMenuEl.remove(); mbMenuEl = null; document.removeEventListener('mousedown', mbMenuOutside, true); } }
+  function mbMenuOutside(e) { if (mbMenuEl && !mbMenuEl.contains(e.target)) mbCloseMenu(); }
+  // items: [{ icon, label, fn, sep, html, color, disabled, keep }]; opts: { title, search, custom(wrap) -> { draw, click }, align }
+  function mbMenu(anchor, items, opts) {
+    mbCloseMenu();
+    opts = opts || {};
+    const m = document.createElement('div');
+    m.className = 'mb-menu';
+    m.innerHTML = (opts.title ? `<div class="mb-mtitle">${esc(opts.title)}</div>` : '') + (opts.search ? `<div class="mb-msearch"><input placeholder="חיפוש"></div>` : '') + '<div class="mb-mitems"></div>';
+    const wrap = $('.mb-mitems', m);
+    let custom = null;
+    const drawItems = (q) => {
+      if (custom) { if (custom.draw) custom.draw(q); return; }
+      wrap.innerHTML = items.map((it, i) => it.sep ? '<div class="mb-msep"></div>' : it.html ? it.html : (q && !(it.label || '').toLowerCase().includes(q)) ? '' : `<button class="mb-mi ${it.disabled ? 'dis' : ''}" data-mi="${i}" ${it.disabled ? 'disabled' : ''}>${it.icon ? ms(it.icon, /reply|forward|label_important/.test(it.icon) ? 'flip' : '') : it.color ? `<span class="mb-mdot" style="background:${esc(it.color)}"></span>` : ''}<span>${esc(it.label)}</span></button>`).join('');
+    };
+    if (opts.custom) custom = opts.custom(wrap);
+    else drawItems('');
+    document.body.appendChild(m);
+    const r = anchor.getBoundingClientRect();
+    const w = m.offsetWidth, h = m.offsetHeight;
+    let left = opts.align === 'start' ? r.left - w + r.width : opts.align === 'end' ? r.left : r.right - w;
+    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+    let top = r.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+    m.style.left = left + 'px'; m.style.top = top + 'px';
+    const s = $('.mb-msearch input', m);
+    if (s) { s.focus(); s.addEventListener('input', () => drawItems(s.value.trim().toLowerCase())); }
+    m.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); mbCloseMenu(); anchor.focus && anchor.focus(); } });
+    m.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (custom) { const res = custom.click(b); if (res === 'close') mbCloseMenu(); else if (res === 'redraw') custom.draw(s ? s.value.trim().toLowerCase() : ''); return; }
+      const it = items[Number(b.dataset.mi)]; if (!it || it.disabled) return;
+      if (!it.keep) mbCloseMenu();
+      it.fn && it.fn();
+    });
+    setTimeout(() => document.addEventListener('mousedown', mbMenuOutside, true), 0);
+    mbMenuEl = m;
+    return m;
+  }
+  function mbCloseDialog() { const d = $('.mb-dlgbg'); if (d) d.remove(); }
+  function mbDialog(title, html, okLabel, onOk) {
+    mbCloseDialog();
+    const bg = document.createElement('div');
+    bg.className = 'mb-dlgbg';
+    bg.innerHTML = `<div class="mb-dlg" role="dialog"><div class="mb-dlgh"><h3>${esc(title)}</h3><button class="mb-ic" data-dx title="סגירה">${ms('close')}</button></div><div class="mb-dlgb">${html}</div>
+      <div class="mb-dlgf">${okLabel ? `<button class="mb-btn" data-dx>ביטול</button><button class="mb-btn primary" data-dok>${esc(okLabel)}</button>` : '<button class="mb-btn primary" data-dx>אישור</button>'}</div></div>`;
+    document.body.appendChild(bg);
+    bg.addEventListener('mousedown', (e) => { if (e.target === bg) bg.remove(); });
+    bg.addEventListener('click', async (e) => {
+      if (e.target.closest('[data-dx]')) bg.remove();
+      const ok = e.target.closest('[data-dok]');
+      if (ok && onOk) { ok.disabled = true; const res = await onOk($('.mb-dlg', bg)); ok.disabled = false; if (res !== false) bg.remove(); }
+    });
+    bg.addEventListener('keydown', (e) => { if (e.key === 'Escape') bg.remove(); if (e.key === 'Enter' && e.target.tagName === 'INPUT' && okLabel) { e.preventDefault(); $('[data-dok]', bg).click(); } });
+    return bg;
+  }
+  let mbSnackT = 0;
+  function mbSnack(text, action, fn, ms0) {
+    let s = $('#mbSnack');
+    if (!s) { s = document.createElement('div'); s.id = 'mbSnack'; s.className = 'mb-snack'; document.body.appendChild(s); }
+    s.innerHTML = `<span>${esc(text)}</span>${action ? `<button data-sa>${esc(action)}</button>` : ''}<button class="mb-snx" data-sx>${ms('close')}</button>`;
+    s.classList.add('show');
+    clearTimeout(mbSnackT); mbSnackT = setTimeout(() => s.classList.remove('show'), ms0 || 7000);
+    const a = $('[data-sa]', s); if (a) a.onclick = () => { s.classList.remove('show'); fn && fn(); };
+    $('[data-sx]', s).onclick = () => s.classList.remove('show');
+  }
+
+  // ---------- Keyboard shortcuts (as in Gmail) ----------
+  document.addEventListener('keydown', (e) => {
+    if (currentView() !== 'mail' || !$('#mb')) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) { if (e.key === 'Escape' && t.id === 'mbQ') t.blur(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if ($('.mb-dlgbg')) return;
+    if (e.key === 'Escape') { mbCloseMenu(); return; }
+    const panel = $('#mbPanel'); if (!panel) return;
+    const list = mbVisibleList();
+    const k = e.key;
+    const cur = M.open ? list.findIndex((x) => x.id === M.open) : M.focus;
+    const target = () => (M.open ? [M.open] : M.sel.size ? Array.from(M.sel) : list[M.focus] ? [list[M.focus].id] : []);
+    const go = (fn) => { e.preventDefault(); fn(); };
+    if (k === 'c') go(() => mbCompose({}));
+    else if (k === '/') go(() => $('#mbQ').focus());
+    else if (k === 'j' || k === 'k') go(() => {
+      const n = Math.max(0, Math.min(list.length - 1, cur + (k === 'j' ? 1 : -1)));
+      if (M.open) { if (list[n] && n !== cur) mbGo(M.view, M.arg, list[n].id); }
+      else { M.focus = n; $$('.mb-row', panel).forEach((r, i) => r.classList.toggle('focus', i === n)); const r = $$('.mb-row', panel)[n]; if (r) r.scrollIntoView({ block: 'nearest' }); }
+    });
+    else if ((k === 'o' || k === 'Enter') && !M.open && list[M.focus]) go(() => mbOpenThread(list[M.focus]));
+    else if (k === 'u' && M.open) go(() => mbGo(M.view, M.arg));
+    else if (k === 'x' && !M.open && list[M.focus]) go(() => { const id = list[M.focus].id; if (M.sel.has(id)) M.sel.delete(id); else M.sel.add(id); mbDrawList(panel); });
+    else if (k === 's') go(() => { const ids = target(); const t0 = list.find((x) => x.id === ids[0]); if (ids.length) mbAct(t0 && t0.starred ? 'unstar' : 'star', ids); });
+    else if (k === 'e') go(() => mbAct('archive', target()));
+    else if (k === '#') go(() => mbAct(M.view === 'trash' ? 'untrash' : 'trash', target()));
+    else if (k === '!') go(() => mbAct(M.view === 'spam' ? 'notspam' : 'spam', target()));
+    else if (k === 'I' && e.shiftKey) go(() => mbAct('read', target()));
+    else if (k === 'U' && e.shiftKey) go(() => mbAct('unread', target()));
+    else if ((k === 'r' || k === 'a' || k === 'f') && M.open && M.convs[M.open]) go(() => { const msgs = M.convs[M.open].msgs; mbReply(msgs[msgs.length - 1], k === 'r' ? 'reply' : k === 'a' ? 'replyall' : 'fwd'); });
+    else if (k === 'l' || k === 'v') go(() => {
+      const ids = target(); if (!ids.length) return;
+      const btn = $(M.open ? `[data-ract="${k === 'l' ? 'labels' : 'moveto'}"]` : `[data-bulk="${k === 'l' ? 'labels' : 'moveto'}"]`, panel) || $('.mb-bar', panel);
+      if (k === 'v') mbMoveMenu(btn, ids); else mbLabelsMenu(btn, list.filter((x) => ids.includes(x.id)).length ? list.filter((x) => ids.includes(x.id)) : [{ id: ids[0], labels: [] }]);
+    });
+  });
+  // Leaving the mail page: back to the regular layout.
+  window.addEventListener('hashchange', () => { if (currentView() !== 'mail') document.body.classList.remove('mail-mode'); });
 
   // ---------- Settings ----------
   function bindLocalDriveSettings(el) {
