@@ -493,19 +493,19 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .proto-kinds button.on .n { background: var(--primary); color: #fff; }
 .dp-status { margin: -4px 0 12px; }
 /* Protocols by project: one compact tile per project with its latest documents. */
-.prtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
-.prtile { display: flex; flex-direction: column; align-items: stretch; padding: 10px 12px; min-width: 0; cursor: pointer; transition: box-shadow .12s, border-color .12s; }
+.prtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; margin-bottom: 6px; }
+.prtiles-head { margin-top: 12px; }
+.prtile { display: flex; flex-direction: column; align-items: stretch; padding: 8px 10px; min-width: 0; cursor: pointer; margin: 0; transition: box-shadow .12s, border-color .12s; }
 .prtile:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(16, 24, 40, .1); }
-.prtile-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
-.prtile-head b { flex: 1; min-width: 0; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.prtile-head .n { flex: none; font-size: 11.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 9px; padding: 0 7px; }
-.prtile-client { font-size: 12px; color: var(--muted); margin: -4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.prtile ul { list-style: none; margin: 0; padding: 0; }
-.prtile li { display: flex; font-size: 13px; padding: 3px 0; border-top: 1px solid var(--border); }
-.prtile li a { color: inherit; text-decoration: none; display: flex; gap: 8px; align-items: baseline; min-width: 0; flex: 1; }
-.prtile li a:hover .t { text-decoration: underline; color: var(--primary); }
-.prtile li .d { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 58px; }
-.prtile li .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 5px; }
+.prtile-head b { flex: 1; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-head .n { flex: none; font-size: 11px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 9px; padding: 0 6px; }
+.prtile-client { font-size: 11.5px; color: var(--muted); margin: -4px 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtile-last { display: flex; gap: 6px; align-items: baseline; min-width: 0; margin-top: auto; padding-top: 5px; border-top: 1px solid var(--border); font-size: 12px; color: inherit; text-decoration: none; }
+.prtile-last:hover .t { text-decoration: underline; color: var(--primary); }
+.prtile-last .d { flex: none; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.prtile-last .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg .seg-lbl { align-self: center; font-size: 12.5px; color: var(--muted); padding: 0 8px; }
 .prtile-more { margin-top: auto; padding-top: 4px; font-size: 12px; color: var(--primary); }
 .dproto { display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .dproto .proto-head { flex: 1; min-width: 240px; text-decoration: none; color: inherit; }
@@ -1580,7 +1580,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     $$('[data-ds]', el).forEach((b) => b.addEventListener('click', () => { ui.dashStatus = ui.dashStatus === b.dataset.ds ? '' : b.dataset.ds; renderDashboard(el); }));
     bindProjCards(el);
     $$('[data-task]', el).forEach((li) => li.addEventListener('click', () => openTaskForm(byId(db.tasks, li.dataset.task))));
-    $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; ui.protoGroup = 'date'; ui.protoKind = protoKind(byId(db.protocols, li.dataset.proto) || {}); ui.protoProject = ''; ui.protoTpl = ''; ui.protoQ = ''; location.hash = 'protocols'; }));
+    $$('[data-proto]', el).forEach((li) => li.addEventListener('click', () => { ui.openProto = li.dataset.proto; const dpr = byId(db.protocols, li.dataset.proto) || {}; ui.protoOpenGroup = dpr.projectId || '_none'; ui.protoKind = protoKind(dpr); ui.protoProject = ''; ui.protoTpl = ''; ui.protoQ = ''; location.hash = 'protocols'; }));
     const dc = $('#dashCal', el);
     if (dc) G.calendar.events(2).then((evs) => { if (document.body.contains(dc)) dc.innerHTML = eventsHtml(evs) || '<div class="empty">אין אירועים היום ומחר</div>'; })
       .catch(() => { if (document.body.contains(dc)) dc.innerHTML = '<div class="hint">לא ניתן לטעון את היומן כרגע</div>'; });
@@ -4170,7 +4170,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       .sort((a, b) => b.date.localeCompare(a.date));
     const cardHtml = (e, o) => (e.site ? protoCardHtml(e.site, o) : driveProtoHtml(e.drive, o));
     let body;
-    if (ui.protoGroup !== 'date') {
+    {
       // One group per project (or client folder), the one with the most recent document first.
       const map = new Map();
       list.forEach((e) => {
@@ -4178,7 +4178,9 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         if (!map.has(k)) map.set(k, { k, p: e.p, label: e.p ? e.p.name : e.drive && e.drive.group ? e.drive.group : 'כללי / ללא פרויקט', items: [] });
         map.get(k).items.push(e);
       });
-      const groups = Array.from(map.values()).sort((a, b) => (a.k === '_none') - (b.k === '_none') || (b.items[0].date || '').localeCompare(a.items[0].date || ''));
+      const byLatest = (a, b) => (a.k === '_none') - (b.k === '_none') || (b.items[0].date || '').localeCompare(a.items[0].date || '');
+      const groups = Array.from(map.values()).sort(byLatest);
+      groups.forEach((g) => { g.client = (g.p && (g.p.client || '').trim()) || (!g.p && g.k !== '_none' ? g.label.split(' · ')[0].trim() : '') || ''; });
       const noun = kind === 'report' ? 'דוחות' : 'סיכומים';
       const groupHead = (g) => `<div class="group-head"><h2>${g.p ? `<a href="${projectHref(g.p)}">${esc(g.label)}</a>` : esc(g.label)}</h2>
           <span class="count">${g.items.length} ${noun}${g.p && g.p.client ? ' · ' + esc(g.p.client) : ''}</span>
@@ -4191,29 +4193,38 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       } else if (q || ui.protoProject) {
         body = groups.map((g) => groupHead(g) + g.items.map((e) => cardHtml(e, { hideProject: true })).join('')).join('');
       } else {
-        // A dense grid: one small tile per project with its 3 latest documents, as many projects on screen as fit.
+        // A dense grid of small tiles: one per project, showing only its latest document.
+        // Arranged by date (newest first, a section per month), by client (a section per client) or by project name.
+        const mode = ui.protoGroup === 'client' || ui.protoGroup === 'date' ? ui.protoGroup : 'project';
         const shortDate = (dt) => (dt ? dt.slice(8, 10) + '.' + dt.slice(5, 7) + '.' + dt.slice(2, 4) : '');
-        const row = (e) => {
-          const title = e.site ? (e.site.title || protoHeading(e.site)) : (e.drive.title || e.drive.label);
+        const latest = (e) => {
+          const title = e.site ? ((e.site.subject || '').trim().replace(/\s*\n\s*/g, ' - ') || e.site.title || protoHeading(e.site)) : (e.drive.title || e.drive.label);
+          const inner = `<span class="d">${shortDate(e.date) || '—'}</span><span class="t">${esc(title)}</span>`;
           return e.drive
-            ? `<li><a href="${esc(dpUrl(e.drive.files[0]))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive"><span class="d">${shortDate(e.date)}</span><span class="t">${esc(title)}</span></a></li>`
-            : `<li><a href="#" data-tileproto="${esc(e.site.id)}"><span class="d">${shortDate(e.date)}</span><span class="t">${esc(title)}</span></a></li>`;
+            ? `<a class="prtile-last" href="${esc(dpUrl(e.drive.files[0]))}" target="_blank" rel="noopener" title="${esc(title)} · פתיחה ב-Google Drive">${inner}</a>`
+            : `<a class="prtile-last" href="#" data-tileproto="${esc(e.site.id)}" title="${esc(title)}">${inner}</a>`;
         };
-        body = `<div class="prtiles">${groups.map((g) => `<div class="card prtile" data-tile="${esc(g.k)}" title="כל ה${noun} של ${esc(g.label)}">
+        const tile = (g) => `<div class="card prtile" data-tile="${esc(g.k)}" title="כל ה${noun} של ${esc(g.label)}">
           <div class="prtile-head"><b>${esc(g.label)}</b><span class="n">${g.items.length}</span></div>
-          ${g.p && g.p.client ? `<div class="prtile-client">${esc(g.p.client)}</div>` : ''}
-          <ul>${g.items.slice(0, 3).map(row).join('')}</ul>
-          ${g.items.length > 3 ? `<div class="prtile-more">עוד ${g.items.length - 3} ←</div>` : ''}
-        </div>`).join('')}</div>`;
+          ${g.client && mode !== 'client' ? `<div class="prtile-client">${esc(g.client)}</div>` : ''}
+          ${latest(g.items[0])}
+        </div>`;
+        let sections;
+        if (mode === 'date') {
+          const sm = new Map();
+          groups.forEach((g) => { const k = (g.items[0].date || '').slice(0, 7); if (!sm.has(k)) sm.set(k, []); sm.get(k).push(g); });
+          sections = Array.from(sm.entries()).map(([k, gs]) => ({ label: k ? new Date(k + '-01T00:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' }) : 'ללא תאריך', groups: gs }));
+        } else if (mode === 'client') {
+          const sm = new Map();
+          groups.forEach((g) => { const k = g.client || ''; if (!sm.has(k)) sm.set(k, []); sm.get(k).push(g); });
+          sections = Array.from(sm.entries()).sort((a, b) => (!a[0]) - (!b[0]) || a[0].localeCompare(b[0], 'he'))
+            .map(([k, gs]) => ({ label: k || 'ללא לקוח', groups: gs }));
+        } else {
+          sections = [{ label: '', groups: groups.slice().sort((a, b) => (a.k === '_none') - (b.k === '_none') || a.label.localeCompare(b.label, 'he')) }];
+        }
+        body = sections.map((sec) => (sec.label ? `<div class="group-head prtiles-head"><h2>${esc(sec.label)}</h2><span class="count">${sec.groups.length} פרויקטים</span></div>` : '')
+          + `<div class="prtiles">${sec.groups.map(tile).join('')}</div>`).join('');
       }
-    } else {
-      // By date: one section per month, newest first.
-      const map = new Map();
-      list.forEach((e) => { const k = (e.date || '').slice(0, 7); if (!map.has(k)) map.set(k, []); map.get(k).push(e); });
-      body = Array.from(map.entries()).map(([k, items]) => {
-        const label = k ? new Date(k + '-01T00:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' }) : 'ללא תאריך';
-        return `<div class="group-head"><h2>${esc(label)}</h2><span class="count">${items.length}</span></div>${items.map((e) => cardHtml(e)).join('')}`;
-      }).join('');
     }
     const withProtos = db.projects.filter((p) => all.some((e) => e.p === p)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he'));
     const kindCount = (k) => db.protocols.filter((pr) => protoKind(pr) === k).length + dprot.items.filter((it) => it.kind === k).length;
@@ -4225,7 +4236,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         ${tpls.map((k) => `<button class="btn sm" data-newtpl="${k}">+ ${esc(PROTO_TPL[k].label)}</button>`).join('')}
       </div>
       <div class="toolbar">
-        <div class="seg"><button data-g="project" class="${ui.protoGroup !== 'date' ? 'on' : ''}">לפי פרויקט</button><button data-g="date" class="${ui.protoGroup === 'date' ? 'on' : ''}">לפי תאריך</button></div>
+        <div class="seg" title="סידור הקוביות"><span class="seg-lbl">מיון:</span>${[['date', 'לפי תאריך'], ['client', 'לפי לקוח'], ['project', 'לפי פרויקט']].map(([k, l]) => `<button data-g="${k}" class="${(ui.protoGroup === k || (k === 'project' && ui.protoGroup !== 'date' && ui.protoGroup !== 'client')) ? 'on' : ''}">${l}</button>`).join('')}</div>
         <input class="input search" id="pq" placeholder="חיפוש ב${PROTO_KINDS[kind]}..." value="${esc(ui.protoQ)}">
         <select class="input" id="pp"><option value="">כל הפרויקטים</option>${withProtos.map((p) => `<option value="${esc(p.id)}" ${p.id === ui.protoProject ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="_none" ${ui.protoProject === '_none' ? 'selected' : ''}>כללי / ללא פרויקט</option></select>
         <select class="input" id="pt"><option value="">כל המקורות</option><option value="drive" ${src === 'drive' ? 'selected' : ''}>מה-Drive (${drive.length})</option>${tpls.map((k) => `<option value="${k}" ${src === k ? 'selected' : ''}>${esc(PROTO_TPL[k].label)} שנכתב באתר (${site.filter((e) => e.site.template === k).length})</option>`).join('')}${kind === 'meeting' ? `<option value="_other" ${src === '_other' ? 'selected' : ''}>סיכומים קודמים באתר</option>` : ''}</select>
