@@ -745,8 +745,9 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .pd-dir { cursor: pointer; user-select: none; }
 /* Drive file preview: a panel on the side (full screen on a phone) */
 .g-file.fp-on { background: var(--primary-soft); border-radius: 6px; }
-.fpv { position: fixed; inset: 0; background: var(--surface); z-index: 55; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transition: opacity .15s ease, visibility .15s; }
-.fpv.show { opacity: 1; visibility: visible; }
+.fpv { position: fixed; top: 0; bottom: 0; left: 0; width: min(760px, 50vw); background: var(--surface); box-shadow: 4px 0 24px rgba(0,0,0,.18); z-index: 55; display: flex; flex-direction: column; transform: translateX(-105%); transition: transform .18s ease; }
+.fpv.show { transform: none; }
+@media (max-width: 900px) { .fpv { width: 100%; } }
 .fpv-head { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 .fpv-head img { width: 18px; height: 18px; flex-shrink: 0; }
 .fpv-title { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
