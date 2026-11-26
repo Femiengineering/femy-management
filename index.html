@@ -2191,9 +2191,11 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     'החברה הממשלתית לתיירות': 'https://igtc.co.il/wp-content/uploads/2025/03/logo-1.png',
     'ערים': 'https://www.arim.co.il/Media/Uploads/logo(1).png',
     'עיריית ראש העין': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Coat_of_arms_of_Rosh_HaAyin.svg/250px-Coat_of_arms_of_Rosh_HaAyin.svg.png',
+    // No logo: the building's rendering, from the project's Drive folder ("שמידמן 3 - זווית א - מעודכן").
+    'שמידמן': 'icons/clients/schmidman-3.jpg',
   };
   // Client names as they appear on the site or in the sheet -> a key of WEB_LOGOS.
-  const WEB_LOGO_NAMES = [[/מכבי/, 'מכבי'], [/נתיבות/, 'עיריית נתיבות'], [/בני ברק/, 'עיריית בני ברק'], [/ממשלתית לתיירות|חמ"ת/, 'החברה הממשלתית לתיירות'], [/אלעד|^ערים/, 'ערים'], [/ראש העין/, 'עיריית ראש העין']];
+  const WEB_LOGO_NAMES = [[/מכבי/, 'מכבי'], [/נתיבות/, 'עיריית נתיבות'], [/בני ברק/, 'עיריית בני ברק'], [/ממשלתית לתיירות|חמ"ת/, 'החברה הממשלתית לתיירות'], [/אלעד|^ערים/, 'ערים'], [/ראש העין/, 'עיריית ראש העין'], [/שמידמן/, 'שמידמן']];
   function webLogo(name) { const m = WEB_LOGO_NAMES.find(([re]) => re.test(name || '')); return m ? WEB_LOGOS[m[1]] : ''; }
   // The client's logo: the uploaded one (a photo id), else the website's, else the initials.
   function clientLogoHtml(name, lg, imgCls, avCls) {
