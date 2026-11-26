@@ -2003,7 +2003,34 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // A project's folder name in Drive (it can differ from the project name in the site); falls back to the project name.
   const folderNames = {};
   // The path of a file or folder in a project, under the projects folder (as localPath() takes it).
+  // A project folder can sit deeper than the projects folder (client \ sub-client \ project), so the path is
+  // the chain of folder names up to the projects folder: from the background sync's folder tree, else from Drive.
+  const folderChains = {};
+  async function projFolderChain(p) {
+    const id = p.driveFolder; if (!id) return null;
+    if (folderChains[id]) return folderChains[id];
+    const root = (window.FEMY_GOOGLE && window.FEMY_GOOGLE.projectsFolderId) || '';
+    if (!root) return null;
+    const walk = async (parentOf) => {
+      const names = []; let at = id;
+      for (let g = 0; at && g < 25; g++) {
+        if (at === root) return names;
+        const x = await parentOf(at); if (!x) return null;
+        names.unshift(x[1]); at = x[0];
+      }
+      return null;
+    };
+    const tree = Object.assign({}, (dprot.base && dprot.base.folders) || {}, dprot.folders || {});
+    let chain = await walk(async (at) => tree[at] || null);
+    if (!chain && GOOGLE && G.valid()) {
+      try { chain = await walk(async (at) => { const m = await G.drive.meta(at, 'id,name,parents'); return m && m.name ? [(m.parents || [])[0] || '', m.name] : null; }); } catch (e) { chain = null; }
+    }
+    if (chain && chain.length) folderChains[id] = chain;
+    return chain && chain.length ? chain : null;
+  }
   async function projLocalParts(p, sub) {
+    let chain = null; try { chain = await projFolderChain(p); } catch (e) { chain = null; }
+    if (chain) return chain.concat(sub || []);
     let name = folderNames[p.driveFolder] || p.name;
     if (!folderNames[p.driveFolder] && GOOGLE && G.valid() && p.driveFolder) { try { name = folderNames[p.driveFolder] = (await G.drive.folderName(p.driveFolder)) || name; } catch (e) {} }
     return [name].concat(sub || []);
