@@ -2643,8 +2643,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   };
   const gKind = (f) => { const m = fileMime(f); return m.startsWith(GAPPS) ? m.slice(GAPPS.length) : ''; };
   const OPEN_HELPER_KEY = 'femy-open-helper';
-  // The installed helper's version: 1 opens files, 2 also hands a file to WhatsApp. 0: not installed.
-  const OPEN_HELPER_VER = 2;
+  // The installed helper's version: 1 opens files, 2 also hands a file to WhatsApp, 3 opens WhatsApp's contact list. 0: not installed.
+  const OPEN_HELPER_VER = 3;
   const helperVer = () => { try { return Number(localStorage.getItem(OPEN_HELPER_KEY)) || 0; } catch (e) { return 0; } };
   const openHelper = () => helperVer() > 0;
   const setOpenHelper = (on) => { try { if (on) localStorage.setItem(OPEN_HELPER_KEY, String(on === true ? OPEN_HELPER_VER : on)); else localStorage.removeItem(OPEN_HELPER_KEY); } catch (e) {} };
@@ -2816,18 +2816,18 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // where the browser cannot share files, WhatsApp opens with a link to the file in Drive.
   async function shareFileWhatsApp(f, w) {
     w = w || window;
-    if (helperVer() >= 2 && !gKind(f)) {
+    if (helperVer() >= 3 && !gKind(f)) {
       const parts = await fpv.parts;
       if (parts && parts.length) {
         const d = w.document; const a = d.createElement('a'); a.href = 'femy-open:wa/' + encodeURIComponent(localPath(parts));
         d.body.appendChild(a); a.click(); a.remove();
-        fpvToast('וואטסאפ נפתח: בחרו איש קשר, ואז Ctrl+V מדביק את הקובץ ו-Enter שולח');
+        fpvToast('וואטסאפ נפתח: בחרו איש קשר ושלחו, ואז Ctrl+V מדביק את הקובץ עצמו ו-Enter שולח אותו');
         return;
       }
     }
     // Without the updated helper, the file is not sent through the browser's share window (WhatsApp got it there
     // with a broken Hebrew name): the panel shows the one-time install/update instead.
-    if (!gKind(f) && helperVer() < 2) {
+    if (!gKind(f) && helperVer() < 3) {
       askOpenHelper();
       fpvToast(openHelper() ? 'כדי לשלוח בוואטסאפ את הקובץ המקורי, עדכנו פעם אחת את הפתיחה הישירה (הכפתור בתחתית החלון)' : 'כדי לשלוח בוואטסאפ את הקובץ המקורי, צריך התקנה חד-פעמית קטנה (פרטים בתחתית החלון)');
       return;
@@ -2900,7 +2900,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       "if (has(p) && act === 'wa' && fso.FileExists(p)) {",
       "  var q = String.fromCharCode(39), dq = String.fromCharCode(34);",
       "  sh.Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command ' + dq + 'Set-Clipboard -LiteralPath ' + q + p.split(q).join(q + q) + q + dq, 0, true);",
-      "  try { new ActiveXObject('Shell.Application').ShellExecute('whatsapp://send?text=', '', '', 'open', 1); }",
+      "  // With a text, WhatsApp opens its 'send to' list to pick a contact; the file name is that text.",
+      "  try { new ActiveXObject('Shell.Application').ShellExecute('whatsapp://send?text=' + encodeURIComponent(p.split(String.fromCharCode(92)).pop()), '', '', 'open', 1); }",
       "  catch (e) { say('WhatsApp לא מותקן במחשב. הקובץ הועתק: אפשר להדביק אותו (Ctrl+V) בכל מקום.'); }",
       "}",
       "else if (has(p)) new ActiveXObject('Shell.Application').ShellExecute(p, '', '', 'open', 1);",
