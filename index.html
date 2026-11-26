@@ -745,7 +745,7 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .pd-dir { cursor: pointer; user-select: none; }
 /* Drive file preview: a panel on the side (full screen on a phone) */
 .g-file.fp-on { background: var(--primary-soft); border-radius: 6px; }
-.fpv { position: fixed; top: 0; bottom: 0; left: 0; width: min(760px, 50vw); background: var(--surface); box-shadow: 4px 0 24px rgba(0,0,0,.18); z-index: 55; display: flex; flex-direction: column; transform: translateX(-105%); transition: transform .18s ease; }
+.fpv { position: fixed; top: 0; bottom: 0; left: 0; width: min(560px, 40vw); background: var(--surface); box-shadow: 4px 0 24px rgba(0,0,0,.18); z-index: 55; display: flex; flex-direction: column; transform: translateX(-105%); transition: transform .18s ease; }
 .fpv.show { transform: none; }
 @media (max-width: 900px) { .fpv { width: 100%; } }
 .fpv-head { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
@@ -2643,17 +2643,21 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   };
   const gKind = (f) => { const m = fileMime(f); return m.startsWith(GAPPS) ? m.slice(GAPPS.length) : ''; };
   const OPEN_HELPER_KEY = 'femy-open-helper';
-  const openHelper = () => { try { return localStorage.getItem(OPEN_HELPER_KEY) === '1'; } catch (e) { return false; } };
-  const setOpenHelper = (on) => { try { if (on) localStorage.setItem(OPEN_HELPER_KEY, '1'); else localStorage.removeItem(OPEN_HELPER_KEY); } catch (e) {} };
-  // The installer reopens the site with ?femyopen=1 when it finishes: turn direct opening on for this browser.
-  if (new URLSearchParams(location.search).get('femyopen') === '1') {
-    setOpenHelper(true);
+  // The installed helper's version: 1 opens files, 2 also hands a file to WhatsApp. 0: not installed.
+  const OPEN_HELPER_VER = 2;
+  const helperVer = () => { try { return Number(localStorage.getItem(OPEN_HELPER_KEY)) || 0; } catch (e) { return 0; } };
+  const openHelper = () => helperVer() > 0;
+  const setOpenHelper = (on) => { try { if (on) localStorage.setItem(OPEN_HELPER_KEY, String(on === true ? OPEN_HELPER_VER : on)); else localStorage.removeItem(OPEN_HELPER_KEY); } catch (e) {} };
+  // The installer reopens the site with ?femyopen=<version> when it finishes: turn direct opening on for this browser.
+  const femyOpenParam = Number(new URLSearchParams(location.search).get('femyopen')) || 0;
+  if (femyOpenParam) {
+    setOpenHelper(femyOpenParam);
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
     setTimeout(() => toast('הפתיחה הישירה הופעלה: "פתיחה" יפתח קבצים ישר בתוכנה במחשב'), 1200);
   }
   const fpv = { f: null, parts: null, hasParts: false, url: '', blob: null, row: null, el: null, win: null };
-  // The preview opens in its own small browser window (one window, reused for every file). When the browser
-  // blocks it, it falls back to a panel on the side of the page.
+  // The preview in its own small browser window (one window, reused for every file). Not used now: the
+  // preview is a panel on the left of the page.
   function previewWindow() {
     const W = Math.min(860, Math.round(screen.availWidth * 0.55)), H = Math.min(980, Math.round(screen.availHeight * 0.82));
     let pw = fpv.win && !fpv.win.closed ? fpv.win : null;
@@ -2684,9 +2688,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     t.textContent = msg; t.classList.add('show'); clearTimeout(fpvToastT); fpvToastT = setTimeout(() => t.classList.remove('show'), 3200);
   }
   function filePreviewEl() {
-    const pop = previewWindow();
-    if (pop) { fpv.win = pop.pw; return pop.el; }
-    fpv.win = null;
+    fpv.win = null; // a panel on the left of the page (previewWindow() opened it in its own window)
     let el = $('#filePreview');
     if (el) return el;
     el = document.createElement('aside'); el.id = 'filePreview'; el.className = 'fpv'; el.setAttribute('aria-label', 'תצוגה מקדימה');
@@ -2734,7 +2736,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const doc = el.ownerDocument;
     $('[data-fpopen]', el).addEventListener('click', () => openFileLocal(f, false, undefined, doc));
     $('[data-fpdown]', el).addEventListener('click', () => downloadDriveFile(f));
-    $('[data-fpmail]', el).addEventListener('click', () => shareFileMail(f));
+    $('[data-fpmail]', el).addEventListener('click', () => shareFileMail(f, doc.defaultView));
     $('[data-fpwa]', el).addEventListener('click', () => shareFileWhatsApp(f, doc.defaultView));
     const dir = $('[data-fpdir]', el); if (dir) dir.addEventListener('click', () => openFileLocal(f, true, undefined, doc));
     const cp = $('[data-fpcopy]', el); if (cp) cp.addEventListener('click', async () => { const p = await fpv.parts; if (p) copyPath(p); });
@@ -2799,10 +2801,22 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   }
   // By mail: a new message from the user's Gmail (the site's mail window) with the file attached;
   // a file too big for Gmail goes as a Drive link.
-  async function shareFileMail(f) {
-    if (!GOOGLE || !G.valid()) { window.open('mailto:?subject=' + encodeURIComponent(f.name) + '&body=' + encodeURIComponent(driveFileUrl(f)), '_blank'); return; }
+  async function shareFileMail(f, w) {
+    w = w || window;
+    if (!GOOGLE || !G.valid()) { w.open('mailto:?subject=' + encodeURIComponent(f.name) + '&body=' + encodeURIComponent(driveFileUrl(f)), '_blank'); return; }
+    // The new Gmail window is opened right away (from the click), and filled when the draft is ready.
+    const gw = w.open('', '_blank');
+    if (gw) try { gw.document.write('<p dir="rtl" style="font:16px sans-serif;padding:24px">מכין מייל חדש עם הקובץ מצורף...</p>'); } catch (e) {}
     fpvToast('מכין את הקובץ למייל...');
     let x = null; try { x = await driveFileBlob(f); } catch (e) { x = null; }
+    if (x && x.blob.size < 24 * 1024 * 1024 && gw) {
+      try {
+        const r = await G.gmail.draft({ to: '', subject: x.name, text: '', attachments: [{ name: x.name, blob: x.blob }] });
+        const mid = r && r.message && r.message.id;
+        if (mid) { gw.location = 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(G.status().email || '') + '#drafts?compose=' + encodeURIComponent(mid); return; }
+      } catch (e) { /* no permission for drafts: the site's own mail window below */ }
+    }
+    if (gw) try { gw.close(); } catch (e) {}
     if (x && x.blob.size < 24 * 1024 * 1024) mbCompose({ subject: x.name, fwdFiles: [{ name: x.name, blob: x.blob, size: x.blob.size }] });
     else mbCompose({ subject: f.name, html: `<a href="${esc(driveFileUrl(f))}">${esc(f.name)}</a>` });
     try { window.focus(); } catch (e) {}
@@ -2812,6 +2826,16 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // where the browser cannot share files, WhatsApp opens with a link to the file in Drive.
   async function shareFileWhatsApp(f, w) {
     w = w || window;
+    if (helperVer() >= 2 && !gKind(f)) {
+      const parts = await fpv.parts;
+      if (parts && parts.length) {
+        const d = w.document; const a = d.createElement('a'); a.href = 'femy-open:wa/' + encodeURIComponent(localPath(parts));
+        d.body.appendChild(a); a.click(); a.remove();
+        fpvToast('וואטסאפ נפתח: בחרו איש קשר, ואז Ctrl+V מדביק את הקובץ ו-Enter שולח');
+        return;
+      }
+    }
+    if (openHelper() && helperVer() < 2) fpvToast('לשליחה ישירה בוואטסאפ, עדכנו את הפתיחה הישירה: הכפתור "עדכון הפתיחה הישירה" בלשונית Drive');
     const nav = w.navigator;
     if (nav.share && nav.canShare) {
       try {
@@ -2862,6 +2886,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       "function say(t) { sh.Popup(t, 0, 'Femy', 48); }",
       "var a = WScript.Arguments.length ? String(WScript.Arguments(0)) : '';",
       "var p = a.replace(/^femy-open:(\\/\\/)?/i, '').replace(/\\/$/, '');",
+      "var act = 'open'; if (/^wa\\//i.test(p)) { act = 'wa'; p = p.slice(3); }",
       "try { p = decodeURIComponent(p); } catch (e) { p = ''; }",
       "p = p.replace(/\\//g, '\\\\');",
       "var BAD = /\\.(exe|com|bat|cmd|ps1|psm1|psd1|vbs|vbe|js|jse|wsf|wsh|wsc|msi|msp|mst|lnk|scr|hta|reg|cpl|jar|pif|url|scf|inf|dll|sys|ocx|application|appref-ms|msc|gadget|settingcontent-ms|library-ms|search-ms|diagcab|appx|appxbundle|msix|msixbundle|appinstaller|iso|img|vhd|vhdx|chm|theme|themepack|xll|xla|xlam|ppa|ppam|website|mht|mhtml|ws)$/i;",
@@ -2876,7 +2901,13 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       "    for (var i = 0; i < c.length; i++) if (has(c[i])) { p = c[i]; break; }",
       "  }",
       "}",
-      "if (has(p)) new ActiveXObject('Shell.Application').ShellExecute(p, '', '', 'open', 1);",
+      "if (has(p) && act === 'wa' && fso.FileExists(p)) {",
+      "  var q = String.fromCharCode(39), dq = String.fromCharCode(34);",
+      "  sh.Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command ' + dq + 'Set-Clipboard -LiteralPath ' + q + p.split(q).join(q + q) + q + dq, 0, true);",
+      "  try { new ActiveXObject('Shell.Application').ShellExecute('whatsapp://send?text=', '', '', 'open', 1); }",
+      "  catch (e) { say('WhatsApp לא מותקן במחשב. הקובץ הועתק: אפשר להדביק אותו (Ctrl+V) בכל מקום.'); }",
+      "}",
+      "else if (has(p)) new ActiveXObject('Shell.Application').ShellExecute(p, '', '', 'open', 1);",
       "else say('הקובץ לא נמצא במחשב:\\n' + p + '\\n\\nודאו ש-Google Drive למחשב פועל, ושאות הכונן באתר נכונה.');",
     ].join('\r\n').replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
     const b64 = btoa(js);
@@ -2891,7 +2922,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       'reg add "HKCU\\Software\\Classes\\femy-open\\shell\\open\\command" /ve /d "wscript.exe //E:jscript \\"%D%\\open.js\\" \\"%%1\\"" /f >nul',
       'echo.',
       'echo Done. Femy can now open Drive files on this computer.',
-      `start "" "${(location.origin + location.pathname).replace(/[^A-Za-z0-9:/._~%-]/g, encodeURIComponent).replace(/%/g, '%%')}?femyopen=1#google"`,
+      `start "" "${(location.origin + location.pathname).replace(/[^A-Za-z0-9:/._~%-]/g, encodeURIComponent).replace(/%/g, '%%')}?femyopen=${OPEN_HELPER_VER}#google"`,
       'echo To remove: reg delete "HKCU\\Software\\Classes\\femy-open" /f',
       'pause',
       '',
@@ -6045,7 +6076,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         ${tab === 'calendar' ? '<button class="btn primary" data-gnew>+ אירוע חדש</button>' : ''}
         ${tab === 'gmail' ? '<button class="btn primary" data-gnew>+ מייל חדש</button>' : ''}
         ${tab === 'drive' ? `<label class="g-local" title="אות הכונן של Google Drive למחשב, לכפתורי העתקת הנתיב">כונן במחשב <select id="gLetter">${'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => `<option ${l === localDrive().letter ? 'selected' : ''}>${l}</option>`).join('')}</select>:</label>` : ''}
-        ${tab === 'drive' ? `<button class="btn" id="gOpenSetup" title="התקנה חד-פעמית כדי ש'פתיחה' יפתח קבצים ישר בתוכנה במחשב">${openHelper() ? '✓ פתיחה ישירה פעילה' : '🖥 התקנת פתיחה ישירה במחשב'}</button>` : ''}
+        ${tab === 'drive' ? `<button class="btn" id="gOpenSetup" title="התקנה חד-פעמית כדי ש'פתיחה' יפתח קבצים ישר בתוכנה במחשב">${!openHelper() ? '🖥 התקנת פתיחה ישירה במחשב' : helperVer() < OPEN_HELPER_VER ? '🖥 עדכון הפתיחה הישירה (וואטסאפ)' : '✓ פתיחה ישירה פעילה'}</button>` : ''}
         ${tab === 'drive' && ui.gDrivePath.length ? '<label class="btn primary">⬆ העלאת קובץ לתיקייה<input type="file" id="gUpload" hidden></label>' : ''}
       </div>
       <div class="card card-pad" id="gArea"></div>`;
