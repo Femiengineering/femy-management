@@ -2482,7 +2482,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const GANTT_Q = ['גאנט', 'גנט', 'gantt', 'לוח זמנים', 'לוחות זמנים', 'לו"ז', 'לוז'];
   const GANTT_MIME = (m) => /pdf|spreadsheet|excel|sheet/.test(m || '');
   const ganttChecked = {};
-  const ganttCanSync = (p) => !!(p && p.driveFolder && GOOGLE && G.valid() && G.drive && G.drive.search && window.FemyGantt) && !(p.ganttFile && p.ganttFile.none);
+  const ganttCanSync = (p) => !!(p && p.driveFolder && GOOGLE && G.valid() && (!G.silent || G.silent()) && G.drive && G.drive.search && window.FemyGantt) && !(p.ganttFile && p.ganttFile.none);
   const ganttFileRows = (p) => (p.ganttSrc && p.ganttSrc.rows && p.ganttSrc.rows.length && !(p.ganttFile && p.ganttFile.none) ? p.ganttSrc.rows : null);
   let pdfjsLoading = null;
   function loadPdfjs() {
@@ -2617,7 +2617,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // ---------- The project's folders in Drive that the tiles open ----------
   // Plans: a folder "תכניות" / "תוכניות" at the top of the project folder. Documents: "ניהול ובקרה". Accounts: every
   // folder whose name has "חשבונ" at the top or inside "ניהול ובקרה", and the folders the user added (p.accFolders).
-  const PLAN_RE = /^ת(ו)?כניות/; const MGMT_RE = /ניהול\s*ו?בקרה/; const ACC_RE = /חשבונ/;
+  // תכניות, תוכניות, תכנית, תוכנית
+  const PLAN_RE = /^ת(ו)?כני(ו)?ת/; const MGMT_RE = /ניהול\s*ו?בקרה/; const ACC_RE = /חשבונ/;
   const projSubCache = {};
   function projSubFolders(p) {
     const k = p.driveFolder;
@@ -2626,7 +2627,9 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     if (c && Date.now() - c.at < 5 * 60 * 1000) return c.pr;
     const pr = (async () => {
       const top = (await listDriveFolder(k)).files.filter((f) => f.folder);
-      const pick = (re) => top.filter((f) => re.test((f.name || '').trim())).sort((x, y) => x.name.length - y.name.length)[0] || null;
+      // Names as typed in Drive may carry invisible direction marks; the plainest name wins ("תכניות" before "תכניות מכרז").
+      const nm = (f) => (f.name || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trim();
+      const pick = (re) => top.filter((f) => re.test(nm(f))).sort((x, y) => nm(x).length - nm(y).length)[0] || null;
       const plans = pick(PLAN_RE); const docs = pick(MGMT_RE);
       const acc = top.filter((f) => ACC_RE.test(f.name)).map((f) => ({ id: f.id, name: f.name.trim(), path: [{ id: f.id, name: f.name }] }));
       if (docs) {
@@ -2806,7 +2809,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     if (p.driveFolder) {
       projSubFolders(p).then((sub) => {
         if (!document.body.contains(el)) return;
-        [['plans', sub.plans, 'תכניות'], ['docs', sub.docs, 'ניהול ובקרה']].forEach(([k, f, nm]) => {
+        [['plans', sub.plans, 'תכניות / תוכניות'], ['docs', sub.docs, 'ניהול ובקרה']].forEach(([k, f, nm]) => {
           if (!f) { set(k, '📁', `אין תיקיית "${nm}" · לכל התיקיות`); return; }
           listDriveFolder(f.id).then((r) => {
             const fo = r.files.filter((x) => x.folder).length; const fi = r.files.length - fo;
@@ -3045,7 +3048,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
           if (!document.body.contains(box)) return;
           const f = sub[sec];
           if (f) { projBrowse(p, box, sec, [{ id: f.id, name: f.name }]); return; }
-          box.innerHTML = `<div class="hint" style="margin-bottom:10px">לא נמצאה בתיקיית הפרויקט תיקייה בשם "${sec === 'plans' ? 'תכניות' : 'ניהול ובקרה'}".</div><a class="btn sm" href="${projSecHref(p, 'folders')}">📁 לכל תיקיות הפרויקט</a>`;
+          box.innerHTML = `<div class="hint" style="margin-bottom:10px">לא נמצאה בתיקייה הראשית של הפרויקט תיקייה בשם ${sec === 'plans' ? '"תכניות" או "תוכניות"' : '"ניהול ובקרה"'}.</div><a class="btn sm" href="${projSecHref(p, 'folders')}">📁 לכל תיקיות הפרויקט</a>`;
         }).catch((e) => { if (document.body.contains(box)) box.innerHTML = `<div class="hint">לא ניתן לקרוא את תיקיית הפרויקט (${esc(gErr(e))})</div>`; });
       }
     } else if (sec === 'gallery') {
@@ -3103,9 +3106,13 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // folders and documents the protocols sync already knows.
   const driveFolderUrl = (id) => 'https://drive.google.com/drive/folders/' + encodeURIComponent(id);
   async function listDriveFolder(id) {
-    if (GOOGLE && G.valid()) {
-      try { const r = await G.drive.browse(id, {}); return { files: r.files, src: 'google' }; }
-      catch (e) { if (!SYNC) throw e; }
+    // Straight from Google only when a token is at hand without a popup (a popup asked for here, not from a click,
+    // is blocked and the list would wait forever), and never longer than 15 seconds; otherwise the sync server.
+    if (GOOGLE && G.valid() && (!G.silent || G.silent() || !SYNC)) {
+      try {
+        const r = await Promise.race([G.drive.browse(id, {}), new Promise((_, rej) => setTimeout(() => rej(new Error('Google לא ענה בזמן')), 15000))]);
+        return { files: r.files, src: 'google' };
+      } catch (e) { if (!SYNC) throw e; }
     }
     if (SYNC) {
       try {
