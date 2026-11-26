@@ -367,6 +367,25 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .gt-ms.od { background: var(--red); }
 .gt-sub { padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--gray-soft); border-top: 1px solid var(--border); }
 .pc-legend .gt-ld { background: var(--purple); border-radius: 2px; transform: rotate(45deg); }
+.gt-now { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.gt-now .gantt-title { margin: 0; }
+.phase-card.open .gt-full { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gt-tot { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.gt-tot strong { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
+.gt-tot .gt-tbar { position: relative; width: 120px; height: 8px; border-radius: 4px; background: #dde4ee; overflow: visible; }
+.gt-tot .gt-tbar > span { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 4px; background: var(--primary); }
+.gt-tot .gt-tbar.late > span { background: var(--red); } .gt-tot .gt-tbar.done > span { background: var(--green); }
+.gt-tot .gt-tbar > i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--amber); }
+.gt-cur { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1 1 240px; min-width: 0; font-size: 13px; }
+.gt-cur > b { color: var(--muted); font-weight: 600; }
+.gt-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 9px; border-radius: 999px; background: var(--surface-2, #f6f8fb); border: 1px solid var(--border); }
+.gt-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; min-width: 60px; }
+.gt-chip small { white-space: nowrap; }
+.gt-chip small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.gt-chip.late { border-color: var(--red); } .gt-chip.late small { color: var(--red); }
+.gt-chip.next { border-style: dashed; }
+.gt-toggle { margin-inline-start: auto; }
+.phase-card:not(.open) .gt-full { display: none; }
 .gt-src { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
 .gt-src-acts { display: inline-flex; gap: 4px; margin-inline-start: auto; }
 .gt-src-n { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -2575,15 +2594,62 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     ganttFilesIn(p, true).then((r) => { found = r; draw(); }).catch(() => draw());
     projDriveIndex(p, (x) => { ix = x; draw(); }).then((x) => { ix = x; draw(); }).catch(() => {});
   }
+  // The Gantt in one line: the progress of the whole project against the plan for today, and the stages / tasks
+  // under way now (or the next one). The full chart opens under it (remembered per project in this browser).
+  const ganttOpenKey = 'femy-gantt-open';
+  const ganttOpen = (id) => { try { return !!(JSON.parse(localStorage.getItem(ganttOpenKey) || '{}'))[id]; } catch (e) { return false; } };
+  const setGanttOpen = (id, v) => { try { const o = JSON.parse(localStorage.getItem(ganttOpenKey) || '{}'); if (v) o[id] = 1; else delete o[id]; localStorage.setItem(ganttOpenKey, JSON.stringify(o)); } catch (e) { /* no storage */ } };
+  function ganttNowHtml(p, m) {
+    const file = ganttFileRows(p);
+    const rows = (file || ganttStages(p)).filter((g) => !g.group && !isNaN(isoMs(g.s)) && !isNaN(isoMs(g.e)));
+    const T = isoMs(todayStr());
+    // The whole: each row weighs as much as its days. Without progress in the file, the site's own figure.
+    let tot = null; let plan = null;
+    if (rows.length) {
+      let w = 0; let done = 0; let due = 0; let known = 0;
+      rows.forEach((g) => {
+        const S = isoMs(g.s); const E = isoMs(g.e) + dayMs; const d = Math.max(dayMs, E - S);
+        w += d; due += d * Math.max(0, Math.min(1, (T - S) / d));
+        if (g.pct != null && g.pct !== '') { known++; done += d * Math.max(0, Math.min(100, Number(g.pct) || 0)) / 100; }
+      });
+      plan = Math.round((due / w) * 100);
+      if (known) tot = Math.round((done / w) * 100);
+    }
+    if (tot == null) tot = p.status === 'done' ? 100 : m.cur; // the file has no progress: the one updated on the site
+    const totCls = tot == null ? '' : tot >= 100 ? 'done' : plan != null && plan - tot >= 10 ? 'late' : '';
+    const totHtml = tot != null
+      ? `<span class="gt-tot" title="${esc(`בוצע ${tot}%${plan != null ? ` · מתוכנן להיום ${plan}%` : ''}`)}">התקדמות כוללת <strong>${tot}%</strong><span class="gt-tbar ${totCls}"><span style="width:${tot}%"></span>${plan != null ? `<i style="inset-inline-start:${plan}%"></i>` : ''}</span>${plan != null ? `<small>מתוכנן ${plan}%</small>` : ''}</span>`
+      : plan != null ? `<span class="gt-tot">לפי הלו"ז עברו <strong>${plan}%</strong><span class="gt-tbar"><span style="width:${plan}%;background:#b8c4d3"></span></span></span>` : '';
+    // Now: what runs today, and what should have ended and is not done.
+    const isLate = (g) => g.pct != null && g.pct !== '' && Number(g.pct) < 100 && isoMs(g.e) + dayMs <= T;
+    let now = rows.filter((g) => isoMs(g.s) <= T && T < isoMs(g.e) + dayMs && !(Number(g.pct) >= 100));
+    const late = rows.filter(isLate);
+    let lab = 'עכשיו:';
+    if (!now.length && !late.length) { const nx = rows.filter((g) => isoMs(g.s) > T).sort((a, b) => a.s.localeCompare(b.s)); if (nx.length) { now = nx.filter((g) => g.s === nx[0].s); lab = 'הבא:'; } }
+    const list = late.map((g) => ({ g, late: true })).concat(now.map((g) => ({ g })));
+    const shown = list.slice(0, 4);
+    const chips = shown.map(({ g, late: l }) => {
+      const pct = g.pct != null && g.pct !== '' ? `${Math.round(Number(g.pct) || 0)}%` : '';
+      const when = l ? `היה צריך להסתיים ${fmtDate(g.e)}` : lab === 'הבא:' ? `מ-${fmtDate(g.s)}` : `עד ${fmtDate(g.e)}`;
+      return `<span class="gt-chip${l ? ' late' : lab === 'הבא:' ? ' next' : ''}" title="${esc(`${g.name}: ${fmtDate(g.s)} עד ${fmtDate(g.e)}${pct ? ' · בוצע ' + pct : ''}`)}"><span>${esc(g.name)}</span><small>${pct ? pct + ' · ' : ''}${when}</small></span>`;
+    }).join('');
+    const cur = rows.length ? `<span class="gt-cur"><b>${lab}</b>${chips || '<span class="hint">אין שלב פעיל היום</span>'}${list.length > shown.length ? `<small class="hint">ועוד ${list.length - shown.length}</small>` : ''}</span>` : '<span class="gt-cur hint">עוד אין שלבים בגאנט</span>';
+    const open = ganttOpen(p.id);
+    return `${totHtml}${cur}<button type="button" class="btn sm ghost gt-toggle" data-gtoggle aria-expanded="${open}">${open ? '▴ סגירת הגאנט' : '▾ הגאנט המלא'}</button>`;
+  }
   function phaseCardHtml(p, tasks) {
     const ph = projPhase(p); const m = phaseModel(p, ph);
     const order = ['planning', 'active', 'done'];
     const at = p.status === 'done' ? 2 : order.indexOf(ph);
     const steps = order.map((k, i) => `<span class="${i < at ? 'past' : i === at ? 'on' + (k === 'done' ? ' done' : '') : ''}">${i < at ? '✓ ' : ''}${k === 'done' ? 'הושלם' : PHASES[k]}</span>`).join('');
     const diff = m.plannedNow == null || p.status === 'done' || p.status === 'paused' ? null : m.cur - m.plannedNow;
-    return `<div class="card card-pad phase-card">
-      <div class="phase-top">
+    return `<div class="card card-pad phase-card${ganttOpen(p.id) ? ' open' : ''}">
+      <div class="gt-now">
         <h2 class="gantt-title">לוח גאנט</h2>
+        ${ganttNowHtml(p, m)}
+      </div>
+      <div class="gt-full">
+      <div class="phase-top">
         <div class="phase-steps" title="סטטוס הפרויקט">${steps}</div>
         ${p.status === 'paused' ? pill(PROJECT_STATUS, 'paused') : ''}
         <div class="phase-kpi">
@@ -2594,9 +2660,16 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       </div>
       ${ganttSrcHtml(p)}
       ${ganttHtml(p, tasks)}
+      </div>
     </div>`;
   }
   function bindGantt(p, el) {
+    const tg = $('[data-gtoggle]', el);
+    if (tg) tg.addEventListener('click', () => {
+      const card = tg.closest('.phase-card'); const open = !card.classList.contains('open');
+      card.classList.toggle('open', open); setGanttOpen(p.id, open);
+      tg.setAttribute('aria-expanded', open); tg.textContent = open ? '▴ סגירת הגאנט' : '▾ הגאנט המלא';
+    });
     $$('[data-gadd]', el).forEach((b) => b.addEventListener('click', () => openGanttForm(p)));
     const rf = $('[data-gfresh]', el);
     if (rf) rf.addEventListener('click', () => { rf.disabled = true; rf.textContent = 'קורא את הקובץ...'; syncProjGantt(p, true).then(() => render(), (e) => { toast('קריאת קובץ הגאנט נכשלה: ' + gErr(e)); render(); }); });
