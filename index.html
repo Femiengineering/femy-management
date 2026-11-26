@@ -3434,6 +3434,19 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       if (sh) { Object.keys(p).forEach((k) => { if (k !== 'id' && k !== 'name') sh[k] = p[k]; }); return; }
       db.projects.push(Object.assign({}, p)); added[p.id] = 1; n++;
     });
+    // Clients and projects taken off the site for good: the projects, with their tasks and protocols, and the
+    // client's logo. Invoices stay (they are the company's books), only unlinked from the project.
+    const goneClients = new Set((data.removeClients || []).map(norm));
+    const goneIds = new Set(data.removeProjects || []);
+    db.projects.forEach((p) => { if (goneClients.has(norm(p.client))) goneIds.add(p.id); });
+    if (goneIds.size) {
+      db.projects = db.projects.filter((p) => !goneIds.has(p.id));
+      db.tasks = db.tasks.filter((t) => !goneIds.has(t.projectId));
+      db.protocols = db.protocols.filter((x) => !goneIds.has(x.projectId));
+      (db.invoices || []).forEach((x) => { if (goneIds.has(x.projectId)) x.projectId = ''; });
+    }
+    const logos = settings().clientLogos || {};
+    Object.keys(logos).forEach((k) => { if (goneClients.has(norm(k))) delete logos[k]; });
     // One-time changes to projects already in the system. With "from", a field changes only while it still
     // holds the old value, so what was edited on the site stays.
     let nu = 0;
