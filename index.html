@@ -2603,23 +2603,18 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const file = ganttFileRows(p);
     const rows = (file || ganttStages(p)).filter((g) => !g.group && !isNaN(isoMs(g.s)) && !isNaN(isoMs(g.e)));
     const T = isoMs(todayStr());
-    // The whole: each row weighs as much as its days. Without progress in the file, the site's own figure.
-    let tot = null; let plan = null;
-    if (rows.length) {
-      let w = 0; let done = 0; let due = 0; let known = 0;
-      rows.forEach((g) => {
-        const S = isoMs(g.s); const E = isoMs(g.e) + dayMs; const d = Math.max(dayMs, E - S);
-        w += d; due += d * Math.max(0, Math.min(1, (T - S) / d));
-        if (g.pct != null && g.pct !== '') { known++; done += d * Math.max(0, Math.min(100, Number(g.pct) || 0)) / 100; }
-      });
-      plan = Math.round((due / w) * 100);
-      if (known) tot = Math.round((done / w) * 100);
+    // The progress: how much of the project's time has passed, (today - start) / (end - start). The dates are the
+    // project's own (start / end in "עריכה"); without them, the first and last dates of the Gantt.
+    const ss = rows.map((g) => g.s).sort(); const es = rows.map((g) => g.e).sort();
+    const pS = p.start || ss[0] || ''; const pE = p.end || es[es.length - 1] || '';
+    let tot = null;
+    if (p.status === 'done') tot = 100;
+    else if (pS && pE && !isNaN(isoMs(pS)) && !isNaN(isoMs(pE)) && pE > pS) {
+      tot = Math.round(Math.max(0, Math.min(1, (T - isoMs(pS)) / (isoMs(pE) + dayMs - isoMs(pS)))) * 100);
     }
-    if (tot == null) tot = p.status === 'done' ? 100 : m.cur; // the file has no progress: the one updated on the site
-    const totCls = tot == null ? '' : tot >= 100 ? 'done' : plan != null && plan - tot >= 10 ? 'late' : '';
     const totHtml = tot != null
-      ? `<span class="gt-tot" title="${esc(`בוצע ${tot}%${plan != null ? ` · מתוכנן להיום ${plan}%` : ''}`)}">התקדמות כוללת <strong>${tot}%</strong><span class="gt-tbar ${totCls}"><span style="width:${tot}%"></span>${plan != null ? `<i style="inset-inline-start:${plan}%"></i>` : ''}</span>${plan != null ? `<small>מתוכנן ${plan}%</small>` : ''}</span>`
-      : plan != null ? `<span class="gt-tot">לפי הלו"ז עברו <strong>${plan}%</strong><span class="gt-tbar"><span style="width:${plan}%;background:#b8c4d3"></span></span></span>` : '';
+      ? `<span class="gt-tot" title="${esc(`עבר ${tot}% מזמן הפרויקט: ${fmtDate(pS)} עד ${fmtDate(pE)}`)}">התקדמות <strong>${tot}%</strong><span class="gt-tbar${tot >= 100 ? ' done' : ''}"><span style="width:${tot}%"></span></span></span>`
+      : `<span class="gt-tot hint" title="חסרים תאריכי התחלה וסיום לפרויקט (ב&quot;עריכה&quot;)">התקדמות: חסרים תאריכי התחלה וסיום</span>`;
     // Now: what runs today, and what should have ended and is not done.
     const isLate = (g) => g.pct != null && g.pct !== '' && Number(g.pct) < 100 && isoMs(g.e) + dayMs <= T;
     let now = rows.filter((g) => isoMs(g.s) <= T && T < isoMs(g.e) + dayMs && !(Number(g.pct) >= 100));
