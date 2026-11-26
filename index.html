@@ -2482,7 +2482,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const GANTT_Q = ['גאנט', 'גנט', 'gantt', 'לוח זמנים', 'לוחות זמנים', 'לו"ז', 'לוז'];
   const GANTT_MIME = (m) => /pdf|spreadsheet|excel|sheet/.test(m || '');
   const ganttChecked = {};
-  const ganttCanSync = (p) => !!(p && p.driveFolder && GOOGLE && G.valid() && G.drive && G.drive.search && window.FemyGantt) && !(p.ganttFile && p.ganttFile.none);
+  const ganttCanSync = (p) => !!(p && p.driveFolder && GOOGLE && G.valid() && (!G.silent || G.silent()) && G.drive && G.drive.search && window.FemyGantt) && !(p.ganttFile && p.ganttFile.none);
   const ganttFileRows = (p) => (p.ganttSrc && p.ganttSrc.rows && p.ganttSrc.rows.length && !(p.ganttFile && p.ganttFile.none) ? p.ganttSrc.rows : null);
   let pdfjsLoading = null;
   function loadPdfjs() {
@@ -3103,9 +3103,13 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // folders and documents the protocols sync already knows.
   const driveFolderUrl = (id) => 'https://drive.google.com/drive/folders/' + encodeURIComponent(id);
   async function listDriveFolder(id) {
-    if (GOOGLE && G.valid()) {
-      try { const r = await G.drive.browse(id, {}); return { files: r.files, src: 'google' }; }
-      catch (e) { if (!SYNC) throw e; }
+    // Straight from Google only when a token is at hand without a popup (a popup asked for here, not from a click,
+    // is blocked and the list would wait forever), and never longer than 15 seconds; otherwise the sync server.
+    if (GOOGLE && G.valid() && (!G.silent || G.silent() || !SYNC)) {
+      try {
+        const r = await Promise.race([G.drive.browse(id, {}), new Promise((_, rej) => setTimeout(() => rej(new Error('Google לא ענה בזמן')), 15000))]);
+        return { files: r.files, src: 'google' };
+      } catch (e) { if (!SYNC) throw e; }
     }
     if (SYNC) {
       try {
