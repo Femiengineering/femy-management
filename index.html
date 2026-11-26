@@ -260,11 +260,23 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .pgroup-inner .ptile-grid { padding: 2px 10px 10px; }
 @media (prefers-reduced-motion: reduce) { .pgroup-body, .pg-chev { transition: none; } }
 @media (max-width: 520px) { .pgroup-head { flex-wrap: wrap; } .pgroup-head .pg-sum { flex-basis: 100%; justify-content: flex-start; padding-inline-start: 24px; } }
-.ptile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr)); gap: 5px; }
-.ptile { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); cursor: pointer; font-size: 12px; line-height: 1.3; min-width: 0; }
+.plist { display: flex; flex-direction: column; gap: 6px; }
+.ptile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.ptile { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); cursor: pointer; font-size: 12px; line-height: 1.3; min-width: 0; }
 .ptile:hover { border-color: var(--primary); background: var(--primary-soft); }
-.ptile.s-done { opacity: .6; }
-.ptile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ptile.s-done { opacity: .65; }
+.ptile-pic { position: relative; height: 64px; border-radius: 7px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.ptile-pic img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.ptile-av { width: 40px; height: 40px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; }
+.ptile-acts { position: absolute; top: 3px; inset-inline-start: 3px; display: flex; gap: 3px; opacity: 0; transition: opacity .15s; }
+.ptile:hover .ptile-acts, .ptile:focus-within .ptile-acts { opacity: 1; }
+@media (hover: none) { .ptile-acts { opacity: 1; } }
+.ptile-act { width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
+.ptile-act:hover { border-color: var(--primary); }
+.ptile-name { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
+.ptile-meta { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
+.pg-logo { width: 26px; height: 26px; border-radius: 50%; flex: none; object-fit: contain; background: #fff; border: 1px solid var(--border); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+span.pg-logo { border: 0; }
 .pdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #94a3b8; }
 .pdot.blue { background: var(--primary); } .pdot.green { background: var(--green); } .pdot.amber { background: var(--amber); } .pdot.purple { background: var(--purple); } .pdot.red { background: var(--red); }
 /* Project page: the phase, its progress chart and the four tiles */
@@ -316,7 +328,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .ptk.split:hover { border-color: var(--border); }
 @media (max-width: 1000px) { .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .ptiles { gap: 10px; } .ptk.split { grid-column: span 2; order: 1; } .ptk .val { font-size: 21px; } .phase-upd { margin-inline-start: 0; } }
-@media (max-width: 800px) { .pcols { grid-template-columns: minmax(0, 1fr); } .ptile-grid { grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); } }
+@media (max-width: 800px) { .pcols { grid-template-columns: minmax(0, 1fr); } .ptile-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); } }
 .proj { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 .proj-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .proj-name { font-size: 17px; font-weight: 700; }
@@ -974,7 +986,7 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     mail: { title: 'מיילים', render: (el) => { ui.gTab = 'gmail'; renderGoogle(el); } },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'status', projQ: '', projOpen: {}, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'client', projQ: '', projOpen: {}, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1547,61 +1559,117 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
     }));
   }
 
-  // A tiny tile: just the name and a status dot. Clicking opens the project page.
+  // ---------- Project tiles: a small square with the client's logo (or initials), the name and a status dot ----------
+  // A project's picture: its own (p.logo, a photo id), or else the logo of another project of the same client.
+  const clientKey = (p) => (p.client || '').trim();
+  function projLogo(p) {
+    if (p.logo) return p.logo;
+    const k = clientKey(p); if (!k) return '';
+    const o = db.projects.find((x) => x.logo && clientKey(x) === k);
+    return o ? o.logo : '';
+  }
+  const AV_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#db2777', '#0891b2', '#4f46e5', '#65a30d'];
+  function avatarHtml(label, cls) {
+    const t = String(label || '?').replace(/["'״׳]/g, '').trim().split(/\s+/).filter(Boolean);
+    const ini = (t.length > 1 ? t[0][0] + t[1][0] : (t[0] || '?').slice(0, 2));
+    let h = 0; for (const c of String(label || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return `<span class="${cls}" style="background:${AV_COLORS[h % AV_COLORS.length]}">${esc(ini)}</span>`;
+  }
+  // A logo made small (up to 240 px) and kept in the photo store.
+  async function makeLogo(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const k = Math.min(1, 240 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+      const id = 'ph' + uid() + '-' + w + 'x' + h;
+      await photoPut(id, c.toDataURL('image/jpeg', 0.85));
+      return id;
+    } finally { URL.revokeObjectURL(url); }
+  }
   function projTile(p) {
     const st = byId(PROJECT_STATUS, p.status);
+    const logo = projLogo(p);
     const tip = [p.name, p.client, st ? st.label : ''].filter(Boolean).join(' · ');
     return `<div class="ptile s-${esc(p.status || 'none')}" data-id="${esc(p.id)}" title="${esc(tip)}">
-      <span class="pdot ${st ? st.color : 'gray'}"></span><span class="ptile-name">${esc(p.name)}</span></div>`;
+      <div class="ptile-pic">${logo ? `<img data-photo="${esc(logo)}" alt="">` : avatarHtml(p.client || p.name, 'ptile-av')}
+        <span class="ptile-acts">${p.logo ? `<button type="button" class="ptile-act" data-logo-del title="הסרת התמונה">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${logo ? 'החלפת תמונה' : 'הוספת תמונה / לוגו לקוח'}">🖼</button></span></div>
+      <div class="ptile-name">${esc(p.name)}</div>
+      <div class="ptile-meta"><span class="pdot ${st ? st.color : 'gray'}"></span>${esc(st ? st.label : 'ללא סטטוס')}</div></div>`;
   }
 
   function renderProjects(el) {
     const q = ui.projQ.trim().toLowerCase();
     const match = (p) => !q || [p.name, p.client, p.location, p.manager].join(' ').toLowerCase().includes(q);
     const all = db.projects.filter(match).sort(projSort);
-    const map = new Map();
-    all.forEach((p) => { const k = (p.client || '').trim() || 'ללא לקוח'; if (!map.has(k)) map.set(k, []); map.get(k).push(p); });
-    const byClient = Array.from(map, ([name, items]) => ({ name, items, active: items.filter((p) => p.status !== 'done').length }))
-      .sort((a, b) => (a.name === 'ללא לקוח') - (b.name === 'ללא לקוח') || b.active - a.active || b.items.length - a.items.length || a.name.localeCompare(b.name, 'he'));
-    const byStatus = ['planning', 'active', 'done', 'paused'].map((s) => ({ status: s, name: byId(PROJECT_STATUS, s).label, items: all.filter((p) => p.status === s) }))
-      .concat([{ name: 'ללא סטטוס', items: all.filter((p) => STATUS_ORDER.indexOf(p.status) < 0) }])
-      .filter((g) => g.items.length);
-    // Each client / status is a row that opens to show its projects (closed by default; a search opens every row).
-    const grp = (key, label, items, sum) => {
-      const open = !!q || !!ui.projOpen[key];
-      return `<div class="pgroup${open ? ' open' : ''}" data-pg="${esc(key)}">
-        <button type="button" class="pgroup-head" aria-expanded="${open}"><span class="pg-chev">◀</span>${label}<span class="count">${items.length}</span><span class="pg-sum">${sum}</span></button>
-        <div class="pgroup-body"><div class="pgroup-inner"><div class="ptile-grid">${items.map(projTile).join('')}</div></div></div></div>`;
-    };
+    const byClientView = ui.projGroup !== 'status';
+    let groups;
+    if (byClientView) {
+      const map = new Map();
+      all.forEach((p) => { const k = clientKey(p) || 'ללא לקוח'; if (!map.has(k)) map.set(k, []); map.get(k).push(p); });
+      groups = Array.from(map, ([name, items]) => ({ key: 'c:' + name, name, items, active: items.filter((p) => p.status !== 'done').length }))
+        .sort((a, b) => (a.name === 'ללא לקוח') - (b.name === 'ללא לקוח') || b.active - a.active || b.items.length - a.items.length || a.name.localeCompare(b.name, 'he'));
+    } else {
+      groups = ['planning', 'active', 'done', 'paused'].map((s) => ({ key: 's:' + s, status: s, name: byId(PROJECT_STATUS, s).label, items: all.filter((p) => p.status === s) }))
+        .concat([{ key: 's:none', name: 'ללא סטטוס', items: all.filter((p) => STATUS_ORDER.indexOf(p.status) < 0) }])
+        .filter((g) => g.items.length);
+    }
     const statusSum = (items) => STATUS_ORDER.map((s) => { const n = items.filter((p) => p.status === s).length; const st = byId(PROJECT_STATUS, s);
       return n ? `<span title="${esc(st.label)}"><span class="pdot ${st.color}"></span>${n} ${esc(st.label)}</span>` : ''; }).join('');
-    const clientCol = byClient.map((g) => grp('c:' + g.name, `<span class="pg-name">${esc(g.name)}</span>`, g.items, statusSum(g.items))).join('');
-    const statusCol = byStatus.map((g) => {
-      const clients = new Set(g.items.map((p) => (p.client || '').trim()).filter(Boolean)).size;
-      return grp('s:' + (g.status || 'none'), g.status ? pill(PROJECT_STATUS, g.status) : `<span class="pg-name">${esc(g.name)}</span>`, g.items, clients ? `<span>${clients} לקוחות</span>` : '');
+    // Each client / status is a row that opens to show its projects (closed by default; a search opens every row).
+    const rows = groups.map((g) => {
+      const open = !!q || !!ui.projOpen[g.key];
+      let label, sum;
+      if (byClientView) {
+        const lg = g.name !== 'ללא לקוח' && projLogo(g.items[0]);
+        label = (lg ? `<img class="pg-logo" data-photo="${esc(lg)}" alt="">` : avatarHtml(g.name, 'pg-logo')) + `<span class="pg-name">${esc(g.name)}</span>`;
+        sum = statusSum(g.items);
+      } else {
+        const clients = new Set(g.items.map(clientKey).filter(Boolean)).size;
+        label = g.status ? pill(PROJECT_STATUS, g.status) : `<span class="pg-name">${esc(g.name)}</span>`;
+        sum = clients ? `<span>${clients} לקוחות</span>` : '';
+      }
+      return `<div class="pgroup${open ? ' open' : ''}" data-pg="${esc(g.key)}">
+        <button type="button" class="pgroup-head" aria-expanded="${open}"><span class="pg-chev">◀</span>${label}<span class="count">${g.items.length}</span><span class="pg-sum">${sum}</span></button>
+        <div class="pgroup-body"><div class="pgroup-inner"><div class="ptile-grid">${g.items.map(projTile).join('')}</div></div></div></div>`;
     }).join('');
-    const allBtn = (col) => q ? '' : `<a href="#" class="hint" data-pg-all="${col}">פתיחת הכל</a>`;
     el.innerHTML = `
       <div class="toolbar">
+        <div class="seg" id="projViews"><button data-v="client" class="${byClientView ? 'on' : ''}">לפי לקוח</button><button data-v="status" class="${byClientView ? '' : 'on'}">לפי סטטוס</button></div>
         <input class="input search" id="prq" placeholder="חיפוש פרויקט או לקוח..." value="${esc(ui.projQ)}">
         <span class="hint">${all.length} פרויקטים</span>
         <span class="spacer"></span>
+        ${q || !all.length ? '' : '<a href="#" class="hint" data-pg-all>פתיחת הכל</a>'}
         ${isAdmin() ? '<button class="btn" id="driveImportBtn" title="מוסיף פרויקטים מתיקיית פרויקטים פמי שעדיין אינם במערכת">📁 ייבוא פרויקטים מה-Drive</button>' : ''}
       </div>
-      ${all.length ? `<div class="pcols">
-        <section class="pcol"><div class="pcol-head"><h2 class="pcol-title">לפי לקוח</h2>${allBtn('c')}</div>${clientCol}</section>
-        <section class="pcol"><div class="pcol-head"><h2 class="pcol-title">לפי סטטוס</h2>${allBtn('s')}</div>${statusCol}</section>
-      </div>` : `<div class="card empty">${q ? 'לא נמצאו פרויקטים' : 'אין פרויקטים עדיין. לחצו על "פרויקט חדש" כדי להוסיף.'}</div>`}`;
+      ${all.length ? `<div class="plist">${rows}</div>` : `<div class="card empty">${q ? 'לא נמצאו פרויקטים' : 'אין פרויקטים עדיין. לחצו על "פרויקט חדש" כדי להוסיף.'}</div>`}
+      <input type="file" accept="image/*" id="logoFile" hidden>`;
     $('#prq', el).addEventListener('input', (e) => { ui.projQ = e.target.value; renderProjects(el); const i = $('#prq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
+    $$('#projViews button', el).forEach((b) => b.addEventListener('click', () => { ui.projGroup = b.dataset.v; renderProjects(el); }));
     // Open / close a row in place (no re-render) so it animates.
     const setOpen = (g, open) => { g.classList.toggle('open', open); $('.pgroup-head', g).setAttribute('aria-expanded', open); if (!q) ui.projOpen[g.dataset.pg] = open; };
-    const syncAll = (sec) => { const a = $('[data-pg-all]', sec); if (a) a.textContent = $$('.pgroup', sec).every((g) => g.classList.contains('open')) ? 'סגירת הכל' : 'פתיחת הכל'; };
-    $$('.pgroup', el).forEach((g) => $('.pgroup-head', g).addEventListener('click', () => { setOpen(g, !g.classList.contains('open')); syncAll(g.closest('.pcol')); }));
-    $$('[data-pg-all]', el).forEach((a) => { const sec = a.closest('.pcol'); syncAll(sec);
-      a.addEventListener('click', (e) => { e.preventDefault(); const open = !$$('.pgroup', sec).every((g) => g.classList.contains('open')); $$('.pgroup', sec).forEach((g) => setOpen(g, open)); syncAll(sec); }); });
+    const allA = $('[data-pg-all]', el);
+    const syncAll = () => { if (allA) allA.textContent = $$('.pgroup', el).every((g) => g.classList.contains('open')) ? 'סגירת הכל' : 'פתיחת הכל'; };
+    $$('.pgroup', el).forEach((g) => $('.pgroup-head', g).addEventListener('click', () => { setOpen(g, !g.classList.contains('open')); syncAll(); }));
+    if (allA) { syncAll(); allA.addEventListener('click', (e) => { e.preventDefault(); const open = !$$('.pgroup', el).every((g) => g.classList.contains('open')); $$('.pgroup', el).forEach((g) => setOpen(g, open)); syncAll(); }); }
     const di = $('#driveImportBtn', el);
     if (di) di.addEventListener('click', () => importDriveProjects(true));
-    $$('.ptile', el).forEach((c) => c.addEventListener('click', () => { location.hash = 'project/' + encodeURIComponent(c.dataset.id); }));
+    // The picture of a project: picked from the computer or the phone, it shows on every project of the same client that has none of its own.
+    const file = $('#logoFile', el); let logoFor = null;
+    file.addEventListener('change', async () => {
+      const f = file.files && file.files[0]; const p = logoFor && byId(db.projects, logoFor); file.value = '';
+      if (!f || !p) return;
+      try { p.logo = await makeLogo(f); save(); renderProjects(el); toast('התמונה נשמרה'); } catch (e) { toast('לא ניתן לטעון את התמונה'); }
+    });
+    $$('.ptile', el).forEach((c) => c.addEventListener('click', (e) => {
+      const p = byId(db.projects, c.dataset.id);
+      if (e.target.closest('[data-logo]')) { e.stopPropagation(); logoFor = c.dataset.id; file.click(); return; }
+      if (e.target.closest('[data-logo-del]')) { e.stopPropagation(); if (p) { delete p.logo; save(); renderProjects(el); } return; }
+      location.hash = 'project/' + encodeURIComponent(c.dataset.id);
+    }));
+    fillPhotos(el);
   }
 
   // One project: details, its tasks, its protocols and summaries, and its Drive folder.
