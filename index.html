@@ -5941,6 +5941,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         ${tab === 'calendar' ? '<button class="btn primary" data-gnew>+ אירוע חדש</button>' : ''}
         ${tab === 'gmail' ? '<button class="btn primary" data-gnew>+ מייל חדש</button>' : ''}
         ${tab === 'drive' ? `<label class="g-local" title="אות הכונן של Google Drive למחשב, לכפתורי העתקת הנתיב">כונן במחשב <select id="gLetter">${'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => `<option ${l === localDrive().letter ? 'selected' : ''}>${l}</option>`).join('')}</select>:</label>` : ''}
+        ${tab === 'drive' ? `<button class="btn" id="gOpenSetup" title="התקנה חד-פעמית כדי ש'פתיחה' יפתח קבצים ישר בתוכנה במחשב">${openHelper() ? '✓ פתיחה ישירה פעילה' : '🖥 התקנת פתיחה ישירה במחשב'}</button>` : ''}
         ${tab === 'drive' && ui.gDrivePath.length ? '<label class="btn primary">⬆ העלאת קובץ לתיקייה<input type="file" id="gUpload" hidden></label>' : ''}
       </div>
       <div class="card card-pad" id="gArea"></div>`;
@@ -5960,6 +5961,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       } else ui.gDriveQ = $('#gq', el).value.trim();
       renderGoogle(el);
     });
+    const gos = $('#gOpenSetup', el);
+    if (gos) gos.addEventListener('click', () => { downloadBlob('femy-open-setup.cmd', new Blob([openHelperSetup()], { type: 'application/octet-stream' })); toast('הקובץ ירד. לחיצה כפולה עליו בשורת ההורדות מתקינה, ובסוף האתר נפתח מחדש עם הפתיחה הישירה'); });
     const gl = $('#gLetter', el);
     if (gl) gl.addEventListener('change', () => { setLocalDrive({ letter: gl.value }); toast('אות הכונן נשמרה: ' + gl.value + ':'); });
     const up = $('#gUpload', el);
