@@ -760,6 +760,8 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .fpv-body .hint { padding: 20px; text-align: center; }
 .fpv-setup { padding: 8px 14px 12px; border-top: 1px solid var(--border); font-size: 13px; }
 .fpv-setup summary { cursor: pointer; color: var(--muted); }
+.fpv-setup.ask { background: var(--amber-soft, #fff7e6); }
+.fpv-setup.ask summary { color: inherit; font-weight: 700; }
 .fpv-setup ol { margin: 8px 0; padding-inline-start: 20px; }
 .fpv-setup li { margin-bottom: 4px; }
 @media (max-width: 900px) { .fpv { width: 100%; } }
@@ -2637,6 +2639,12 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const OPEN_HELPER_KEY = 'femy-open-helper';
   const openHelper = () => { try { return localStorage.getItem(OPEN_HELPER_KEY) === '1'; } catch (e) { return false; } };
   const setOpenHelper = (on) => { try { if (on) localStorage.setItem(OPEN_HELPER_KEY, '1'); else localStorage.removeItem(OPEN_HELPER_KEY); } catch (e) {} };
+  // The installer reopens the site with ?femyopen=1 when it finishes: turn direct opening on for this browser.
+  if (new URLSearchParams(location.search).get('femyopen') === '1') {
+    setOpenHelper(true);
+    try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+    setTimeout(() => toast('הפתיחה הישירה הופעלה: "פתיחה" יפתח קבצים ישר בתוכנה במחשב'), 1200);
+  }
   const fpv = { f: null, parts: null, hasParts: false, url: '', row: null };
   function filePreviewEl() {
     let el = $('#filePreview');
@@ -2668,7 +2676,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const local = openHelper();
     el.innerHTML = `<div class="fpv-head">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="fpv-title">${esc(f.name)}</div><button type="button" class="fpv-x" data-fpclose title="סגירה (Esc)" aria-label="סגירה">×</button></div>
       <div class="fpv-acts">
-        <button type="button" class="btn primary" data-fpopen title="${local ? 'פותח את הקובץ מ-Google Drive למחשב, בתוכנה שלו (Word, Excel, Acrobat, AutoCAD...)' : 'מוריד את הקובץ, והדפדפן פותח אותו בתוכנה שלו במחשב'}">🖥 פתיחה${local ? '' : ' במחשב'}</button>
+        <button type="button" class="btn primary" data-fpopen title="${local ? 'פותח את הקובץ מ-Google Drive למחשב, בתוכנה שלו (Word, Excel, Acrobat, AutoCAD...)' : 'פותח את הקובץ בתוכנה שלו במחשב (Acrobat, Word, Excel...). בפעם הראשונה צריך התקנה חד-פעמית קטנה'}">🖥 פתיחה${local ? '' : ' במחשב'}</button>
         ${local ? '<button type="button" class="btn" data-fpdir title="פותח בסייר הקבצים את התיקייה שבה הקובץ נמצא">📂 התיקייה במחשב</button>' : ''}
         <button type="button" class="btn" data-fpdown title="הורדת עותק של הקובץ">⬇ הורדה</button>
         <a class="btn" href="${esc(driveFileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive בלשונית חדשה">Drive ↗</a>
@@ -2705,13 +2713,21 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   // The file's local copy, through the femy-open: link the helper registers on this computer.
   async function openFileLocal(f, folder) {
     if (gKind(f) && !folder) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // Google Docs/Sheets open in the browser
-    if (!openHelper()) { downloadDriveFile(f, true); return; }
+    if (!openHelper()) { askOpenHelper(); return; }
     const parts = await fpv.parts;
-    if (!parts || !parts.length) { toast('לא ידוע איפה הקובץ נמצא במחשב, מוריד אותו במקום'); downloadDriveFile(f, true); return; }
+    if (!parts || !parts.length) { toast('לא ידוע איפה הקובץ נמצא במחשב. פתחו אותו מתוך תיקיית הפרויקט'); return; }
     const path = localPath(folder ? parts.slice(0, -1) : parts);
     const a = document.createElement('a'); a.href = 'femy-open:' + encodeURIComponent(path);
     document.body.appendChild(a); a.click(); a.remove();
     toast((folder ? 'פותח את התיקייה במחשב: ' : 'פותח במחשב: ') + '⁦' + path + '⁩');
+  }
+  // "פתיחה" before the one-time setup: opens the setup steps in the panel, with the installer button highlighted.
+  function askOpenHelper() {
+    const el = $('#filePreview'); if (!el) return;
+    const d = $('.fpv-setup', el); if (!d) return;
+    d.open = true; d.classList.add('ask');
+    d.scrollIntoView({ block: 'nearest' });
+    toast('כדי שקבצים ייפתחו ישר בתוכנה במחשב, צריך התקנה חד-פעמית קטנה (פרטים בתחתית החלון)');
   }
   async function downloadDriveFile(f, toOpen) {
     const kind = gKind(f); const ex = GEXPORT[kind];
@@ -2731,8 +2747,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   function openHelperHelp(on) {
     return `<ol>
         <li>צריך את <b>Google Drive למחשב</b> מותקן ומחובר, כך שהתיקייה "${esc((window.FemyGoogle && FemyGoogle.drive.projectsName) || 'פרויקטים פמי')}" מופיעה בכונן <b>${esc(localDrive().letter)}:</b> (אפשר לשנות את האות בלשונית <a href="#google">יומן, מייל ו-Drive</a> › Drive).</li>
-        <li><a href="#" data-fphelper>הורידו את קובץ ההתקנה</a> (femy-open-setup.cmd) והפעילו אותו פעם אחת בלחיצה כפולה. הוא לא דורש הרשאות מנהל, ורק מלמד את Windows לפתוח קישורי femy-open של האתר.</li>
-        <li>סמנו כאן: <label><input type="checkbox" data-fphelperon ${on ? 'checked' : ''}> התקנתי, לפתוח קבצים ישירות מהמחשב</label></li>
+        <li><button type="button" class="btn sm primary" data-fphelper>⬇ הורדת קובץ ההתקנה</button> ואז לחיצה כפולה על femy-open-setup.cmd בשורת ההורדות. אם Windows מציג "Windows protected your PC", לוחצים "More info" ואז "Run anyway". לא צריך הרשאות מנהל.</li>
+        <li>בסוף ההתקנה האתר נפתח מחדש והפתיחה הישירה מופעלת לבד. (או סמנו כאן: <label><input type="checkbox" data-fphelperon ${on ? 'checked' : ''}> התקנתי</label>)</li>
       </ol>
       <div class="hint">בפעם הראשונה הדפדפן ישאל אם לפתוח את "femy-open". סמנו "תמיד לאפשר" ולחצו פתיחה. הקובץ נפתח מהעותק שב-Google Drive למחשב, ושינויים שתשמרו יסונכרנו ל-Drive. קבצי Google Docs/Sheets נפתחים בדפדפן.</div>`;
   }
@@ -2771,6 +2787,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       'reg add "HKCU\\Software\\Classes\\femy-open\\shell\\open\\command" /ve /d "wscript.exe //E:jscript \\"%D%\\open.js\\" \\"%%1\\"" /f >nul',
       'echo.',
       'echo Done. Femy can now open Drive files on this computer.',
+      `start "" "${(location.origin + location.pathname).replace(/[^A-Za-z0-9:/._~%-]/g, encodeURIComponent).replace(/%/g, '%%')}?femyopen=1#google"`,
       'echo To remove: reg delete "HKCU\\Software\\Classes\\femy-open" /f',
       'pause',
       '',
