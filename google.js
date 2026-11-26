@@ -532,7 +532,7 @@
   const DAPI = 'https://www.googleapis.com/drive/v3/files';
   const UP = 'https://www.googleapis.com/upload/drive/v3/files';
   const FOLDER = 'פמי הנדסה - מערכת ניהול';
-  const FIELDS = 'files(id,name,mimeType,webViewLink,modifiedTime,iconLink)';
+  const FIELDS = 'files(id,name,mimeType,webViewLink,modifiedTime,iconLink,size)';
   const qs = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   async function files(search) {
     const q = 'trashed=false' + (search ? ` and name contains '${qs(search)}'` : '');

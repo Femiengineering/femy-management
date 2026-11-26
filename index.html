@@ -743,6 +743,26 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .pd-name a { overflow-wrap: anywhere; }
 .pd-where { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .pd-dir { cursor: pointer; user-select: none; }
+/* Drive file preview: a panel on the side (full screen on a phone) */
+.g-file.fp-on { background: var(--primary-soft); border-radius: 6px; }
+.fpv { position: fixed; top: 0; bottom: 0; left: 0; width: min(620px, 48vw); background: var(--surface); box-shadow: 4px 0 24px rgba(0,0,0,.18); z-index: 55; display: flex; flex-direction: column; transform: translateX(-105%); transition: transform .18s ease; }
+.fpv.show { transform: none; }
+.fpv-head { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.fpv-head img { width: 18px; height: 18px; flex-shrink: 0; }
+.fpv-title { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.fpv-x { background: none; border: 0; font-size: 22px; line-height: 1; cursor: pointer; color: inherit; padding: 2px 6px; border-radius: 6px; }
+.fpv-x:hover { background: var(--gray-soft); }
+.fpv-acts { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+.fpv-meta { font-size: 12px; color: var(--muted); padding: 6px 14px; overflow-wrap: anywhere; }
+.fpv-body { flex: 1; min-height: 0; background: var(--surface-2, #f3f5f8); display: flex; align-items: center; justify-content: center; position: relative; }
+.fpv-body iframe { border: 0; width: 100%; height: 100%; background: #fff; }
+.fpv-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.fpv-body .hint { padding: 20px; text-align: center; }
+.fpv-setup { padding: 8px 14px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.fpv-setup summary { cursor: pointer; color: var(--muted); }
+.fpv-setup ol { margin: 8px 0; padding-inline-start: 20px; }
+.fpv-setup li { margin-bottom: 4px; }
+@media (max-width: 900px) { .fpv { width: 100%; } }
 .pd-crumbs .g-copy { text-decoration: none; }
 .g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
@@ -1917,11 +1937,13 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const copyPath = (parts) => { const path = localPath(parts); copyText(path).then(() => toast('הנתיב הועתק, הדביקו בסייר הקבצים (Ctrl+L): \u2066' + path + '\u2069')); };
   // A project's folder name in Drive (it can differ from the project name in the site); falls back to the project name.
   const folderNames = {};
-  async function copyProjectPath(p, sub) {
+  // The path of a file or folder in a project, under the projects folder (as localPath() takes it).
+  async function projLocalParts(p, sub) {
     let name = folderNames[p.driveFolder] || p.name;
     if (!folderNames[p.driveFolder] && GOOGLE && G.valid() && p.driveFolder) { try { name = folderNames[p.driveFolder] = (await G.drive.folderName(p.driveFolder)) || name; } catch (e) {} }
-    copyPath([name].concat(sub || []));
+    return [name].concat(sub || []);
   }
+  async function copyProjectPath(p, sub) { copyPath(await projLocalParts(p, sub)); }
   // A link to a project's folder (or a file in it) that copies its local path.
   const lpAttr = (p, sub) => `href="#" data-lproj="${esc(p.id)}"${sub ? ` data-lsub="${esc(sub)}"` : ''} ${TITLE_LP}`;
   const TITLE_LP = 'title="מעתיק את נתיב התיקייה במחשב (Google Drive למחשב). הדביקו בסייר הקבצים עם Ctrl+L"';
@@ -2532,7 +2554,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       box.innerHTML = `<div class="g-crumbs pd-crumbs"><b>תוצאות חיפוש: "${esc(q)}"</b><span style="flex:1"></span><button type="button" class="g-copy" data-clear>✕ ניקוי החיפוש</button></div>
         <div class="pd-list">${shown.map((it, i) => (it.f.folder
           ? `<div class="g-file pd-dir" data-i="${i}"><span>📁</span><div class="pd-name"><a href="#" data-dir="${i}" title="פתיחת התיקייה">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`
-          : `<div class="g-file">${it.f.iconLink ? `<img src="${esc(it.f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="pd-name"><a href="${esc(fileUrl(it.f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`)).join('')
+          : `<div class="g-file pd-dir" data-fi="${i}">${it.f.iconLink ? `<img src="${esc(it.f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="pd-name"><a href="${esc(fileUrl(it.f))}" data-fpv="${i}" title="תצוגה מקדימה">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`)).join('')
           || `<div class="hint" style="padding:8px 0">${ix.running ? 'מחפש...' : 'לא נמצא קובץ או תיקייה בשם הזה'}</div>`}</div>
         <div class="hint" style="padding-top:8px">${hits.length} תוצאות${hits.length > shown.length ? ` (מוצגות ${shown.length})` : ''}${ix.running ? ` · סורק תיקיות... (${ix.items.length} פריטים עד עכשיו)` : ''}${!ix.running && ix.partial ? ' · ייתכן שחלק מהתיקיות לא נסרקו' : ''}</div>`;
       const pick = (i) => shown[Number(i)];
@@ -2541,6 +2563,9 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       $$('[data-dir]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openDir(pick(a.dataset.dir)); }));
       $$('.pd-dir', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; openDir(pick(r.dataset.i)); }));
       $$('[data-copy]', box).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); const it = pick(b.dataset.copy); copyProjectPath(p, it.path.map((c) => c.name).concat([it.f.name])); }));
+      const preview = (i, row) => { const it = pick(i); openFilePreview(it.f, projLocalParts(p, it.path.map((c) => c.name).concat([it.f.name])), row); };
+      $$('[data-fpv]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); preview(a.dataset.fpv, a.closest('.g-file')); }));
+      $$('[data-fi]', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; preview(r.dataset.fi, r); }));
     };
     box.innerHTML = '<div class="hint" style="padding:8px 0">מחפש...</div>';
     let last = 0;
@@ -2576,7 +2601,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       const fileUrl = (f) => f.webViewLink || ('https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view');
       const rows = res.files.map((f, i) => (f.folder
         ? `<div class="g-file pd-dir" data-i="${i}"><span>📁</span><a href="#" data-dir="${i}" title="פתיחת התיקייה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`
-        : `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<a href="${esc(fileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`)).join('');
+        : `<div class="g-file pd-dir" data-fi="${i}">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<a href="${esc(fileUrl(f))}" data-fpv="${i}" title="תצוגה מקדימה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`)).join('');
       const nf = res.files.filter((f) => f.folder).length;
       box.innerHTML = head + `<div class="pd-list">${rows || '<div class="hint" style="padding:8px 0">התיקייה ריקה</div>'}</div>`
         + `<div class="hint" style="padding-top:8px">${nf} תיקיות · ${res.files.length - nf} קבצים${res.src === 'cache' ? ' · מהסנכרון האחרון, רק תיקיות וסיכומים שכבר זוהו. לרשימה המלאה חברו את חשבון ה-Google בלשונית <a href="#google">יומן, מייל ו-Drive</a>' : ''}</div>`;
@@ -2584,11 +2609,172 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       $$('[data-dir]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); open(res.files[Number(a.dataset.dir)]); }));
       $$('.pd-dir', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; open(res.files[Number(r.dataset.i)]); }));
       $$('[data-copy]', box).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); copyProjectPath(p, names.concat([res.files[Number(b.dataset.copy)].name])); }));
+      const preview = (i, row) => { const f = res.files[Number(i)]; openFilePreview(f, projLocalParts(p, names.concat([f.name])), row); };
+      $$('[data-fpv]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); preview(a.dataset.fpv, a.closest('.g-file')); }));
+      $$('[data-fi]', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; preview(r.dataset.fi, r); }));
     }).catch((e) => {
       if (!alive()) return;
       box.innerHTML = head + `<div class="hint" style="padding:8px 0">לא ניתן לטעון את התיקייה (${esc(gErr(e))}). אפשר לפתוח אותה ב-Drive או להעתיק את הנתיב.</div>`;
       bindHead();
     });
+  }
+
+  // ---------- Drive file preview and "open on this computer" ----------
+  // Clicking a file in any Drive list shows it in a panel on the side. "פתיחה" opens the file in its own program
+  // on this computer: with the one-time helper installed (femy-open: link -> the file in Google Drive for desktop),
+  // otherwise it downloads the file so the browser opens it in that program.
+  const GAPPS = 'application/vnd.google-apps.';
+  const EXT_MIME = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+  const fileMime = (f) => f.mimeType || EXT_MIME[(f.name.split('.').pop() || '').toLowerCase()] || '';
+  // Google Docs/Sheets/Slides have no file of their own: they are downloaded as Office files (or PDF).
+  const GEXPORT = {
+    document: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx', 'document'],
+    spreadsheet: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx', 'spreadsheets'],
+    presentation: ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', 'presentation'],
+    drawing: ['application/pdf', 'pdf', 'drawings'],
+  };
+  const gKind = (f) => { const m = fileMime(f); return m.startsWith(GAPPS) ? m.slice(GAPPS.length) : ''; };
+  const OPEN_HELPER_KEY = 'femy-open-helper';
+  const openHelper = () => { try { return localStorage.getItem(OPEN_HELPER_KEY) === '1'; } catch (e) { return false; } };
+  const setOpenHelper = (on) => { try { if (on) localStorage.setItem(OPEN_HELPER_KEY, '1'); else localStorage.removeItem(OPEN_HELPER_KEY); } catch (e) {} };
+  const fpv = { f: null, parts: null, hasParts: false, url: '', row: null };
+  function filePreviewEl() {
+    let el = $('#filePreview');
+    if (el) return el;
+    el = document.createElement('aside'); el.id = 'filePreview'; el.className = 'fpv'; el.setAttribute('aria-label', 'תצוגה מקדימה');
+    document.body.appendChild(el);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('show')) closeFilePreview(); });
+    window.addEventListener('hashchange', () => closeFilePreview());
+    return el;
+  }
+  function closeFilePreview() {
+    const el = $('#filePreview'); if (!el) return;
+    el.classList.remove('show');
+    if (fpv.row) fpv.row.classList.remove('fp-on');
+    if (fpv.url) URL.revokeObjectURL(fpv.url);
+    Object.assign(fpv, { f: null, parts: null, url: '', row: null });
+    setTimeout(() => { if (!el.classList.contains('show')) el.innerHTML = ''; }, 250);
+  }
+  // f: a Drive file ({ id, name, mimeType, ... }); parts: its path under the projects folder, for the local copy
+  // (a promise or an array, or null when unknown); row: the list row to highlight.
+  function openFilePreview(f, parts, row) {
+    const el = filePreviewEl();
+    if (fpv.row) fpv.row.classList.remove('fp-on');
+    if (fpv.url) URL.revokeObjectURL(fpv.url);
+    Object.assign(fpv, { f, parts: Promise.resolve(parts || null), hasParts: !!parts, url: '', row: row || null });
+    if (row) row.classList.add('fp-on');
+    const mime = fileMime(f); const kind = gKind(f);
+    const meta = [f.modifiedTime ? 'עודכן ' + new Date(f.modifiedTime).toLocaleDateString('he-IL') : '', f.size ? fmtSize(Number(f.size)) : ''].filter(Boolean).join(' · ');
+    const local = openHelper();
+    el.innerHTML = `<div class="fpv-head">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="fpv-title">${esc(f.name)}</div><button type="button" class="fpv-x" data-fpclose title="סגירה (Esc)" aria-label="סגירה">×</button></div>
+      <div class="fpv-acts">
+        <button type="button" class="btn primary" data-fpopen title="${local ? 'פותח את הקובץ מ-Google Drive למחשב, בתוכנה שלו (Word, Excel, Acrobat, AutoCAD...)' : 'מוריד את הקובץ, והדפדפן פותח אותו בתוכנה שלו במחשב'}">🖥 פתיחה${local ? '' : ' במחשב'}</button>
+        ${local ? '<button type="button" class="btn" data-fpdir title="פותח בסייר הקבצים את התיקייה שבה הקובץ נמצא">📂 התיקייה במחשב</button>' : ''}
+        <button type="button" class="btn" data-fpdown title="הורדת עותק של הקובץ">⬇ הורדה</button>
+        <a class="btn" href="${esc(driveFileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive בלשונית חדשה">Drive ↗</a>
+        ${fpvPartsKnown() ? '<button type="button" class="g-copy" data-fpcopy title="העתקת הנתיב במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋 נתיב</button>' : ''}
+      </div>
+      ${meta ? `<div class="fpv-meta">${esc(meta)}</div>` : ''}
+      <div class="fpv-body"><div class="hint">טוען תצוגה מקדימה...</div></div>
+      <details class="fpv-setup"><summary>${local ? '✓ פתיחה ישירה מהמחשב פעילה' : '⚙ פתיחה ישירה בתוכנה, בלי הורדה (התקנה חד-פעמית)'}</summary>${openHelperHelp(local)}</details>`;
+    requestAnimationFrame(() => el.classList.add('show'));
+    $('[data-fpclose]', el).addEventListener('click', closeFilePreview);
+    $('[data-fpopen]', el).addEventListener('click', () => openFileLocal(f));
+    $('[data-fpdown]', el).addEventListener('click', () => downloadDriveFile(f));
+    const dir = $('[data-fpdir]', el); if (dir) dir.addEventListener('click', () => openFileLocal(f, true));
+    const cp = $('[data-fpcopy]', el); if (cp) cp.addEventListener('click', async () => { const p = await fpv.parts; if (p) copyPath(p); });
+    bindOpenHelper(el);
+    const body = $('.fpv-body', el);
+    const alive = () => fpv.f === f;
+    const frame = (src) => { if (alive()) body.innerHTML = `<iframe src="${esc(src)}" title="${esc(f.name)}" allow="autoplay" referrerpolicy="no-referrer-when-downgrade"></iframe>`; };
+    const drivePreview = () => frame(kind && GEXPORT[kind] ? `https://docs.google.com/${GEXPORT[kind][2]}/d/${encodeURIComponent(f.id)}/preview` : `https://drive.google.com/file/d/${encodeURIComponent(f.id)}/preview`);
+    // Images and PDFs are read with the user's own Google connection and shown by the browser itself;
+    // everything else (Office files, Google Docs, video, drawings) through Google Drive's viewer.
+    const small = !f.size || Number(f.size) < 40 * 1024 * 1024;
+    if (GOOGLE && G.valid() && small && (mime.startsWith('image/') || mime === 'application/pdf')) {
+      G.drive.readBlob(f.id).then((b) => {
+        if (!alive()) return;
+        fpv.url = URL.createObjectURL(mime === 'application/pdf' ? new Blob([b], { type: 'application/pdf' }) : b);
+        if (mime.startsWith('image/')) body.innerHTML = `<img src="${esc(fpv.url)}" alt="${esc(f.name)}">`; else frame(fpv.url);
+      }).catch(drivePreview);
+    } else drivePreview();
+  }
+  const driveFileUrl = (f) => f.webViewLink || ('https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view');
+  const fpvPartsKnown = () => fpv.hasParts;
+  function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  // The file's local copy, through the femy-open: link the helper registers on this computer.
+  async function openFileLocal(f, folder) {
+    if (gKind(f) && !folder) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // Google Docs/Sheets open in the browser
+    if (!openHelper()) { downloadDriveFile(f, true); return; }
+    const parts = await fpv.parts;
+    if (!parts || !parts.length) { toast('לא ידוע איפה הקובץ נמצא במחשב, מוריד אותו במקום'); downloadDriveFile(f, true); return; }
+    const path = localPath(folder ? parts.slice(0, -1) : parts);
+    const a = document.createElement('a'); a.href = 'femy-open:' + encodeURIComponent(path);
+    document.body.appendChild(a); a.click(); a.remove();
+    toast((folder ? 'פותח את התיקייה במחשב: ' : 'פותח במחשב: ') + '⁦' + path + '⁩');
+  }
+  async function downloadDriveFile(f, toOpen) {
+    const kind = gKind(f); const ex = GEXPORT[kind];
+    if (kind && !ex) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // forms, maps...: only in Drive
+    const name = ex && !new RegExp('\\.' + ex[1] + '$', 'i').test(f.name) ? f.name + '.' + ex[1] : f.name;
+    if (GOOGLE && G.valid()) {
+      toast('מוריד את "' + name + '"...');
+      try {
+        const blob = ex ? new Blob([await G.drive.exportFile(f.id, ex[0])], { type: ex[0] }) : await G.drive.readBlob(f.id);
+        downloadBlob(name, blob);
+        if (toOpen) toast('הקובץ ירד. לחצו עליו בשורת ההורדות של הדפדפן והוא ייפתח בתוכנה שלו. לפתיחה ישירה בלי הורדה, ראו "פתיחה ישירה בתוכנה" בתחתית החלון');
+        return;
+      } catch (e) { toast('ההורדה נכשלה (' + gErr(e) + '), מנסה דרך Drive'); }
+    }
+    window.open(ex ? `https://docs.google.com/${ex[2]}/d/${encodeURIComponent(f.id)}/export?format=${ex[1]}` : 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(f.id), '_blank', 'noopener');
+  }
+  function openHelperHelp(on) {
+    return `<ol>
+        <li>צריך את <b>Google Drive למחשב</b> מותקן ומחובר, כך שהתיקייה "${esc((window.FemyGoogle && FemyGoogle.drive.projectsName) || 'פרויקטים פמי')}" מופיעה בכונן <b>${esc(localDrive().letter)}:</b> (אפשר לשנות את האות בלשונית <a href="#google">יומן, מייל ו-Drive</a> › Drive).</li>
+        <li><a href="#" data-fphelper>הורידו את קובץ ההתקנה</a> (femy-open-setup.cmd) והפעילו אותו פעם אחת בלחיצה כפולה. הוא לא דורש הרשאות מנהל, ורק מלמד את Windows לפתוח קישורי femy-open של האתר.</li>
+        <li>סמנו כאן: <label><input type="checkbox" data-fphelperon ${on ? 'checked' : ''}> התקנתי, לפתוח קבצים ישירות מהמחשב</label></li>
+      </ol>
+      <div class="hint">בפעם הראשונה הדפדפן ישאל אם לפתוח את "femy-open". סמנו "תמיד לאפשר" ולחצו פתיחה. הקובץ נפתח מהעותק שב-Google Drive למחשב, ושינויים שתשמרו יסונכרנו ל-Drive. קבצי Google Docs/Sheets נפתחים בדפדפן.</div>`;
+  }
+  function bindOpenHelper(el) {
+    const dl = $('[data-fphelper]', el);
+    if (dl) dl.addEventListener('click', (e) => { e.preventDefault(); downloadBlob('femy-open-setup.cmd', new Blob([openHelperSetup()], { type: 'application/octet-stream' })); });
+    const on = $('[data-fphelperon]', el);
+    if (on) on.addEventListener('change', () => { setOpenHelper(on.checked); toast(on.checked ? 'מעכשיו "פתיחה" פותח את הקובץ ישירות מהמחשב' : 'מעכשיו "פתיחה" מוריד את הקובץ'); if (fpv.f) openFilePreview(fpv.f, fpv.parts, fpv.row); });
+  }
+  // The one-time Windows setup: writes a small script to %LOCALAPPDATA%\FemyOpen and registers femy-open: for this
+  // user only (HKCU, no admin rights). The script opens only an existing file or folder on a local drive, and never
+  // a program or script, so a link from another site cannot run anything with it.
+  function openHelperSetup() {
+    const js = [
+      "var sh = new ActiveXObject('WScript.Shell');",
+      "function say(t) { sh.Popup(t, 0, 'Femy', 48); }",
+      "var a = WScript.Arguments.length ? String(WScript.Arguments(0)) : '';",
+      "var p = a.replace(/^femy-open:(\\/\\/)?/i, '').replace(/\\/$/, '');",
+      "try { p = decodeURIComponent(p); } catch (e) { p = ''; }",
+      "p = p.replace(/\\//g, '\\\\');",
+      "var BAD = /\\.(exe|com|bat|cmd|ps1|psm1|psd1|vbs|vbe|js|jse|wsf|wsh|wsc|msi|msp|mst|lnk|scr|hta|reg|cpl|jar|pif|url|scf|inf|dll|sys|ocx|application|appref-ms|msc|gadget|settingcontent-ms|library-ms|search-ms|diagcab|appx|appxbundle|msix|msixbundle|appinstaller|iso|img|vhd|vhdx|chm|theme|themepack|xll|xla|xlam|ppa|ppam|website|mht|mhtml|ws)$/i;",
+      "if (!/^[A-Za-z]:\\\\[^:*?\"<>|]*$/.test(p) || /(^|\\\\)\\.\\.(\\\\|$)/.test(p) || BAD.test(p)) { say('הקישור הזה לא נפתח: מותר לפתוח רק קבצים ותיקיות מ-Google Drive במחשב.'); WScript.Quit(1); }",
+      "var fso = new ActiveXObject('Scripting.FileSystemObject');",
+      "if (fso.FileExists(p) || fso.FolderExists(p)) new ActiveXObject('Shell.Application').ShellExecute(p, '', '', 'open', 1);",
+      "else say('הקובץ לא נמצא במחשב:\\n' + p + '\\n\\nודאו ש-Google Drive למחשב פועל, ושאות הכונן באתר נכונה.');",
+    ].join('\r\n').replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+    const b64 = btoa(js);
+    return [
+      '@echo off',
+      'rem Femy: lets the site open Drive files in their own program on this computer (current user only).',
+      'set "D=%LOCALAPPDATA%\\FemyOpen"',
+      'if not exist "%D%" mkdir "%D%"',
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "[IO.File]::WriteAllBytes($env:LOCALAPPDATA + '\\FemyOpen\\open.js', [Convert]::FromBase64String('${b64}'))"`,
+      'reg add "HKCU\\Software\\Classes\\femy-open" /ve /d "URL:Femy Open" /f >nul',
+      'reg add "HKCU\\Software\\Classes\\femy-open" /v "URL Protocol" /d "" /f >nul',
+      'reg add "HKCU\\Software\\Classes\\femy-open\\shell\\open\\command" /ve /d "wscript.exe //E:jscript \\"%D%\\open.js\\" \\"%%1\\"" /f >nul',
+      'echo.',
+      'echo Done. Femy can now open Drive files on this computer.',
+      'echo To remove: reg delete "HKCU\\Software\\Classes\\femy-open" /f',
+      'pause',
+      '',
+    ].join('\r\n');
   }
 
   // Projects collected from the company's Drive folder ("פרויקטים פמי"), in projects/drive-projects.json.
@@ -5794,7 +5980,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         area.innerHTML = `<div class="g-crumbs">${crumbs.map((c, i) => i === crumbs.length - 1 ? `<b>${esc(c.name)}</b>` : `<a href="#" data-crumb="${i}">${esc(c.name)}</a>`).join(' <span class="hint">›</span> ')}<span style="flex:1"></span>${copyBtn('data-copyhere')}</div>`
           + (res.files.map((f) => f.folder
             ? `<div class="g-file"><span>📁</span><a href="#" data-dir="${esc(f.id)}">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${esc(f.name)}"`)}</div>`
-            : `<div class="g-file">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a href="#" data-copy="${esc(f.name)}" title="העתקת נתיב הקובץ במחשב, להדבקה בסייר הקבצים עם Ctrl+L">${esc(f.name)}</a>${when(f)}</div>`).join('')
+            : `<div class="g-file pd-dir" data-fi="${esc(f.id)}">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a href="#" data-fpv="${esc(f.id)}" title="תצוגה מקדימה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${esc(f.name)}"`)}</div>`).join('')
           || `<div class="empty">${ui.gDriveQ ? 'לא נמצא דבר בשם הזה' : here ? 'התיקייה ריקה' : 'אין תיקיות'}</div>`);
         $$('[data-dir]', area).forEach((a) => a.addEventListener('click', (e) => {
           e.preventDefault(); ui.gDrivePath = path.concat([{ id: a.dataset.dir, name: a.textContent }]); ui.gDriveQ = ''; renderGoogle(el);
@@ -5803,6 +5989,9 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         $$('[data-copy]', area).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); copyPath(names.concat([b.dataset.copy])); }));
         const ch = $('[data-copyhere]', area);
         if (ch) ch.addEventListener('click', () => copyPath(names));
+        const preview = (id, row) => { const f = res.files.find((x) => x.id === id); if (f) openFilePreview(f, ui.gDriveQ && !here ? null : names.concat([f.name]), row); };
+        $$('[data-fpv]', area).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); preview(a.dataset.fpv, a.closest('.g-file')); }));
+        $$('[data-fi]', area).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; preview(r.dataset.fi, r); }));
         $$('[data-crumb]', area).forEach((a) => a.addEventListener('click', (e) => {
           e.preventDefault(); ui.gDrivePath = path.slice(0, Number(a.dataset.crumb)); ui.gDriveQ = ''; renderGoogle(el);
         }));
