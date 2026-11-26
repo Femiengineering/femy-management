@@ -2730,7 +2730,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       </div>
       ${meta ? `<div class="fpv-meta">${esc(meta)}</div>` : ''}
       <div class="fpv-body"><div class="hint">טוען תצוגה מקדימה...</div></div>
-      <details class="fpv-setup"><summary>${local ? '✓ פתיחה ישירה מהמחשב פעילה' : '⚙ פתיחה ישירה בתוכנה, בלי הורדה (התקנה חד-פעמית)'}</summary>${openHelperHelp(local)}</details>`;
+      <details class="fpv-setup"><summary>${!local ? '⚙ פתיחה ישירה בתוכנה ושליחה בוואטסאפ (התקנה חד-פעמית)' : helperVer() < OPEN_HELPER_VER ? '⚙ עדכון חד-פעמי: שליחת הקובץ המקורי בוואטסאפ' : '✓ פתיחה ישירה מהמחשב פעילה'}</summary>${openHelperHelp(local)}</details>`;
     requestAnimationFrame(() => el.classList.add('show'));
     $('[data-fpclose]', el).addEventListener('click', closeFilePreview);
     const doc = el.ownerDocument;
@@ -2835,7 +2835,13 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         return;
       }
     }
-    if (openHelper() && helperVer() < 2) fpvToast('לשליחה ישירה בוואטסאפ, עדכנו את הפתיחה הישירה: הכפתור "עדכון הפתיחה הישירה" בלשונית Drive');
+    // Without the updated helper, the file is not sent through the browser's share window (WhatsApp got it there
+    // with a broken Hebrew name): the panel shows the one-time install/update instead.
+    if (!gKind(f) && helperVer() < 2) {
+      askOpenHelper();
+      fpvToast(openHelper() ? 'כדי לשלוח בוואטסאפ את הקובץ המקורי, עדכנו פעם אחת את הפתיחה הישירה (הכפתור בתחתית החלון)' : 'כדי לשלוח בוואטסאפ את הקובץ המקורי, צריך התקנה חד-פעמית קטנה (פרטים בתחתית החלון)');
+      return;
+    }
     const nav = w.navigator;
     if (nav.share && nav.canShare) {
       try {
