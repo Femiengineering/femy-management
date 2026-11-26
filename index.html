@@ -2651,8 +2651,42 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
     setTimeout(() => toast('הפתיחה הישירה הופעלה: "פתיחה" יפתח קבצים ישר בתוכנה במחשב'), 1200);
   }
-  const fpv = { f: null, parts: null, hasParts: false, url: '', row: null };
+  const fpv = { f: null, parts: null, hasParts: false, url: '', blob: null, row: null, el: null, win: null };
+  // The preview opens in its own small browser window (one window, reused for every file). When the browser
+  // blocks it, it falls back to a panel on the side of the page.
+  function previewWindow() {
+    const W = Math.min(860, Math.round(screen.availWidth * 0.55)), H = Math.min(980, Math.round(screen.availHeight * 0.82));
+    let pw = fpv.win && !fpv.win.closed ? fpv.win : null;
+    if (!pw) try { pw = window.open('', 'femy-preview', `popup=yes,width=${W},height=${H},left=${Math.round((screen.availWidth - W) / 2)},top=${Math.round((screen.availHeight - H) / 3)}`); } catch (e) { pw = null; }
+    if (!pw) return null;
+    let el = null;
+    try { el = pw.document.getElementById('filePreview'); } catch (e) { return null; }
+    if (!el) {
+      const css = $$('style').map((x) => x.textContent).join('\n');
+      const links = $$('link[rel="stylesheet"]').map((l) => `<link rel="stylesheet" href="${esc(l.href)}">`).join('');
+      pw.document.open();
+      pw.document.write(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>תצוגה מקדימה</title>${links}<style>${css}</style>
+        <style>html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface); } .fpv.pop { position: fixed; inset: 0; width: auto; transform: none; box-shadow: none; transition: none; }</style></head>
+        <body><div id="filePreview" class="fpv pop show" aria-label="תצוגה מקדימה"></div><div class="toast" id="toast"></div></body></html>`);
+      pw.document.close();
+      pw.addEventListener('keydown', (e) => { if (e.key === 'Escape') pw.close(); });
+      el = pw.document.getElementById('filePreview');
+    }
+    try { pw.focus(); } catch (e) {}
+    return { pw, el };
+  }
+  // A message shown where the person is looking: in the preview window when it is open.
+  let fpvToastT = 0;
+  function fpvToast(msg) {
+    const w = fpv.win && !fpv.win.closed ? fpv.win : null;
+    const t = w && w.document.getElementById('toast');
+    if (!t) { toast(msg); return; }
+    t.textContent = msg; t.classList.add('show'); clearTimeout(fpvToastT); fpvToastT = setTimeout(() => t.classList.remove('show'), 3200);
+  }
   function filePreviewEl() {
+    const pop = previewWindow();
+    if (pop) { fpv.win = pop.pw; return pop.el; }
+    fpv.win = null;
     let el = $('#filePreview');
     if (el) return el;
     el = document.createElement('aside'); el.id = 'filePreview'; el.className = 'fpv'; el.setAttribute('aria-label', 'תצוגה מקדימה');
@@ -2662,11 +2696,12 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     return el;
   }
   function closeFilePreview() {
+    if (fpv.win) { try { fpv.win.close(); } catch (e) {} fpv.win = null; }
     const el = $('#filePreview'); if (!el) return;
     el.classList.remove('show');
     if (fpv.row) fpv.row.classList.remove('fp-on');
     if (fpv.url) URL.revokeObjectURL(fpv.url);
-    Object.assign(fpv, { f: null, parts: null, url: '', row: null });
+    Object.assign(fpv, { f: null, parts: null, url: '', blob: null, row: null });
     setTimeout(() => { if (!el.classList.contains('show')) el.innerHTML = ''; }, 250);
   }
   // f: a Drive file ({ id, name, mimeType, ... }); parts: its path under the projects folder, for the local copy
@@ -2675,7 +2710,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const el = filePreviewEl();
     if (fpv.row) fpv.row.classList.remove('fp-on');
     if (fpv.url) URL.revokeObjectURL(fpv.url);
-    Object.assign(fpv, { f, parts: Promise.resolve(parts || null), hasParts: !!parts, url: '', row: row || null });
+    Object.assign(fpv, { f, parts: Promise.resolve(parts || null), hasParts: !!parts, url: '', blob: null, row: row || null, el });
+    if (fpv.win) try { fpv.win.document.title = f.name; } catch (e) {}
     if (row) row.classList.add('fp-on');
     const mime = fileMime(f); const kind = gKind(f);
     const meta = [f.modifiedTime ? 'עודכן ' + new Date(f.modifiedTime).toLocaleDateString('he-IL') : '', f.size ? fmtSize(Number(f.size)) : ''].filter(Boolean).join(' · ');
@@ -2685,6 +2721,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         <button type="button" class="btn primary" data-fpopen title="${local ? 'פותח את הקובץ מ-Google Drive למחשב, בתוכנה שלו (Word, Excel, Acrobat, AutoCAD...)' : 'פותח את הקובץ בתוכנה שלו במחשב (Acrobat, Word, Excel...). בפעם הראשונה צריך התקנה חד-פעמית קטנה'}">🖥 פתיחה${local ? '' : ' במחשב'}</button>
         ${local ? '<button type="button" class="btn" data-fpdir title="פותח בסייר הקבצים את התיקייה שבה הקובץ נמצא">📂 התיקייה במחשב</button>' : ''}
         <button type="button" class="btn" data-fpdown title="הורדת עותק של הקובץ">⬇ הורדה</button>
+        <button type="button" class="btn" data-fpmail title="שליחת הקובץ במייל מה-Gmail שלך, כקובץ מצורף">✉ מייל</button>
+        <button type="button" class="btn" data-fpwa title="שליחת הקובץ בוואטסאפ">🟢 וואטסאפ</button>
         <a class="btn" href="${esc(driveFileUrl(f))}" target="_blank" rel="noopener" title="פתיחה ב-Google Drive בלשונית חדשה">Drive ↗</a>
         ${fpvPartsKnown() ? '<button type="button" class="g-copy" data-fpcopy title="העתקת הנתיב במחשב, להדבקה בסייר הקבצים עם Ctrl+L">📋 נתיב</button>' : ''}
       </div>
@@ -2693,9 +2731,12 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       <details class="fpv-setup"><summary>${local ? '✓ פתיחה ישירה מהמחשב פעילה' : '⚙ פתיחה ישירה בתוכנה, בלי הורדה (התקנה חד-פעמית)'}</summary>${openHelperHelp(local)}</details>`;
     requestAnimationFrame(() => el.classList.add('show'));
     $('[data-fpclose]', el).addEventListener('click', closeFilePreview);
-    $('[data-fpopen]', el).addEventListener('click', () => openFileLocal(f));
+    const doc = el.ownerDocument;
+    $('[data-fpopen]', el).addEventListener('click', () => openFileLocal(f, false, undefined, doc));
     $('[data-fpdown]', el).addEventListener('click', () => downloadDriveFile(f));
-    const dir = $('[data-fpdir]', el); if (dir) dir.addEventListener('click', () => openFileLocal(f, true));
+    $('[data-fpmail]', el).addEventListener('click', () => shareFileMail(f));
+    $('[data-fpwa]', el).addEventListener('click', () => shareFileWhatsApp(f, doc.defaultView));
+    const dir = $('[data-fpdir]', el); if (dir) dir.addEventListener('click', () => openFileLocal(f, true, undefined, doc));
     const cp = $('[data-fpcopy]', el); if (cp) cp.addEventListener('click', async () => { const p = await fpv.parts; if (p) copyPath(p); });
     bindOpenHelper(el);
     const body = $('.fpv-body', el);
@@ -2708,7 +2749,8 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     if (GOOGLE && G.valid() && small && (mime.startsWith('image/') || mime === 'application/pdf')) {
       G.drive.readBlob(f.id).then((b) => {
         if (!alive()) return;
-        fpv.url = URL.createObjectURL(mime === 'application/pdf' ? new Blob([b], { type: 'application/pdf' }) : b);
+        fpv.blob = mime === 'application/pdf' ? new Blob([b], { type: 'application/pdf' }) : b;
+        fpv.url = URL.createObjectURL(fpv.blob);
         if (mime.startsWith('image/')) body.innerHTML = `<img src="${esc(fpv.url)}" alt="${esc(f.name)}">`; else frame(fpv.url + '#toolbar=0&navpanes=0&view=FitH');
       }).catch(drivePreview);
     } else drivePreview();
@@ -2724,36 +2766,76 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     if (tap) clearTimeout(tap.t);
     tap = { id: f.id, t: setTimeout(() => { tap = null; openFilePreview(f, parts, row); }, 280) };
   }
-  async function openFileLocal(f, folder, partsIn) {
+  async function openFileLocal(f, folder, partsIn, doc) {
     if (gKind(f) && !folder) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // Google Docs/Sheets open in the browser
-    if (!openHelper()) { if (!$('#filePreview.show')) openFilePreview(f, partsIn, null); askOpenHelper(); return; }
+    if (!openHelper()) { if (fpv.f !== f) openFilePreview(f, partsIn, null); askOpenHelper(); return; }
     const parts = await (partsIn !== undefined ? Promise.resolve(partsIn) : fpv.parts);
     if (!parts || !parts.length) { toast('לא ידוע איפה הקובץ נמצא במחשב. פתחו אותו מתוך תיקיית הפרויקט'); return; }
     const path = localPath(folder ? parts.slice(0, -1) : parts);
-    const a = document.createElement('a'); a.href = 'femy-open:' + encodeURIComponent(path);
-    document.body.appendChild(a); a.click(); a.remove();
-    toast(folder ? 'פותח את התיקייה בסייר הקבצים...' : 'פותח את "' + f.name + '" בתוכנה במחשב...');
+    // The link is clicked in the window that was clicked, since the browser opens femy-open only from a click.
+    const d = doc || document;
+    const a = d.createElement('a'); a.href = 'femy-open:' + encodeURIComponent(path);
+    d.body.appendChild(a); a.click(); a.remove();
+    (d === document ? toast : fpvToast)(folder ? 'פותח את התיקייה בסייר הקבצים...' : 'פותח את "' + f.name + '" בתוכנה במחשב...');
   }
   // "פתיחה" before the one-time setup: opens the setup steps in the panel, with the installer button highlighted.
   function askOpenHelper() {
-    const el = $('#filePreview'); if (!el) return;
+    const el = fpv.el; if (!el) return;
     const d = $('.fpv-setup', el); if (!d) return;
     d.open = true; d.classList.add('ask');
     d.scrollIntoView({ block: 'nearest' });
-    toast('כדי שקבצים ייפתחו ישר בתוכנה במחשב, צריך התקנה חד-פעמית קטנה (פרטים בתחתית החלון)');
+    fpvToast('כדי שקבצים ייפתחו ישר בתוכנה במחשב, צריך התקנה חד-פעמית קטנה (פרטים בתחתית החלון)');
+  }
+  // The file itself (Google Docs/Sheets/Slides as Office files), with the name to send it under.
+  async function driveFileBlob(f) {
+    const ex = GEXPORT[gKind(f)];
+    if (gKind(f) && !ex) return null;
+    const name = ex && !new RegExp('\\.' + ex[1] + '$', 'i').test(f.name) ? f.name + '.' + ex[1] : f.name;
+    if (fpv.f === f && fpv.blob) return { name, blob: fpv.blob };
+    if (!GOOGLE || !G.valid()) return null;
+    const blob = ex ? new Blob([await G.drive.exportFile(f.id, ex[0])], { type: ex[0] }) : await G.drive.readBlob(f.id);
+    if (fpv.f === f) fpv.blob = blob;
+    return { name, blob };
+  }
+  // By mail: a new message from the user's Gmail (the site's mail window) with the file attached;
+  // a file too big for Gmail goes as a Drive link.
+  async function shareFileMail(f) {
+    if (!GOOGLE || !G.valid()) { window.open('mailto:?subject=' + encodeURIComponent(f.name) + '&body=' + encodeURIComponent(driveFileUrl(f)), '_blank'); return; }
+    fpvToast('מכין את הקובץ למייל...');
+    let x = null; try { x = await driveFileBlob(f); } catch (e) { x = null; }
+    if (x && x.blob.size < 24 * 1024 * 1024) mbCompose({ subject: x.name, fwdFiles: [{ name: x.name, blob: x.blob, size: x.blob.size }] });
+    else mbCompose({ subject: f.name, html: `<a href="${esc(driveFileUrl(f))}">${esc(f.name)}</a>` });
+    try { window.focus(); } catch (e) {}
+    fpvToast('המייל מוכן בחלון האתר: הוסיפו נמען ושלחו');
+  }
+  // By WhatsApp: the computer's share window with the file itself (WhatsApp is in it when installed);
+  // where the browser cannot share files, WhatsApp opens with a link to the file in Drive.
+  async function shareFileWhatsApp(f, w) {
+    w = w || window;
+    const nav = w.navigator;
+    if (nav.share && nav.canShare) {
+      try {
+        const x = await driveFileBlob(f);
+        if (x) {
+          const file = new w.File([x.blob], x.name, { type: x.blob.type || 'application/octet-stream' });
+          if (nav.canShare({ files: [file] })) { await nav.share({ files: [file], title: x.name }); return; }
+        }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    w.open('https://wa.me/?text=' + encodeURIComponent(f.name + '\n' + driveFileUrl(f)), '_blank', 'noopener');
   }
   async function downloadDriveFile(f, toOpen) {
     const kind = gKind(f); const ex = GEXPORT[kind];
     if (kind && !ex) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // forms, maps...: only in Drive
     const name = ex && !new RegExp('\\.' + ex[1] + '$', 'i').test(f.name) ? f.name + '.' + ex[1] : f.name;
     if (GOOGLE && G.valid()) {
-      toast('מוריד את "' + name + '"...');
+      fpvToast('מוריד את "' + name + '"...');
       try {
         const blob = ex ? new Blob([await G.drive.exportFile(f.id, ex[0])], { type: ex[0] }) : await G.drive.readBlob(f.id);
         downloadBlob(name, blob);
-        if (toOpen) toast('הקובץ ירד. לחצו עליו בשורת ההורדות של הדפדפן והוא ייפתח בתוכנה שלו. לפתיחה ישירה בלי הורדה, ראו "פתיחה ישירה בתוכנה" בתחתית החלון');
+        if (toOpen) fpvToast('הקובץ ירד. לחצו עליו בשורת ההורדות של הדפדפן והוא ייפתח בתוכנה שלו. לפתיחה ישירה בלי הורדה, ראו "פתיחה ישירה בתוכנה" בתחתית החלון');
         return;
-      } catch (e) { toast('ההורדה נכשלה (' + gErr(e) + '), מנסה דרך Drive'); }
+      } catch (e) { fpvToast('ההורדה נכשלה (' + gErr(e) + '), מנסה דרך Drive'); }
     }
     window.open(ex ? `https://docs.google.com/${ex[2]}/d/${encodeURIComponent(f.id)}/export?format=${ex[1]}` : 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(f.id), '_blank', 'noopener');
   }
@@ -2769,7 +2851,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const dl = $('[data-fphelper]', el);
     if (dl) dl.addEventListener('click', (e) => { e.preventDefault(); downloadBlob('femy-open-setup.cmd', new Blob([openHelperSetup()], { type: 'application/octet-stream' })); });
     const on = $('[data-fphelperon]', el);
-    if (on) on.addEventListener('change', () => { setOpenHelper(on.checked); toast(on.checked ? 'מעכשיו "פתיחה" פותח את הקובץ ישירות מהמחשב' : 'מעכשיו "פתיחה" מוריד את הקובץ'); if (fpv.f) openFilePreview(fpv.f, fpv.parts, fpv.row); });
+    if (on) on.addEventListener('change', () => { setOpenHelper(on.checked); fpvToast(on.checked ? 'מעכשיו "פתיחה" פותח את הקובץ ישירות מהמחשב' : 'מעכשיו "פתיחה" מוריד את הקובץ'); if (fpv.f) openFilePreview(fpv.f, fpv.parts, fpv.row); });
   }
   // The one-time Windows setup: writes a small script to %LOCALAPPDATA%\FemyOpen and registers femy-open: for this
   // user only (HKCU, no admin rights). The script opens only an existing file or folder on a local drive, and never
