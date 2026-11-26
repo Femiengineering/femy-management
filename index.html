@@ -745,8 +745,8 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .pd-dir { cursor: pointer; user-select: none; }
 /* Drive file preview: a panel on the side (full screen on a phone) */
 .g-file.fp-on { background: var(--primary-soft); border-radius: 6px; }
-.fpv { position: fixed; top: 0; bottom: 0; left: 0; width: min(620px, 48vw); background: var(--surface); box-shadow: 4px 0 24px rgba(0,0,0,.18); z-index: 55; display: flex; flex-direction: column; transform: translateX(-105%); transition: transform .18s ease; }
-.fpv.show { transform: none; }
+.fpv { position: fixed; inset: 0; background: var(--surface); z-index: 55; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transition: opacity .15s ease, visibility .15s; }
+.fpv.show { opacity: 1; visibility: visible; }
 .fpv-head { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 .fpv-head img { width: 18px; height: 18px; flex-shrink: 0; }
 .fpv-title { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
@@ -764,7 +764,6 @@ img.pg-logo { width: 56px; border-radius: 8px; padding: 2px; }
 .fpv-setup.ask summary { color: inherit; font-weight: 700; }
 .fpv-setup ol { margin: 8px 0; padding-inline-start: 20px; }
 .fpv-setup li { margin-bottom: 4px; }
-@media (max-width: 900px) { .fpv { width: 100%; } }
 .pd-crumbs .g-copy { text-decoration: none; }
 .g-crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .g-search { display: flex; gap: 8px; flex: 1; min-width: 200px; }
@@ -1919,7 +1918,13 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const LOCAL_DRIVE_KEY = 'femy-local-drive';
   const localDrive = () => {
     let c = {}; try { c = JSON.parse(localStorage.getItem(LOCAL_DRIVE_KEY) || '{}') || {}; } catch (e) { c = {}; }
-    return { letter: /^[A-Z]$/.test(c.letter || '') ? c.letter : 'G', root: typeof c.root === 'string' && c.root.trim() ? c.root.trim() : 'My Drive\\' + ((window.FemyGoogle && FemyGoogle.drive.projectsName) || 'פרויקטים פמי') };
+    const name = (window.FemyGoogle && FemyGoogle.drive.projectsName) || 'פרויקטים פמי';
+    // The projects folder is shared with the office, so Google Drive for desktop keeps it under
+    // .shortcut-targets-by-id\<folder id>\ (not under My Drive). The old default is treated as unset.
+    const id = window.FEMY_GOOGLE && window.FEMY_GOOGLE.projectsFolderId;
+    const def = id ? '.shortcut-targets-by-id\\' + id + '\\' + name : 'My Drive\\' + name;
+    const saved = typeof c.root === 'string' ? c.root.trim() : '';
+    return { letter: /^[A-Z]$/.test(c.letter || '') ? c.letter : 'G', root: saved && saved !== 'My Drive\\' + name ? saved : def };
   };
   const setLocalDrive = (patch) => { try { localStorage.setItem(LOCAL_DRIVE_KEY, JSON.stringify(Object.assign(localDrive(), patch))); } catch (e) {} };
   const localPath = (parts) => { const c = localDrive(); return [c.letter + ':', c.root.replace(/^[\\/]+|[\\/]+$/g, '')].concat(parts || []).filter(Boolean).join('\\'); };
@@ -2556,7 +2561,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       box.innerHTML = `<div class="g-crumbs pd-crumbs"><b>תוצאות חיפוש: "${esc(q)}"</b><span style="flex:1"></span><button type="button" class="g-copy" data-clear>✕ ניקוי החיפוש</button></div>
         <div class="pd-list">${shown.map((it, i) => (it.f.folder
           ? `<div class="g-file pd-dir" data-i="${i}"><span>📁</span><div class="pd-name"><a href="#" data-dir="${i}" title="פתיחת התיקייה">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`
-          : `<div class="g-file pd-dir" data-fi="${i}">${it.f.iconLink ? `<img src="${esc(it.f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="pd-name"><a href="${esc(fileUrl(it.f))}" data-fpv="${i}" title="תצוגה מקדימה">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`)).join('')
+          : `<div class="g-file pd-dir" data-fi="${i}">${it.f.iconLink ? `<img src="${esc(it.f.iconLink)}" alt="">` : '<span>📄</span>'}<div class="pd-name"><a href="${esc(fileUrl(it.f))}" data-fpv="${i}" title="לחיצה: תצוגה מקדימה · לחיצה כפולה: פתיחה בתוכנה במחשב">${esc(it.f.name)}</a>${where(it)}</div>${copyBtn(`data-copy="${i}"`)}</div>`)).join('')
           || `<div class="hint" style="padding:8px 0">${ix.running ? 'מחפש...' : 'לא נמצא קובץ או תיקייה בשם הזה'}</div>`}</div>
         <div class="hint" style="padding-top:8px">${hits.length} תוצאות${hits.length > shown.length ? ` (מוצגות ${shown.length})` : ''}${ix.running ? ` · סורק תיקיות... (${ix.items.length} פריטים עד עכשיו)` : ''}${!ix.running && ix.partial ? ' · ייתכן שחלק מהתיקיות לא נסרקו' : ''}</div>`;
       const pick = (i) => shown[Number(i)];
@@ -2565,7 +2570,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       $$('[data-dir]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openDir(pick(a.dataset.dir)); }));
       $$('.pd-dir', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; openDir(pick(r.dataset.i)); }));
       $$('[data-copy]', box).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); const it = pick(b.dataset.copy); copyProjectPath(p, it.path.map((c) => c.name).concat([it.f.name])); }));
-      const preview = (i, row) => { const it = pick(i); openFilePreview(it.f, projLocalParts(p, it.path.map((c) => c.name).concat([it.f.name])), row); };
+      const preview = (i, row) => { const it = pick(i); fileTap(it.f, projLocalParts(p, it.path.map((c) => c.name).concat([it.f.name])), row); };
       $$('[data-fpv]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); preview(a.dataset.fpv, a.closest('.g-file')); }));
       $$('[data-fi]', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; preview(r.dataset.fi, r); }));
     };
@@ -2603,7 +2608,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       const fileUrl = (f) => f.webViewLink || ('https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view');
       const rows = res.files.map((f, i) => (f.folder
         ? `<div class="g-file pd-dir" data-i="${i}"><span>📁</span><a href="#" data-dir="${i}" title="פתיחת התיקייה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`
-        : `<div class="g-file pd-dir" data-fi="${i}">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<a href="${esc(fileUrl(f))}" data-fpv="${i}" title="תצוגה מקדימה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`)).join('');
+        : `<div class="g-file pd-dir" data-fi="${i}">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '<span>📄</span>'}<a href="${esc(fileUrl(f))}" data-fpv="${i}" title="לחיצה: תצוגה מקדימה · לחיצה כפולה: פתיחה בתוכנה במחשב">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${i}"`)}</div>`)).join('');
       const nf = res.files.filter((f) => f.folder).length;
       box.innerHTML = head + `<div class="pd-list">${rows || '<div class="hint" style="padding:8px 0">התיקייה ריקה</div>'}</div>`
         + `<div class="hint" style="padding-top:8px">${nf} תיקיות · ${res.files.length - nf} קבצים${res.src === 'cache' ? ' · מהסנכרון האחרון, רק תיקיות וסיכומים שכבר זוהו. לרשימה המלאה חברו את חשבון ה-Google בלשונית <a href="#google">יומן, מייל ו-Drive</a>' : ''}</div>`;
@@ -2611,7 +2616,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       $$('[data-dir]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); open(res.files[Number(a.dataset.dir)]); }));
       $$('.pd-dir', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; open(res.files[Number(r.dataset.i)]); }));
       $$('[data-copy]', box).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); copyProjectPath(p, names.concat([res.files[Number(b.dataset.copy)].name])); }));
-      const preview = (i, row) => { const f = res.files[Number(i)]; openFilePreview(f, projLocalParts(p, names.concat([f.name])), row); };
+      const preview = (i, row) => { const f = res.files[Number(i)]; fileTap(f, projLocalParts(p, names.concat([f.name])), row); };
       $$('[data-fpv]', box).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); preview(a.dataset.fpv, a.closest('.g-file')); }));
       $$('[data-fi]', box).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; preview(r.dataset.fi, r); }));
     }).catch((e) => {
@@ -2703,7 +2708,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       G.drive.readBlob(f.id).then((b) => {
         if (!alive()) return;
         fpv.url = URL.createObjectURL(mime === 'application/pdf' ? new Blob([b], { type: 'application/pdf' }) : b);
-        if (mime.startsWith('image/')) body.innerHTML = `<img src="${esc(fpv.url)}" alt="${esc(f.name)}">`; else frame(fpv.url);
+        if (mime.startsWith('image/')) body.innerHTML = `<img src="${esc(fpv.url)}" alt="${esc(f.name)}">`; else frame(fpv.url + '#toolbar=0&navpanes=0&view=FitH');
       }).catch(drivePreview);
     } else drivePreview();
   }
@@ -2711,10 +2716,17 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   const fpvPartsKnown = () => fpv.hasParts;
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
   // The file's local copy, through the femy-open: link the helper registers on this computer.
-  async function openFileLocal(f, folder) {
+  // A file in a list: one click shows the full-window preview, a double click opens it in its program.
+  let tap = null;
+  function fileTap(f, parts, row) {
+    if (tap && tap.id === f.id) { clearTimeout(tap.t); tap = null; openFileLocal(f, false, parts); return; }
+    if (tap) clearTimeout(tap.t);
+    tap = { id: f.id, t: setTimeout(() => { tap = null; openFilePreview(f, parts, row); }, 280) };
+  }
+  async function openFileLocal(f, folder, partsIn) {
     if (gKind(f) && !folder) { window.open(driveFileUrl(f), '_blank', 'noopener'); return; } // Google Docs/Sheets open in the browser
-    if (!openHelper()) { askOpenHelper(); return; }
-    const parts = await fpv.parts;
+    if (!openHelper()) { if (!$('#filePreview.show')) openFilePreview(f, partsIn, null); askOpenHelper(); return; }
+    const parts = await (partsIn !== undefined ? Promise.resolve(partsIn) : fpv.parts);
     if (!parts || !parts.length) { toast('לא ידוע איפה הקובץ נמצא במחשב. פתחו אותו מתוך תיקיית הפרויקט'); return; }
     const path = localPath(folder ? parts.slice(0, -1) : parts);
     const a = document.createElement('a'); a.href = 'femy-open:' + encodeURIComponent(path);
@@ -2772,7 +2784,16 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       "var BAD = /\\.(exe|com|bat|cmd|ps1|psm1|psd1|vbs|vbe|js|jse|wsf|wsh|wsc|msi|msp|mst|lnk|scr|hta|reg|cpl|jar|pif|url|scf|inf|dll|sys|ocx|application|appref-ms|msc|gadget|settingcontent-ms|library-ms|search-ms|diagcab|appx|appxbundle|msix|msixbundle|appinstaller|iso|img|vhd|vhdx|chm|theme|themepack|xll|xla|xlam|ppa|ppam|website|mht|mhtml|ws)$/i;",
       "if (!/^[A-Za-z]:\\\\[^:*?\"<>|]*$/.test(p) || /(^|\\\\)\\.\\.(\\\\|$)/.test(p) || BAD.test(p)) { say('הקישור הזה לא נפתח: מותר לפתוח רק קבצים ותיקיות מ-Google Drive במחשב.'); WScript.Quit(1); }",
       "var fso = new ActiveXObject('Scripting.FileSystemObject');",
-      "if (fso.FileExists(p) || fso.FolderExists(p)) new ActiveXObject('Shell.Application').ShellExecute(p, '', '', 'open', 1);",
+      "function has(x) { return fso.FileExists(x) || fso.FolderExists(x); }",
+      "if (!has(p)) {",
+      "  var m = p.match(/^([A-Za-z]):\\\\(?:My Drive|האחסון שלי|Shared drives|תיקיות אחסון שיתופי|\\.shortcut-targets-by-id\\\\[^\\\\]+)\\\\(.+)$/);",
+      "  if (m) {",
+      "    var L = m[1] + ':\\\\', R = m[2], c = [L + 'My Drive\\\\' + R, L + 'האחסון שלי\\\\' + R, L + 'Shared drives\\\\' + R, L + 'תיקיות אחסון שיתופי\\\\' + R];",
+      "    try { var e = new Enumerator(fso.GetFolder(L + '.shortcut-targets-by-id').SubFolders); for (; !e.atEnd(); e.moveNext()) c.push(e.item().Path + '\\\\' + R); } catch (x) {}",
+      "    for (var i = 0; i < c.length; i++) if (has(c[i])) { p = c[i]; break; }",
+      "  }",
+      "}",
+      "if (has(p)) new ActiveXObject('Shell.Application').ShellExecute(p, '', '', 'open', 1);",
       "else say('הקובץ לא נמצא במחשב:\\n' + p + '\\n\\nודאו ש-Google Drive למחשב פועל, ושאות הכונן באתר נכונה.');",
     ].join('\r\n').replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
     const b64 = btoa(js);
@@ -6000,7 +6021,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         area.innerHTML = `<div class="g-crumbs">${crumbs.map((c, i) => i === crumbs.length - 1 ? `<b>${esc(c.name)}</b>` : `<a href="#" data-crumb="${i}">${esc(c.name)}</a>`).join(' <span class="hint">›</span> ')}<span style="flex:1"></span>${copyBtn('data-copyhere')}</div>`
           + (res.files.map((f) => f.folder
             ? `<div class="g-file"><span>📁</span><a href="#" data-dir="${esc(f.id)}">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${esc(f.name)}"`)}</div>`
-            : `<div class="g-file pd-dir" data-fi="${esc(f.id)}">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a href="#" data-fpv="${esc(f.id)}" title="תצוגה מקדימה">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${esc(f.name)}"`)}</div>`).join('')
+            : `<div class="g-file pd-dir" data-fi="${esc(f.id)}">${f.iconLink ? `<img src="${esc(f.iconLink)}" alt="">` : '📄'}<a href="#" data-fpv="${esc(f.id)}" title="לחיצה: תצוגה מקדימה · לחיצה כפולה: פתיחה בתוכנה במחשב">${esc(f.name)}</a>${when(f)}${copyBtn(`data-copy="${esc(f.name)}"`)}</div>`).join('')
           || `<div class="empty">${ui.gDriveQ ? 'לא נמצא דבר בשם הזה' : here ? 'התיקייה ריקה' : 'אין תיקיות'}</div>`);
         $$('[data-dir]', area).forEach((a) => a.addEventListener('click', (e) => {
           e.preventDefault(); ui.gDrivePath = path.concat([{ id: a.dataset.dir, name: a.textContent }]); ui.gDriveQ = ''; renderGoogle(el);
@@ -6009,7 +6030,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         $$('[data-copy]', area).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); copyPath(names.concat([b.dataset.copy])); }));
         const ch = $('[data-copyhere]', area);
         if (ch) ch.addEventListener('click', () => copyPath(names));
-        const preview = (id, row) => { const f = res.files.find((x) => x.id === id); if (f) openFilePreview(f, ui.gDriveQ && !here ? null : names.concat([f.name]), row); };
+        const preview = (id, row) => { const f = res.files.find((x) => x.id === id); if (f) fileTap(f, ui.gDriveQ && !here ? null : names.concat([f.name]), row); };
         $$('[data-fpv]', area).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); preview(a.dataset.fpv, a.closest('.g-file')); }));
         $$('[data-fi]', area).forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; preview(r.dataset.fi, r); }));
         $$('[data-crumb]', area).forEach((a) => a.addEventListener('click', (e) => {
