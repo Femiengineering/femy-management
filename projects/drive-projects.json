@@ -1,5 +1,5 @@
 {
- "version": "2026-11-26",
+ "version": "2026-11-26b",
  "source": "Google Drive: תיקיית \"פרויקטים פמי\". נאסף מדוחות הסטטוס וסיכומי הפגישות האחרונים בכל תיקייה. תאריך ההתחלה הוא תאריך פתיחת תיקיית הפרויקט ב-Drive. אחוז ההתקדמות הוא הערכה לפי שלב הפרויקט.",
  "projects": [
   {
@@ -379,34 +379,6 @@
    "budget": "",
    "driveFolder": "1W1smfM-4jUdAgrSj2gFwBQ-GTe_Y3uQT",
    "notes": "ארבע עבודות בתיקייה. אין פעילות ב-Drive מאז 2025. סומן מושהה עד לבדיקה: לעדכן סטטוס."
-  },
-  {
-   "id": "drv-satmar-tiberias",
-   "name": "ישיבת ייטב לב - טבריה",
-   "client": "סאטמר",
-   "location": "נוף כנרת, טבריה",
-   "manager": "",
-   "status": "planning",
-   "progress": 10,
-   "start": "2026-08-25",
-   "end": "",
-   "budget": "",
-   "driveFolder": "14R55yUvu_8645DB0d9KWHsAP1kEwGeYR",
-   "notes": "שלב היתכנות ותכנון ראשוני: סקיצות לפגישה עם מהנדס העיר, תכנית מעודכנת 17.08.26, חלוקה לשלבים, הדמיה ואומדני עלויות (אומדן פרויקט 09.2026)."
-  },
-  {
-   "id": "drv-satmar-yoldot",
-   "name": "בית החלמה ליולדות",
-   "client": "סאטמר",
-   "location": "",
-   "manager": "",
-   "status": "planning",
-   "progress": 5,
-   "start": "2026-09-08",
-   "end": "",
-   "budget": "",
-   "driveFolder": "14R55yUvu_8645DB0d9KWHsAP1kEwGeYR",
-   "notes": "יש גיליון \"בית החלמה ליולדות\" בתיקיית סאטמר (עודכן 10.2026). אין דוח סטטוס."
   },
   {
    "id": "drv-maccabi-shalom-big",
@@ -1026,5 +998,12 @@
     ]
    }
   }
+ ],
+ "removeClients": [
+  "סאטמר"
+ ],
+ "removeProjects": [
+  "drv-satmar-tiberias",
+  "drv-satmar-yoldot"
  ]
 }
