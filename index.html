@@ -2731,7 +2731,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const path = localPath(folder ? parts.slice(0, -1) : parts);
     const a = document.createElement('a'); a.href = 'femy-open:' + encodeURIComponent(path);
     document.body.appendChild(a); a.click(); a.remove();
-    toast((folder ? 'פותח את התיקייה במחשב: ' : 'פותח במחשב: ') + '⁦' + path + '⁩');
+    toast(folder ? 'פותח את התיקייה בסייר הקבצים...' : 'פותח את "' + f.name + '" בתוכנה במחשב...');
   }
   // "פתיחה" before the one-time setup: opens the setup steps in the panel, with the installer button highlighted.
   function askOpenHelper() {
