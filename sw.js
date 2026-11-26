@@ -1,5 +1,5 @@
 // Service worker: lets the app open without a network connection.
-const CACHE = 'femy-v34';
+const CACHE = 'femy-v35';
 const ASSETS = [
   './',
   './index.html',
@@ -45,8 +45,10 @@ self.addEventListener('fetch', (e) => {
   const url = e.request.url;
   const own = new URL(url).origin === location.origin;
   if (!own && !url.startsWith(FIREBASE_SDK)) return;
+  // The site's own files skip the browser's HTTP cache (GitHub Pages keeps them up to 10 minutes),
+  // so a new version shows on the next load instead of up to 10 minutes later.
   e.respondWith(
-    fetch(e.request)
+    (own ? fetch(url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(e.request))
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();
