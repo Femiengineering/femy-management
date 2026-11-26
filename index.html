@@ -1921,9 +1921,16 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
   function applySheet(res, at) {
     const st = settings();
     const map = st.sheetMap = st.sheetMap || {}; // "לקוח|פרויקט בגיליון" -> project id on the site
+    const real = db.projects.filter((p) => !/^sh-p-/.test(p.id));
     res.groups.forEach((g) => {
       const key = g.client + '|' + g.name;
-      if (map[key] && byId(db.projects, map[key])) return;
+      if (map[key] && byId(db.projects, map[key])) {
+        // A heading that got a project of its own (sh-p-) moves to a real project once one fits it.
+        if (!/^sh-p-/.test(map[key])) return;
+        const m = FemySheet.matchProject(g.name, g.client, real);
+        if (m) map[key] = m.id;
+        return;
+      }
       let p = FemySheet.matchProject(g.name, g.client, db.projects);
       if (!p) {
         p = { id: 'sh-p-' + FemySheet.hash(key), name: g.name, client: g.client, location: '', manager: '', status: 'active', progress: 0, start: '', end: '', budget: '', notes: 'נוצר מהגיליון "משימות פמי".' };
@@ -1940,6 +1947,14 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     // The tasks taken from the status reports (drv-t-) are replaced by the sheet, which is the real list.
     db.tasks = db.tasks.filter((t) => !t.sheet && !/^drv-t-/.test(t.id)).concat(fromSheet);
     db.contacts = res.contacts;
+    // Projects the sheet opened on its own (sh-p-) that no heading points to any more, and that nothing on the
+    // site uses, are removed (e.g. "כללי" headings, or a heading that now belongs to a real project).
+    const heads = new Set(res.groups.map((g) => g.client + '|' + g.name));
+    Object.keys(map).forEach((k) => { if (!heads.has(k)) delete map[k]; });
+    const used = new Set(Object.values(map));
+    const linked = (id) => ['tasks', 'protocols', 'invoices'].some((c) => (db[c] || []).some((x) => x.projectId === id));
+    const edited = (p) => (p.team && p.team.length) || p.logo || p.notes !== 'נוצר מהגיליון "משימות פמי".';
+    db.projects = db.projects.filter((p) => !/^sh-p-/.test(p.id) || used.has(p.id) || linked(p.id) || edited(p));
     st.sheetSync = { at: at || Date.now(), tasks: fromSheet.length, contacts: res.contacts.length };
     save();
     // Don't redraw under someone who is typing or has a form open.
@@ -2147,6 +2162,27 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const o = db.projects.find((x) => x.logo && clientKey(x) === name);
     return o ? o.logo : '';
   }
+  // Official logos of the clients in the tasks sheet, from each client's own website. A logo uploaded on the site
+  // (the 🖼 button) comes first; if a website's image can't be loaded, the client's initials show instead.
+  const WEB_LOGOS = {
+    'מכבי': 'https://www.maccabi4u.co.il/media/xtxhwsfh/%D7%9C%D7%95%D7%92%D7%95-%D7%9E%D7%9B%D7%91%D7%99_%D7%90%D7%93%D7%A8-%D7%93%D7%A1%D7%A7%D7%98%D7%95%D7%A4.svg',
+    'עיריית נתיבות': 'https://www.netivot.muni.il/content/images/logo.png',
+    'עיריית בני ברק': 'https://www.bnei-brak.muni.il/wp-content/uploads/2023/05/%D7%9C%D7%95%D7%92%D7%95-%D7%91%D7%A8%D7%A7%D7%A2-%D7%A9%D7%A7%D7%95%D7%A3-150x150.png',
+    'החברה הממשלתית לתיירות': 'https://igtc.co.il/wp-content/uploads/2025/03/logo-1.png',
+    'ערים': 'https://www.arim.co.il/Media/Uploads/logo(1).png',
+    'עיריית ראש העין': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Coat_of_arms_of_Rosh_HaAyin.svg/240px-Coat_of_arms_of_Rosh_HaAyin.svg.png',
+  };
+  // Client names as they appear on the site or in the sheet -> a key of WEB_LOGOS.
+  const WEB_LOGO_NAMES = [[/מכבי/, 'מכבי'], [/נתיבות/, 'עיריית נתיבות'], [/בני ברק/, 'עיריית בני ברק'], [/ממשלתית לתיירות|חמ"ת/, 'החברה הממשלתית לתיירות'], [/אלעד|^ערים/, 'ערים'], [/ראש העין/, 'עיריית ראש העין']];
+  function webLogo(name) { const m = WEB_LOGO_NAMES.find(([re]) => re.test(name || '')); return m ? WEB_LOGOS[m[1]] : ''; }
+  // The client's logo: the uploaded one (a photo id), else the website's, else the initials.
+  function clientLogoHtml(name, lg, imgCls, avCls) {
+    if (lg) return `<img${imgCls ? ` class="${imgCls}"` : ''} data-photo="${esc(lg)}" alt="">`;
+    const url = webLogo(name);
+    if (!url) return avatarHtml(name, avCls);
+    return `<img${imgCls ? ` class="${imgCls}"` : ''} src="${esc(url)}" alt="${esc(name)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.nextElementSibling.style.display='';this.remove()">`
+      + avatarHtml(name, avCls).replace('style="', 'style="display:none;');
+  }
   const AV_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#db2777', '#0891b2', '#4f46e5', '#65a30d'];
   function avatarHtml(label, cls) {
     const t = String(label || '?').replace(/["'״׳]/g, '').trim().split(/\s+/).filter(Boolean);
@@ -2199,7 +2235,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       const real = g.name !== 'ללא לקוח', lg = real && clientLogo(g.name);
       return `<div class="ccard" data-client="${esc(g.name)}">
         <button type="button" class="ccard-main" aria-expanded="false" title="${esc(g.name)}">
-          <span class="ccard-logo">${lg ? `<img data-photo="${esc(lg)}" alt="">` : avatarHtml(g.name, 'ccard-av')}</span>
+          <span class="ccard-logo">${real ? clientLogoHtml(g.name, lg, '', 'ccard-av') : avatarHtml(g.name, 'ccard-av')}</span>
           <span class="ccard-name">${esc(g.name)}</span>
           <span class="ccard-sum">${statusSum(g.items)}</span>
           <span class="ccard-count">${g.items.length} פרויקטים</span>
@@ -2212,7 +2248,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       let label, sum, acts = '';
       if (byClientView) {
         const real = g.name !== 'ללא לקוח', lg = real && clientLogo(g.name);
-        label = (lg ? `<img class="pg-logo" data-photo="${esc(lg)}" alt="">` : avatarHtml(g.name, 'pg-logo')) + `<span class="pg-name">${esc(g.name)}</span>`;
+        label = clientLogoHtml(g.name, lg, 'pg-logo', 'pg-logo') + `<span class="pg-name">${esc(g.name)}</span>`;
         sum = statusSum(g.items);
         if (real) acts = `<span class="pg-acts">${lg ? `<button type="button" class="ptile-act" data-logo-del title="הסרת הלוגו">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${lg ? 'החלפת הלוגו של הלקוח' : 'הוספת לוגו ללקוח'}">🖼</button></span>`;
       } else {
@@ -3391,7 +3427,23 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     const added = {};
     data.projects.forEach((p) => {
       if (ids.has(p.id) || names.has(norm(p.name))) return;
+      // A project the tasks sheet already opened on its own (sh-p-, under its heading in the sheet) takes this
+      // project's details and keeps its id, so its tasks stay with it.
+      const own = [p.name].concat(p.aliases || []).map(norm);
+      const sh = db.projects.find((x) => /^sh-p-/.test(x.id) && own.includes(norm(x.name)));
+      if (sh) { Object.keys(p).forEach((k) => { if (k !== 'id' && k !== 'name') sh[k] = p[k]; }); return; }
       db.projects.push(Object.assign({}, p)); added[p.id] = 1; n++;
+    });
+    // One-time changes to projects already in the system. With "from", a field changes only while it still
+    // holds the old value, so what was edited on the site stays.
+    let nu = 0;
+    (data.updates || []).forEach((u) => {
+      const p = byId(db.projects, u.id); if (!p) return;
+      Object.keys(u.set || {}).forEach((k) => {
+        if (u.from && k in u.from && norm(p[k]) !== norm(u.from[k])) return;
+        if (JSON.stringify(p[k]) === JSON.stringify(u.set[k])) return;
+        p[k] = u.set[k]; nu++;
+      });
     });
     // Open action items and recent meeting summaries, only for projects added now.
     let nt = 0;
@@ -3402,6 +3454,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     settings().driveImport = data.version;
     save(); render();
     if (n) toast(`נוספו ${n} פרויקטים ו-${nt} משימות מתיקיית פרויקטים פמי ב-Drive`);
+    else if (nu && manual) toast('פרטי הפרויקטים עודכנו');
     else if (manual) toast('כל הפרויקטים מה-Drive כבר נמצאים במערכת');
   }
 
