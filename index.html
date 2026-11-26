@@ -2295,7 +2295,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
           <span class="ccard-sum">${statusSum(g.items)}</span>
           <span class="ccard-count">${g.items.length} פרויקטים</span>
         </button>
-        ${real ? `<span class="ccard-acts">${lg ? `<button type="button" class="ptile-act" data-logo-del title="הסרת הלוגו">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${lg ? 'החלפת הלוגו של הלקוח' : 'הוספת לוגו ללקוח'}">🖼</button></span>` : ''}</div>`;
+</div>`;
     }).join('');
     // By status: each status is a row that opens to show its projects (closed by default; a search opens every row).
     const rows = byClientView ? '' : groups.map((g) => {
@@ -2305,7 +2305,6 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         const real = g.name !== 'ללא לקוח', lg = real && clientLogo(g.name);
         label = clientLogoHtml(g.name, lg, 'pg-logo', 'pg-logo') + `<span class="pg-name">${esc(g.name)}</span>`;
         sum = statusSum(g.items);
-        if (real) acts = `<span class="pg-acts">${lg ? `<button type="button" class="ptile-act" data-logo-del title="הסרת הלוגו">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${lg ? 'החלפת הלוגו של הלקוח' : 'הוספת לוגו ללקוח'}">🖼</button></span>`;
       } else {
         const clients = new Set(g.items.map(clientKey).filter(Boolean)).size;
         label = g.status ? pill(PROJECT_STATUS, g.status) : `<span class="pg-name">${esc(g.name)}</span>`;
