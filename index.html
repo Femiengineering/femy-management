@@ -268,6 +268,28 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .ptile { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); cursor: pointer; font-size: 12px; line-height: 1.3; min-width: 0; }
 .ptile:hover { border-color: var(--primary); background: var(--primary-soft); }
 .ptile.s-done { opacity: .65; }
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; align-items: start; }
+.ccard { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; transition: border-color .15s, box-shadow .15s; }
+.ccard:hover { border-color: var(--primary); }
+.ccard.open { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.ccard-main { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 12px 10px 10px; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: center; border-radius: var(--radius); }
+.ccard-main:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ccard-logo { width: 100%; height: 96px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.ccard-logo img { max-width: 92%; max-height: 88px; object-fit: contain; }
+.ccard-av { width: 60px; height: 60px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; }
+.ccard-name { font-weight: 700; font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccard-sum { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; color: var(--muted); font-size: 11px; min-height: 15px; }
+.ccard-sum span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.ccard-count { font-size: 12px; color: var(--muted); font-weight: 600; }
+.ccard-acts { position: absolute; top: 16px; inset-inline-end: 14px; display: flex; gap: 3px; opacity: 0; transition: opacity .15s; }
+.ccard:hover .ccard-acts, .ccard:focus-within .ccard-acts { opacity: 1; }
+@media (hover: none) { .ccard-acts { opacity: 1; } }
+.cpanel { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; }
+.cpanel.open { grid-template-rows: 1fr; }
+.cpanel-inner { min-height: 0; overflow: hidden; }
+.cpanel .ptile-grid { background: var(--surface); border: 1px solid var(--primary); border-radius: var(--radius); padding: 10px; }
+@media (prefers-reduced-motion: reduce) { .cpanel { transition: none; } }
+@media (max-width: 520px) { .cgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ccard-logo { height: 76px; } .ccard-logo img { max-height: 70px; } }
 .pgroup-top { display: flex; align-items: center; }
 .pgroup-top .pgroup-head { flex: 1; min-width: 0; }
 .pg-acts { display: flex; gap: 3px; padding-inline-end: 8px; flex: none; }
@@ -1360,7 +1382,7 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     mail: { title: 'מיילים', render: renderMailbox },
     settings: { title: 'הגדרות וגיבוי', render: renderSettings },
   };
-  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'client', projQ: '', projOpen: {}, projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
+  const ui = { taskView: 'projects', taskOpenDone: {}, taskFilter: { q: '', project: '', assignee: '', priority: '' }, invFilter: { q: '', type: '', status: '', project: '' }, dashStatus: '', projGroup: 'client', projQ: '', projOpen: {}, projClient: '', projectId: '', projTaskDone: false, protoQ: '', protoGroup: 'project', protoKind: 'meeting', protoMore: {}, protoOpenGroup: '', protoProject: '', protoTpl: '', openProto: null, contactQ: '', gTab: 'calendar', gMailQ: '', gMailF: 'inbox', gMailOpen: '', gMailList: null, gMailConv: null, gDriveQ: '', gDrivePath: [], projDrive: { pid: '', path: [], q: '' } };
 
   const $ = (sel, el) => (el || document).querySelector(sel);
   const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
@@ -1992,8 +2014,20 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
     }
     const statusSum = (items) => STATUS_ORDER.map((s) => { const n = items.filter((p) => p.status === s).length; const st = byId(PROJECT_STATUS, s);
       return n ? `<span title="${esc(st.label)}"><span class="pdot ${st.color}"></span>${n} ${esc(st.label)}</span>` : ''; }).join('');
-    // Each client / status is a row that opens to show its projects (closed by default; a search opens every row).
-    const rows = groups.map((g) => {
+    // By client: each client is a card with a big logo; clicking it opens its projects under the cards' line (one at a time).
+    const cards = !byClientView ? '' : groups.map((g) => {
+      const real = g.name !== 'ללא לקוח', lg = real && clientLogo(g.name);
+      return `<div class="ccard" data-client="${esc(g.name)}">
+        <button type="button" class="ccard-main" aria-expanded="false" title="${esc(g.name)}">
+          <span class="ccard-logo">${lg ? `<img data-photo="${esc(lg)}" alt="">` : avatarHtml(g.name, 'ccard-av')}</span>
+          <span class="ccard-name">${esc(g.name)}</span>
+          <span class="ccard-sum">${statusSum(g.items)}</span>
+          <span class="ccard-count">${g.items.length} פרויקטים</span>
+        </button>
+        ${real ? `<span class="ccard-acts">${lg ? `<button type="button" class="ptile-act" data-logo-del title="הסרת הלוגו">✕</button>` : ''}<button type="button" class="ptile-act" data-logo title="${lg ? 'החלפת הלוגו של הלקוח' : 'הוספת לוגו ללקוח'}">🖼</button></span>` : ''}</div>`;
+    }).join('');
+    // By status: each status is a row that opens to show its projects (closed by default; a search opens every row).
+    const rows = byClientView ? '' : groups.map((g) => {
       const open = !!q || !!ui.projOpen[g.key];
       let label, sum, acts = '';
       if (byClientView) {
@@ -2016,10 +2050,10 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
         <input class="input search" id="prq" placeholder="חיפוש פרויקט או לקוח..." value="${esc(ui.projQ)}">
         <span class="hint">${all.length} פרויקטים</span>
         <span class="spacer"></span>
-        ${q || !all.length ? '' : '<a href="#" class="hint" data-pg-all>פתיחת הכל</a>'}
+        ${q || !all.length || byClientView ? '' : '<a href="#" class="hint" data-pg-all>פתיחת הכל</a>'}
         ${isAdmin() ? '<button class="btn" id="driveImportBtn" title="מוסיף פרויקטים מתיקיית פרויקטים פמי שעדיין אינם במערכת">📁 ייבוא פרויקטים מה-Drive</button>' : ''}
       </div>
-      ${all.length ? `<div class="plist">${rows}</div>` : `<div class="card empty">${q ? 'לא נמצאו פרויקטים' : 'אין פרויקטים עדיין. לחצו על "פרויקט חדש" כדי להוסיף.'}</div>`}
+      ${all.length ? (byClientView ? `<div class="cgrid">${cards}</div>` : `<div class="plist">${rows}</div>`) : `<div class="card empty">${q ? 'לא נמצאו פרויקטים' : 'אין פרויקטים עדיין. לחצו על "פרויקט חדש" כדי להוסיף.'}</div>`}
       <input type="file" accept="image/*" id="logoFile" hidden>`;
     $('#prq', el).addEventListener('input', (e) => { ui.projQ = e.target.value; renderProjects(el); const i = $('#prq', el); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
     $$('#projViews button', el).forEach((b) => b.addEventListener('click', () => { ui.projGroup = b.dataset.v; renderProjects(el); }));
@@ -2038,15 +2072,41 @@ body.mb-cfull-open::after { content: ''; position: fixed; inset: 0; background: 
       if (!f || !name) return;
       try { clientLogos()[name] = await makeLogo(f); save(); renderProjects(el); toast('הלוגו נשמר'); } catch (e) { toast('לא ניתן לטעון את התמונה'); }
     });
-    $$('.pg-acts', el).forEach((a) => a.addEventListener('click', (e) => {
-      const name = a.closest('.pgroup').dataset.client; if (!name) return;
+    $$('.ccard-acts', el).forEach((a) => a.addEventListener('click', (e) => {
+      const name = a.closest('.ccard').dataset.client; if (!name) return;
       if (e.target.closest('[data-logo]')) { logoFor = name; file.click(); }
       else if (e.target.closest('[data-logo-del]')) {
         delete clientLogos()[name]; db.projects.forEach((x) => { if (x.logo && clientKey(x) === name) delete x.logo; });
         save(); renderProjects(el);
       }
     }));
-    $$('.ptile', el).forEach((c) => c.addEventListener('click', () => { location.hash = 'project/' + encodeURIComponent(c.dataset.id); }));
+    const bindTiles = (root) => $$('.ptile', root).forEach((c) => c.addEventListener('click', () => { location.hash = 'project/' + encodeURIComponent(c.dataset.id); }));
+    bindTiles(el);
+    // The open client's projects: a full-width panel placed after the last card on the open card's line.
+    const grid = $('.cgrid', el);
+    if (grid) {
+      const place = (name, animate) => {
+        const old = $('.cpanel', grid); if (old) old.remove();
+        $$('.ccard', grid).forEach((c) => { const on = c.dataset.client === name; c.classList.toggle('open', on); $('.ccard-main', c).setAttribute('aria-expanded', on); });
+        const card = name && $$('.ccard', grid).find((c) => c.dataset.client === name);
+        const g = card && groups.find((x) => x.name === name);
+        if (!g) return;
+        const line = $$('.ccard', grid).filter((c) => c.offsetTop === card.offsetTop);
+        const panel = document.createElement('div'); panel.className = 'cpanel' + (animate ? '' : ' open');
+        panel.innerHTML = `<div class="cpanel-inner"><div class="ptile-grid">${g.items.map(projTile).join('')}</div></div>`;
+        line[line.length - 1].after(panel); bindTiles(panel);
+        if (animate) requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
+      };
+      $$('.ccard-main', grid).forEach((b) => b.addEventListener('click', () => {
+        const name = b.closest('.ccard').dataset.client;
+        ui.projClient = ui.projClient === name ? '' : name; place(ui.projClient, true);
+      }));
+      const start = q && groups.length === 1 ? groups[0].name : ui.projClient;
+      if (start) place(start, false);
+      let w = grid.clientWidth;
+      const ro = new ResizeObserver(() => { if (!grid.isConnected) { ro.disconnect(); return; } if (grid.clientWidth !== w) { w = grid.clientWidth; const o = $('.ccard.open', grid); if (o) place(o.dataset.client, false); } });
+      ro.observe(grid);
+    }
     fillPhotos(el);
   }
 
